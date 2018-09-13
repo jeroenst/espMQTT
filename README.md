@@ -19,8 +19,13 @@ Features:
 - Debug interface via telnet
 - Read a Growatt Solar Inverter
 - Read a watermeter with use of a hall sensor (needs external eeprom to store counter)
+- Read a Smartmeter via P1 port
+- Communicate with a boiler and thermostat via an opentherm gateway
 - Control the outputs of a sonoff device
 - Read a MHZ19 co2 sensor
 - Read a DHT22 temperature/humidity sensor
 - Read a special board for measuring power consumption of up to 14 devices
-
+- Read fanspeed from a ducobox ventilation unit
+- Measure sound pressure (not finished yet)
+- Measure soil humidity (not finished yet)
+-
