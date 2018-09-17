@@ -499,7 +499,7 @@ void handle_watermeter()
   }
   oldinputpinstate = inputpinstate;
 
-  if ((watermeter_lmin > 0.5) && (lmincountdownmillis < millis()))
+  if ((watermeter_lmin > 0) && (lmincountdownmillis < millis()))
   {
       watermeter_lmin = watermeter_lmin / 2;
       lmincountdownmillis = millis() + (60000 / watermeter_lmin) + 1000;
