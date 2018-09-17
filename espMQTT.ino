@@ -8,11 +8,11 @@
 //#define SONOFFDUAL
 //#define OLDBATHROOM
 //#define SMARTMETER
-//#define WATERMETER
+#define WATERMETER
 //#define NOISE
 //#define IRRIGATION
 //#define SOIL
-#define GROWATT
+//#define GROWATT
 
 #ifdef NOISE
 #define ESPNAME "NOISE"
@@ -323,16 +323,17 @@ void update_systeminfo(bool writestaticvalues = false)
     putdatamap("sourcefile", String(__FILE__).substring(String(__FILE__).lastIndexOf('/') + 1));
     putdatamap("compiletime", String(__DATE__) + " " + __TIME__);
     putdatamap("chipid", String(chipid));
+    putdatamap("status", "online");
   }
   putdatamap("uptime", String(uptimestr), uptime % 60 == 0);
   putdatamap("freeram", String(system_get_free_heap_size()), uptime % 60 == 0);
-  putdatamap("wifi/state", WiFi.status() == WL_CONNECTED ? "Connected" : "Disconnected");
+  putdatamap("wifi/state", WiFi.status() == WL_CONNECTED ? "connected" : "disconnected");
   putdatamap("wifi/localip", WiFi.localIP().toString());
   putdatamap("wifi/ssid", String(WiFi.SSID()));
   putdatamap("wifi/rssi", String(WiFi.RSSI()), uptime % 10 == 0);
   putdatamap("wifi/channel", String(WiFi.channel()));
   putdatamap("mqtt/server", String(mqtt_server));
-  putdatamap("mqtt/state", mqttclient.connected() ? "Connected" : "Disconnected");
+  putdatamap("mqtt/state", mqttclient.connected() ? "connected" : "disconnected");
 }
 
 
@@ -475,53 +476,39 @@ void handle_watermeter()
   static uint16_t lmincountdowntimer = 0;
   static long long lmincountdownmillis = 0;
   static long long last_pulse_time = 0;
-  static long long last_liter_pulse_time = 0;
   static bool oldinputpinstate = digitalRead(WATERPULSEPIN);
   bool inputpinstate = digitalRead(WATERPULSEPIN);
   digitalWrite(NODEMCULEDPIN, !inputpinstate);
-  if ((inputpinstate != oldinputpinstate))
+  if ((inputpinstate != oldinputpinstate) && (inputpinstate == 0))
   {
-    long pulse_time = millis() - last_pulse_time;
+    long long pulse_time = millis() - last_pulse_time;
     last_pulse_time = millis();
-    if (pulse_time > 600) // Filter pulses less than 600 ms which is more than 100l/min
+    if (pulse_time > 1200) // Filter pulses less than 1200 ms which is more than 50l/min which is bouncing
     {
-      oldinputpinstate = inputpinstate;
-      if (inputpinstate == 0)
-      {
-        uint16_t liter_pulse_time = millis() - last_liter_pulse_time;
-        DEBUG("Watermeter Last Liter Pulsetime=%ld\n", liter_pulse_time);
-        watermeter_lmin = double(60000) / liter_pulse_time;
-        watermeter_liter++;
-        writeWatermeterCounterToI2cEeprom(watermeter_liter);
-        lmincountdowntimer = (liter_pulse_time / 1000) * 2;
-        float m3h = 0;
-        last_liter_pulse_time = pulse_time;
-        putdatamap("water/liter", String(watermeter_liter));
-        putdatamap("water/lmin", String(watermeter_lmin, 1));
-        putdatamap("water/m3", String(double(watermeter_liter) / 1000, 3));
-        putdatamap("water/m3h", String(double(watermeter_lmin) * 0.06, 2));
-        last_liter_pulse_time = millis();
-      }
+      DEBUG("Watermeter Last Liter Pulsetime=%ld\n", pulse_time);
+      watermeter_lmin = double(60000) / pulse_time;
+      watermeter_liter++;
+      writeWatermeterCounterToI2cEeprom(watermeter_liter);
+      lmincountdownmillis = millis() + (pulse_time * 2);
+      float m3h = 0;
+      putdatamap("water/liter", String(watermeter_liter));
+      putdatamap("water/lmin", String(watermeter_lmin, 1));
+      putdatamap("water/m3", String(double(watermeter_liter) / 1000, 3));
+      putdatamap("water/m3h", String(double(watermeter_lmin) * 0.06, 2));
     }
   }
+  oldinputpinstate = inputpinstate;
 
-  if ((lmincountdowntimer > 0) && (lmincountdownmillis + 1000 < millis()))
+  if ((watermeter_lmin > 0.5) && (lmincountdownmillis < millis()))
   {
-    lmincountdowntimer--;
-    DEBUG("lmincountdowntimer=%d\n", lmincountdowntimer);
-    lmincountdownmillis = millis();
-    if (lmincountdowntimer == 0)
-    {
       watermeter_lmin = watermeter_lmin / 2;
-      lmincountdowntimer = (60 / watermeter_lmin) + 1;
-      if (watermeter_lmin < 0.5)
+      lmincountdownmillis = millis() + (60000 / watermeter_lmin) + 1000;
+      if (watermeter_lmin <= 0.5)
       {
         watermeter_lmin = 0;
-        lmincountdowntimer = 0;
       }
       putdatamap("water/lmin", String(watermeter_lmin, 1));
       putdatamap("water/m3h", String(double(watermeter_lmin) * 0.06, 2));
-    }
   }
 }
 #endif
@@ -870,8 +857,6 @@ void loop()
 #ifdef DUCOBOX
           mqttclient.subscribe(("home/" + WiFi.hostname() + "/setfan").c_str());
 #endif
-          DEBUG("Publishing status online to MQTT...\n");
-          mqttclient.publish(String("home/" + WiFi.hostname() + "/status").c_str(), "online", true);
         }
       }
     }
@@ -955,49 +940,6 @@ void write_eeprom(String data, byte eepromindex)
   }
   EEPROM.commit();
 }
-
-#ifdef MAINPOWERMETER
-void init_mainpowermeter()
-{
-  system_update_cpu_freq(160);
-  initADS(ADS0_CS_PIN, ADS0_RDY_PIN);
-  initADS(ADS1_CS_PIN, ADS1_RDY_PIN);
-}
-
-void update_mainpowermeter()
-{
-  // Every round update a circuit channel
-  static uint8_t i = 0;
-
-  int32_t powermeter_mW = 0;
-  int32_t powermeter_mVA = 0;
-  int32_t powermeter_mA = 0;
-  int32_t powermeter_mV = 0;
-
-  // Read 10 samples from a circuit
-  for (uint8_t y = 0; y < 10; y++)
-  {
-    int32_t powermeterpart_mW = 0;
-    int32_t powermeterpart_mVA = 0;
-    int32_t powermeterpart_mA = 0;
-    int32_t powermeterpart_mV = 0;
-    readADSpower(i, &powermeterpart_mA, &powermeterpart_mV, &powermeterpart_mW, &powermeterpart_mVA);
-    powermeter_mW += powermeterpart_mW / 10;
-    powermeter_mVA += powermeterpart_mVA / 10;
-    powermeter_mA += powermeterpart_mA / 10;
-    powermeter_mV += powermeterpart_mV / 10;
-  }
-
-  DEBUG("Circuit %d:%dmV, %dmA, %dmW, %dmVA\n", i + 1, powermeter_mV, powermeter_mA, powermeter_mW, powermeter_mVA);
-  putdatamap(String("circuit/") + (i + 1) + "/V", String(powermeter_mV / 1000));
-  putdatamap(String("circuit/") + (i + 1) + "/mA", String(powermeter_mA));
-  putdatamap(String("circuit/") + (i + 1) + "/W", String(powermeter_mW / 1000));
-  putdatamap(String("circuit/") + (i + 1) + "/VA", String(powermeter_mVA / 1000));
-
-  i++;
-  if (i == 14) i = 0;
-}
-#endif
 
 void publishdatamap()
 {
@@ -1111,39 +1053,68 @@ void timerCallback(void *pArg)
 #ifdef GROWATT
 void growatt_send_command(uint8_t c1)
 {
-    DEBUG("Requesting Growatt Data %#02x...\n");
-    uint8_t TxBuffer[10];
-    TxBuffer[0] = 0x3F;
-    TxBuffer[1] = 0x23;
-    TxBuffer[2] = 0x01;
-    TxBuffer[3] = 0x32;
-    TxBuffer[4] = c1;
-    TxBuffer[5] = 0x00;
-    uint16_t wStringSum = 0;
-    for (int i = 0; i < 6; i++)
-    {
-      wStringSum = wStringSum + (TxBuffer[i] ^ i);
-      if (wStringSum == 0 || wStringSum > 0xFFFF) wStringSum = 0xFFFF;
-    }
-    TxBuffer[6] = wStringSum >> 8;
-    TxBuffer[7] = wStringSum & 0xFF;
-    for (int i = 0; i < 8; i++) 
-    {
-      DEBUG ("Sending to Growatt inverter: %#02x\n", TxBuffer[i]);
-      Serial.write(TxBuffer[i]);
-    }
+  DEBUG("Requesting Growatt Data %#02x...\n");
+  uint8_t TxBuffer[10];
+  TxBuffer[0] = 0x3F;
+  TxBuffer[1] = 0x23;
+  TxBuffer[2] = 0x01;
+  TxBuffer[3] = 0x32;
+  TxBuffer[4] = c1;
+  TxBuffer[5] = 0x00;
+  uint16_t wStringSum = 0;
+  for (int i = 0; i < 6; i++)
+  {
+    wStringSum = wStringSum + (TxBuffer[i] ^ i);
+    if (wStringSum == 0 || wStringSum > 0xFFFF) wStringSum = 0xFFFF;
+  }
+  TxBuffer[6] = wStringSum >> 8;
+  TxBuffer[7] = wStringSum & 0xFF;
+  for (int i = 0; i < 8; i++)
+  {
+    DEBUG ("Sending to Growatt inverter: %#02x\n", TxBuffer[i]);
+    Serial.write(TxBuffer[i]);
+  }
 }
 
 void growatt_read()
 {
-  static long long lastupdatetime = 0;
+  static long long nextupdatetime = 0;
   static uint8_t RxBuffer[50];
   static uint8_t RxBufferPointer = 0;
-  if (millis() > lastupdatetime + 10000)
+  static bool RxPowerDataOk = 0;
+  static bool firstRun = 1;
+
+  if (millis() > nextupdatetime)
   {
     RxBufferPointer = 0;
+
+    if (!RxPowerDataOk)
+    {
+      putdatamap("inverterstatus", "offline");
+      putdatamap("pv/1/volt", "-");
+      putdatamap("pv/2/volt", "-");
+      putdatamap("pv/watt", "-");
+      putdatamap("grid/volt", "-");
+      putdatamap("grid/amp", "-");
+      putdatamap("grid/frequency", "-");
+      putdatamap("grid/watt", "-");
+      putdatamap("fault/temperature", "-");
+      putdatamap("fault/type", "-");
+      putdatamap("temperature", "-");
+      putdatamap("status", "commerror");
+    }
+    RxPowerDataOk = 0;
+
+    if (firstRun)
+    {
+      putdatamap("grid/today/kwh", "-");
+      putdatamap("grid/total/kwh", "-");
+      putdatamap("grid/total/hour", "-");
+      firstRun = 0;
+    }
     growatt_send_command(0x41);
-    lastupdatetime = millis();
+    putdatamap("status", "querying");
+    nextupdatetime = millis() + 10000;
   }
 
   if (Serial.available())
@@ -1159,10 +1130,10 @@ void growatt_read()
       }
       RxBufferPointer++;
     }
-    else 
+    else
     {
-       DEBUG("Serial Buffer Overflow!!\n");
-       RxBufferPointer = 0;
+      DEBUG("Serial Buffer Overflow!!\n");
+      RxBufferPointer = 0;
     }
     if (RxBufferPointer > 5)
     {
@@ -1171,45 +1142,49 @@ void growatt_read()
         double value = 0;
         uint32_t intvalue = 0;
         DEBUG("Received complete message from Growatt Inverter...\n");
-        if ((RxBuffer[3] == 0x32) && (RxBuffer[4] == 0x41) && (RxBufferPointer >= 34)) 
+        if ((RxBuffer[3] == 0x32) && (RxBuffer[4] == 0x41) && (RxBufferPointer >= 34))
         {
           DEBUG("Received power data from Growatt Inverter...\n");
-          value = (uint16_t(RxBuffer[7]) << 8) + RxBuffer[6];
-          putdatamap("inverterstatus", value == 0 ? "Waiting" : value == 1 ? "Ready" : value == 3 ? "Fault" : "Unknown");
+          intvalue = RxBuffer[6];
+          putdatamap("inverterstatus/value", String(intvalue));
+          putdatamap("inverterstatus", intvalue == 0 ? "waiting" : intvalue == 1 ? "ready" : intvalue == 3 ? "fault" : "unknown");
           value = ((uint16_t(RxBuffer[7]) << 8) + RxBuffer[8]) / 10;
-          putdatamap("pv/1/volt", String(value,1));
+          putdatamap("pv/1/volt", String(value, 1));
           value = ((uint16_t(RxBuffer[9]) << 8) + RxBuffer[10]) / 10;
-          putdatamap("pv/2/volt", String(value,1));
+          putdatamap("pv/2/volt", String(value, 1));
           value = ((uint16_t(RxBuffer[11]) << 8) + RxBuffer[12]) / 10;
-          putdatamap("pv/watt", String(value,1));
+          putdatamap("pv/watt", String(value, 1));
           value = ((uint16_t(RxBuffer[13]) << 8) + RxBuffer[14]) / 10;
-          putdatamap("grid/volt", String(value,1));
+          putdatamap("grid/volt", String(value, 1));
           value = ((uint16_t(RxBuffer[15]) << 8) + RxBuffer[16]) / 10;
-          putdatamap("grid/amp", String(value,1));
+          putdatamap("grid/amp", String(value, 1));
           value = ((uint16_t(RxBuffer[17]) << 8) + RxBuffer[18]) / 100;
-          putdatamap("grid/frequency", String(value,1));
+          putdatamap("grid/frequency", String(value, 1));
           value = ((uint16_t(RxBuffer[19]) << 8) + RxBuffer[20]) / 10;
-          putdatamap("grid/watt", String(value,1));
+          putdatamap("grid/watt", String(value, 1));
           value = ((uint16_t(RxBuffer[33]) << 8) + RxBuffer[34]) / 10;
-          putdatamap("fault/temperature", String(value,1));
+          putdatamap("fault/temperature", String(value, 1));
           intvalue = ((uint16_t(RxBuffer[35]) << 8) + RxBuffer[36]);
           putdatamap("fault/type", String(intvalue));
           value = ((uint16_t(RxBuffer[37]) << 8) + RxBuffer[38]) / 10;
-          putdatamap("temperature", String(value,1));
+          putdatamap("temperature", String(value, 1));
+          RxPowerDataOk = 1;
           growatt_send_command(0x42);
         }
-        if ((RxBuffer[3] == 0x32) && (RxBuffer[4] == 0x42) && (RxBufferPointer >= 22)) 
+        if ((RxBuffer[3] == 0x32) && (RxBuffer[4] == 0x42) && (RxBufferPointer >= 22))
         {
           DEBUG("Received energy data from Growatt Inverter...\n");
           value = ((uint16_t(RxBuffer[13]) << 8) + RxBuffer[14]) / 10;
-          putdatamap("grid/today/kwh", String(value,1));
+          if (getdatamap("pv/1/volt").toInt() > 100) putdatamap("grid/today/kwh", String(value, 1)); // Only reset today value when pv 1 volt is above 100 volt (steady voltage) otherwise this gets resets during shutdown
+          else if (getdatamap("grid/today/kwh") == "-") putdatamap("grid/today/kwh", "0.0"); // If inverter is active change - of today kwh to 0.0
           value = ((uint32_t(RxBuffer[15]) << 24) + (uint32_t(RxBuffer[16]) << 16) + (uint16_t(RxBuffer[17]) << 8) + RxBuffer[18]) / 10;
-          putdatamap("grid/total/kwh", String(value,1));
+          putdatamap("grid/total/kwh", String(value, 1));
           intvalue = ((uint32_t(RxBuffer[19]) << 24) + (uint32_t(RxBuffer[20]) << 16) + (uint16_t(RxBuffer[21]) << 8) + RxBuffer[22]);
           putdatamap("grid/total/hour", String(intvalue));
+          putdatamap("status", "ready");
         }
         RxBufferPointer = 0;
-      }     
+      }
     }
   }
 }
@@ -1251,6 +1226,18 @@ int ducobox_handle()
   int returnvalue = 0;
   String topic = "";
   String ducovalue = "";
+  static bool firstrun = 1;
+
+  if (firstrun)
+  {
+    putdatamap("1/fanspeed", "-");
+    putdatamap("1/minfanspeed", "-");
+    putdatamap("2/co2", "-");
+    putdatamap("2/co2/retries", "-");
+    putdatamap("2/temperature", "-");
+    putdatamap("2/temperature/retries", "-");
+    firstrun = 0;
+  }
 
   static WiFiClient ducoclient;
   if (!ducoclient || !ducoclient.connected()) ducoclient = ducoserver.available();
@@ -1346,11 +1333,21 @@ int ducobox_handle()
         {
           case 2:
             // Read node 2 temperature
-            if (ducomessage != "") ducovalue = String(float(ducomessage.substring(6).toInt()) / 10, 1);
-            else ducovalue = "NaN";
+            static uint8_t tempretry = 0;
+            if (ducomessage != "")
+            {
+              ducovalue = String(float(ducomessage.substring(6).toInt()) / 10, 1);
+              putdatamap("2/temperature", ducovalue);
+              tempretry = 0;
+            }
+            else
+            {
+              tempretry++;
+              if (tempretry == 0) tempretry--;
+            }
+            if (tempretry == 10) putdatamap("2/temperature", "-");
+            putdatamap("2/temperature/retries", String(tempretry));
             DEBUG("DUCOBOX NODE 2 TEMPERATURE=%s\n", ducovalue.c_str());
-            topic = "2/temperature";
-            putdatamap(topic, ducovalue);
             returnvalue = 1;
 
             DEBUG("Requesting CO2 from node 2 from ducobox...\n");
@@ -1359,11 +1356,21 @@ int ducobox_handle()
             break;
           case 3:
             // Read node 2 co2
-            if (ducomessage != "") ducovalue = ducomessage.substring(6);
-            else ducovalue = "NaN";
+            static uint8_t co2retry = 0;
+            if (ducomessage != "")
+            {
+              ducovalue = ducomessage.substring(6);
+              putdatamap("2/co2", ducovalue);
+              co2retry = 0;
+            }
+            else
+            {
+              co2retry++;
+              if (co2retry == 0) co2retry--;
+            }
+            if (co2retry == 10) putdatamap("2/co2", "-");
+            putdatamap("2/co2/retries", String(co2retry));
             DEBUG("DUCOBOX NODE 2 CO2=%s\n", ducovalue.c_str());
-            topic = "2/co2";
-            putdatamap(topic, ducovalue);
             returnvalue = 1;
 
             ducocmd = 4;
@@ -1377,8 +1384,9 @@ int ducobox_handle()
         static uint16_t co2 = 0;
         static uint8_t fanspeed = 0;
         static uint8_t oldfanspeed = 255;
-        if (getdatamap("2/co2") != "NaN")
+        if (getdatamap("2/co2") != "-")
         {
+          co2 = getdatamap("2/co2").toInt();
           DEBUG ("CO2=%d\n", co2);
           switch (fanspeed)
           {
@@ -1882,6 +1890,48 @@ void handleWWWRoot() {
 }
 
 #ifdef MAINPOWERMETER
+void init_mainpowermeter()
+{
+  system_update_cpu_freq(160);
+  initADS(ADS0_CS_PIN, ADS0_RDY_PIN);
+  initADS(ADS1_CS_PIN, ADS1_RDY_PIN);
+}
+
+void update_mainpowermeter()
+{
+  //debugvoltread();
+  //return;
+  // Every round update a circuit channel
+  static uint8_t i = 0;
+
+  int32_t powermeter_mW = 0;
+  int32_t powermeter_mVA = 0;
+  int32_t powermeter_mA = 0;
+  int32_t powermeter_mV = 0;
+
+  // Read 10 samples from a circuit
+  for (uint8_t y = 0; y < 10; y++)
+  {
+    int32_t powermeterpart_mW = 0;
+    int32_t powermeterpart_mVA = 0;
+    int32_t powermeterpart_mA = 0;
+    int32_t powermeterpart_mV = 0;
+    readADSpower(i, &powermeterpart_mA, &powermeterpart_mV, &powermeterpart_mW, &powermeterpart_mVA);
+    powermeter_mW += powermeterpart_mW / 10;
+    powermeter_mVA += powermeterpart_mVA / 10;
+    powermeter_mA += powermeterpart_mA / 10;
+    powermeter_mV += powermeterpart_mV / 10;
+  }
+
+  DEBUG("Circuit %d:%dmV, %dmA, %dmW, %dmVA\n", i + 1, powermeter_mV, powermeter_mA, powermeter_mW, powermeter_mVA);
+  if (i==0) putdatamap("mainsvoltage", String(powermeter_mV / 1000));
+  putdatamap("circuit/" + String((i + 1)) + "/mA", String(powermeter_mA));
+  putdatamap("circuit/" + String((i + 1)) + "/W", String(powermeter_mW / 1000));
+  putdatamap("circuit/" + String((i + 1)) + "/VA", String(powermeter_mVA / 1000));
+
+  i++;
+  if (i == 14) i = 0;
+}
 
 void initADS(byte cspin, byte drdypin)
 {
@@ -1930,7 +1980,6 @@ void initADS(byte cspin, byte drdypin)
   SPI.transfer(0x00);   // 2nd command byte, write one register only
   SPI.transfer(drate_data);   // write the databyte to the register
   delayMicroseconds(10);
-
 
   //done with settings, can close SPI transaction now
   digitalWrite(cspin, HIGH); //unselect ADS
@@ -2053,6 +2102,25 @@ long readADSac(byte cspin, byte drdypin)
   return max(long(acm_val / 2) - 252, long(0)); // Filter noise
 }
 
+void debugvoltread()
+{
+   setADSch(ADS0_CS_PIN, ADS0_RDY_PIN, 7); // Volt
+   while (!digitalRead(ADS0_RDY_PIN)) {}; // Wait for DRDY pin to become high..
+   while (digitalRead(ADS0_RDY_PIN)) {} ; // Wait for DRDY pin to become low..
+
+    uint32_t adc_val_volt = 0;
+    digitalWrite(ADS0_CS_PIN, LOW);
+    adc_val_volt = 0;
+    adc_val_volt = SPI.transfer(0);
+    adc_val_volt <<= 8; //shift to left
+    adc_val_volt |= SPI.transfer(0);
+    adc_val_volt <<= 8;
+    adc_val_volt |= SPI.transfer(0);
+    digitalWrite(ADS0_CS_PIN, HIGH);
+
+    DEBUG("ADC READ=%d\n", adc_val_volt);
+}
+
 byte readADSpower(byte adchannel, int32 * mA, int32 * mV, int32 * mW, int32 * mVA)
 {
 #define NROFSAMPLES 250
@@ -2075,14 +2143,14 @@ byte readADSpower(byte adchannel, int32 * mA, int32 * mV, int32 * mW, int32 * mV
   if (adchannel < 7)
   {
     ac_mA_offset = 5; // Offset ad 0
-    ac_mA_gain = 1.07; // Gain ad 0
+    ac_mA_gain = 0.01168; // Gain ad 0
     adc_cs_amp_pin = ADS0_CS_PIN;
     adc_drdy_amp_pin = ADS0_RDY_PIN;
     setADSch(ADS0_CS_PIN, ADS0_RDY_PIN, adchannel); // Amps
 
 
     ac_mV_offset = 0; // Offset ad 1
-    ac_mV_gain = 1; // Gain ad 1
+    ac_mV_gain = 0.092; // Gain ad 1
     adc_cs_volt_pin = ADS1_CS_PIN;
     adc_drdy_volt_pin = ADS1_RDY_PIN;
     setADSch(ADS1_CS_PIN, ADS1_RDY_PIN, 7); // Volt
@@ -2090,13 +2158,13 @@ byte readADSpower(byte adchannel, int32 * mA, int32 * mV, int32 * mW, int32 * mV
   else if (adchannel < 14)
   {
     ac_mA_offset = 2; // Offset ad 1
-    ac_mA_gain = 1.07; // Gain ad 1
+    ac_mA_gain = 0.01168; // Gain ad 1
     adc_cs_amp_pin = ADS1_CS_PIN;
     adc_drdy_amp_pin = ADS1_RDY_PIN;
     setADSch(ADS1_CS_PIN, ADS1_RDY_PIN, adchannel - 7); // Amps
 
     ac_mV_offset = 0; // Offset ad 0 mV
-    ac_mV_gain = 1; // Gain ad 0
+    ac_mV_gain = 0.092; // Gain ad 0
     adc_cs_volt_pin = ADS0_CS_PIN;
     adc_drdy_volt_pin = ADS0_RDY_PIN;
     setADSch(ADS0_CS_PIN, ADS0_RDY_PIN, 7); // Volt
@@ -2148,17 +2216,21 @@ byte readADSpower(byte adchannel, int32 * mA, int32 * mV, int32 * mW, int32 * mV
   int64_t sum_mW = 0;
   for (i = 0; i < NROFSAMPLES; i++)
   {
-    ac_mA[i] = (double)(ac_mA[i] - 0x400000) / 85, 56; // Center measurement and calculate mains current in mA
-    ac_mA[i] += ac_mA_offset;
-    ac_mA[i] = (double)ac_mA[i] * ac_mA_gain;
-    sum_mA += abs(ac_mA[i]);
-    //sum_mV += abs(ac_mV[i]);
-    ac_mV[i] = (double)(ac_mV[i] - 0x400000) / 5461;
-    ac_mV[i] += ac_mV_offset;
-    ac_mV[i] = (double)ac_mV[i] * ac_mV_gain;
-    //sum_mV += abs(ac_mV[i]);
-    sum_mV += 238000; // Reading voltage still failes because of defect module
-    sum_mW += int64_t(int64_t(ac_mA[i]) * int64_t(ac_mV[i])) / 1000;
+    double ac_mA_calc = 0;
+    ac_mA_calc = (ac_mA[i] - 0x400000); // Center measurement and calculate mains current in mA
+    ac_mA_calc += ac_mA_offset;
+    ac_mA_calc *= ac_mA_gain;
+    sum_mA += abs(ac_mA_calc);
+
+    double ac_mV_calc = 0;
+    ac_mV_calc = (ac_mV[i] - 0x400000);
+    ac_mV_calc += ac_mV_offset;
+    ac_mV_calc *= ac_mV_gain;
+    sum_mV += abs(ac_mV_calc);
+
+    ac_mV_calc = 236000; // Voltage reading is not working :-(
+    double mW_calc = ac_mA_calc * ac_mV_calc;
+    sum_mW += mW_calc;
     //ac_val_watt += ((adc_val_amp - 0x3ffef0) * (adc_val_volt - 0x3ffef0))/10000; // Calculate milliwatts
     //DEBUG ("%.3f,%.3f\n", ac_mA[i], ac_volt[i]);
     //DEBUG ("%d\n", ac_mA[i]);
@@ -2167,12 +2239,12 @@ byte readADSpower(byte adchannel, int32 * mA, int32 * mV, int32 * mW, int32 * mV
 
   *mA = sum_mA / NROFSAMPLES;
   *mV = sum_mV / NROFSAMPLES;
-  *mW = sum_mW / NROFSAMPLES;
+  *mW = (sum_mW / NROFSAMPLES) / 1000;
   *mVA = (*mA * *mV) / 1000;
 }
 
 
-
+/*
 
 //Maximum value of ADS
 #define ADC_COUNTS 32768
@@ -2209,7 +2281,6 @@ double squareRoot(double fg)
   }
   return n;
 }
-
 
 
 void calcVI(unsigned int crossings, unsigned int timeout)
@@ -2301,7 +2372,7 @@ void calcVI(unsigned int crossings, unsigned int timeout)
   //-------------------------------------------------------------------------------------------------------------------------
   //Calculation of the root of the mean of the voltage and current squared (rms)
   //Calibration coefficients applied.
-  float multiplier = 0.125F; /* ADS1115 @ +/- 4.096V gain (16-bit results) */
+  float multiplier = 0.125F; // ADS1115 @ +/- 4.096V gain (16-bit results) 
   double V_RATIO = VCAL * multiplier;
   Vrms = V_RATIO * squareRoot(sumV / numberOfSamples);
 
@@ -2328,8 +2399,8 @@ void calcVI(unsigned int crossings, unsigned int timeout)
 
 double calcIrms(unsigned int Number_of_Samples)
 {
-  /* Be sure to update this value based on the IC and the gain settings! */
-  float multiplier = 0.125F;    /* ADS1115 @ +/- 4.096V gain (16-bit results) */
+  // Be sure to update this value based on the IC and the gain settings!
+  float multiplier = 0.125F;    // ADS1115 @ +/- 4.096V gain (16-bit results) 
   for (unsigned int n = 0; n < Number_of_Samples; n++)
   {
     //sampleI = ads0.readADC_Differential_0_1();
@@ -2355,6 +2426,7 @@ double calcIrms(unsigned int Number_of_Samples)
 
   return Irms;
 }
+*/
 #endif
 
 
