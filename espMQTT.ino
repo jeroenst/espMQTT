@@ -8,11 +8,21 @@
 //#define SONOFFDUAL
 //#define OLDBATHROOM
 //#define SMARTMETER
-#define WATERMETER
+//#define WATERMETER
 //#define NOISE
 //#define IRRIGATION
 //#define SOIL
 //#define GROWATT
+#define DIMMER
+
+#ifdef DIMMER
+#define ESPNAME "DIMMER"
+#define PWMOUT D1
+#define ZEROCROSS D2
+#define FLASHBUTTON D3
+#define ESPLED D4
+#include "hw_timer.h"
+#endif
 
 #ifdef NOISE
 #define ESPNAME "NOISE"
@@ -340,7 +350,6 @@ void update_systeminfo(bool writestaticvalues = false)
 
 #ifdef WATERMETER
 uint32_t watermeter_liter = 0;
-double watermeter_lmin = 0;
 #include <Wire.h>
 
 void i2cEepromWriteByte(uint16_t theMemoryAddress, uint8_t u8Byte)
@@ -473,6 +482,7 @@ void init_watermeter()
 
 void handle_watermeter()
 {
+  static double watermeter_lmin = 0;
   static uint16_t lmincountdowntimer = 0;
   static long long lmincountdownmillis = 0;
   static long long last_pulse_time = 0;
@@ -608,6 +618,17 @@ void mqttcallback(char* topic, byte* payload, unsigned int length) {
     }*/
   if (String(topic) == String("home/" + WiFi.hostname() + "/setfan")) ducobox_setfan("mqtt", payloadstring.toInt());
 #endif
+
+#ifdef DIMMER
+  /*  if (String(topic) == String("home/" + WiFi.hostname() + "/setminfanspeed"))
+    {
+      uint16_t minfanspeed = payloadstring.toInt();
+      DEBUG("RECEIVED SETMINFANSPEED %d\n", minfanspeed);
+      if ((minfanspeed > 0) && (minfanspeed <= 3000)) ducobox_minfanspeed = minfanspeed;
+    }*/
+  if (String(topic) == String("home/" + WiFi.hostname() + "/setdimvalue")) dimmer_setdimvalue(payloadstring.toInt());
+  if (String(topic) == String("home/" + WiFi.hostname() + "/setdimstate")) dimmer_setdimstate(payloadstring.toInt() ? 1 : 0);
+#endif
 }
 
 String uint64ToString(uint64_t input) {
@@ -720,9 +741,10 @@ void loop()
   static int8_t oldrssi = 0;
 
   ESP.wdtFeed(); // Prevent HW WD to kick in...
-
   ArduinoOTA.handle();
   Debug.handle();
+
+  
   mqttclient.loop();
   webserver.handleClient();
   yield();
@@ -856,6 +878,10 @@ void loop()
 #endif
 #ifdef DUCOBOX
           mqttclient.subscribe(("home/" + WiFi.hostname() + "/setfan").c_str());
+#endif
+#ifdef DIMMER
+          mqttclient.subscribe(("home/" + WiFi.hostname() + "/setdimvalue").c_str());
+          mqttclient.subscribe(("home/" + WiFi.hostname() + "/setdimstate").c_str());
 #endif
         }
       }
@@ -2490,11 +2516,22 @@ void setup() {
 
   ArduinoOTA.onStart([]() {
     Serial.end();
+#ifdef DIMMER    
+    dimmer_stop();
+#endif
   });
 
   ArduinoOTA.onEnd([]() {
     initSerial();
+#ifdef DIMMER
+    dimmer_init();
+#endif
   });
+
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+//    ESP.wdtFeed();
+  });
+  
   ArduinoOTA.begin();
 
   update_systeminfo(true);
@@ -2590,8 +2627,103 @@ void setup() {
   neopixelleds.setPixelColor(1, neopixelleds.Color(0, 0, 0));
   neopixelleds.show();
 #endif
+
+#ifdef DIMMER
+  dimmer_init();  
+#endif
 }
 
+#ifdef DIMMER
+byte fade = 1;
+byte state = 1;
+byte tarBrightness = 255;
+byte curBrightness = 0;
+byte zcState = 0; // 0 = ready; 1 = processing;
+
+void dimmer_setdimvalue(byte value)
+{
+  DEBUG("Dimmer set %d\n", value);
+  tarBrightness = value;
+  putdatamap ("dimvalue", String(value));
+  dimmer_setdimstate(value ? 1 : 0);
+}
+
+void dimmer_setdimstate(bool value)
+{
+  DEBUG("Dimmer set state %d\n", value);
+  state = value;
+  putdatamap ("dimstate", String(value));
+}
+
+void dimmer_init()
+{
+  DEBUG("Dimmer Init!\n");
+  pinMode(ZEROCROSS, INPUT_PULLUP);
+  digitalWrite(PWMOUT, 0);
+  pinMode(PWMOUT, OUTPUT);
+  hw_timer_init(NMI_SOURCE, 0);
+  hw_timer_set_func(dimTimerISR);
+  attachInterrupt(ZEROCROSS, dimmerzcDetectISR, RISING);
+  dimmer_setdimvalue(0);
+}
+
+void dimmer_stop()
+{
+    DEBUG("Dimmer Stop!\n");
+    detachInterrupt(ZEROCROSS);
+    hw_timer_set_func(0);
+    hw_timer_deinit();
+    digitalWrite(PWMOUT, 0);
+}
+
+void dimmerzcDetectISR() 
+{
+  if (zcState == 0) 
+  {
+    zcState = 1;
+  
+    if (curBrightness < 255) {
+      digitalWrite(PWMOUT, 0);
+    }
+      
+      int dimDelay = 30 * (255 - curBrightness) + 400;
+      hw_timer_arm(dimDelay);
+  }
+}
+
+byte fadedelay = 0;
+
+void dimTimerISR() 
+{
+    if (curBrightness >= 0) 
+    {
+      digitalWrite(PWMOUT, 1);
+    }
+
+    if (fadedelay < 1) fadedelay++;
+    else
+    {
+      fadedelay = 0;
+      if (fade == 1) {
+        if (curBrightness > tarBrightness && curBrightness > 0) {
+          --curBrightness;
+        }
+        else if (curBrightness < tarBrightness && curBrightness < 255 ) {
+          if ((curBrightness == 0) && (tarBrightness > 15)) curBrightness = 15;
+          ++curBrightness;
+        }
+      }
+    }
+
+    if (fade == 0)
+    {
+        curBrightness = tarBrightness;
+    }
+
+
+    zcState = 0;
+}
+#endif
 
 void processCmdRemoteDebug()
 {
