@@ -2,7 +2,7 @@
 //#define BEDROOM2
 //#define GARDEN //ESP8285
 //#define MAINPOWERMETER
-//#define OPENTHERM
+#define OPENTHERM
 //#define SONOFF4CH //ESP8285
 //#define DUCOBOX
 //#define SONOFFDUAL
@@ -13,7 +13,7 @@
 //#define IRRIGATION
 //#define SOIL
 //#define GROWATT
-#define DIMMER
+//#define DIMMER
 
 #ifdef DIMMER
 #define ESPNAME "DIMMER"
@@ -287,6 +287,7 @@ void initSerial()
 #else
   Serial.begin(115200); //Init serial 19200 baud
 #endif
+  Serial.setRxBufferSize(2048); 
 }
 
 String getdatamap(String topic)
@@ -813,10 +814,16 @@ void loop()
 #endif
 
 #ifdef OPENTHERM
-    DEBUG("Requesting DS18B20 temperatures...\n");
-    oneWireSensors.requestTemperatures();
-    if (chReturnWaterEnabled) dataMap->put("chReturnWaterTemperature", dataStruct{String(oneWireSensors.getTempC(chReturnWaterThermometer)), true});
-    if (chSupplyWaterEnabled) dataMap->put("chSupplyWaterTemperature", dataStruct{String(oneWireSensors.getTempC(chSupplyWaterThermometer)), true});
+    static uint8_t ds18b20timer = 0;
+    if (ds18b20timer == 0)
+    {
+      ds18b20timer = 10;
+      DEBUG("Requesting DS18B20 temperatures...\n");
+      oneWireSensors.requestTemperatures();
+      if (chReturnWaterEnabled) dataMap->put("chReturnWaterTemperature", dataStruct{String(oneWireSensors.getTempC(chReturnWaterThermometer)), true});
+      if (chSupplyWaterEnabled) dataMap->put("chSupplyWaterTemperature", dataStruct{String(oneWireSensors.getTempC(chSupplyWaterThermometer)), true});
+    }
+    else ds18b20timer--;
 #endif
 
 
@@ -1174,25 +1181,25 @@ void growatt_read()
           intvalue = RxBuffer[6];
           putdatamap("inverterstatus/value", String(intvalue));
           putdatamap("inverterstatus", intvalue == 0 ? "waiting" : intvalue == 1 ? "ready" : intvalue == 3 ? "fault" : "unknown");
-          value = ((uint16_t(RxBuffer[7]) << 8) + RxBuffer[8]) / 10;
+          value = double((uint16_t(RxBuffer[7]) << 8) + RxBuffer[8]) / 10;
           putdatamap("pv/1/volt", String(value, 1));
-          value = ((uint16_t(RxBuffer[9]) << 8) + RxBuffer[10]) / 10;
+          value = double((uint16_t(RxBuffer[9]) << 8) + RxBuffer[10]) / 10;
           putdatamap("pv/2/volt", String(value, 1));
-          value = ((uint16_t(RxBuffer[11]) << 8) + RxBuffer[12]) / 10;
+          value = double((uint16_t(RxBuffer[11]) << 8) + RxBuffer[12]) / 10;
           putdatamap("pv/watt", String(value, 1));
-          value = ((uint16_t(RxBuffer[13]) << 8) + RxBuffer[14]) / 10;
+          value = double((uint16_t(RxBuffer[13]) << 8) + RxBuffer[14]) / 10;
           putdatamap("grid/volt", String(value, 1));
-          value = ((uint16_t(RxBuffer[15]) << 8) + RxBuffer[16]) / 10;
+          value = double((uint16_t(RxBuffer[15]) << 8) + RxBuffer[16]) / 10;
           putdatamap("grid/amp", String(value, 1));
-          value = ((uint16_t(RxBuffer[17]) << 8) + RxBuffer[18]) / 100;
+          value = double((uint16_t(RxBuffer[17]) << 8) + RxBuffer[18]) / 100;
           putdatamap("grid/frequency", String(value, 1));
-          value = ((uint16_t(RxBuffer[19]) << 8) + RxBuffer[20]) / 10;
+          value = double((uint16_t(RxBuffer[19]) << 8) + RxBuffer[20]) / 10;
           putdatamap("grid/watt", String(value, 1));
-          value = ((uint16_t(RxBuffer[33]) << 8) + RxBuffer[34]) / 10;
+          value = double((uint16_t(RxBuffer[33]) << 8) + RxBuffer[34]) / 10;
           putdatamap("fault/temperature", String(value, 1));
-          intvalue = ((uint16_t(RxBuffer[35]) << 8) + RxBuffer[36]);
+          intvalue = double((uint16_t(RxBuffer[35]) << 8) + RxBuffer[36]);
           putdatamap("fault/type", String(intvalue));
-          value = ((uint16_t(RxBuffer[37]) << 8) + RxBuffer[38]) / 10;
+          value = double((uint16_t(RxBuffer[37]) << 8) + RxBuffer[38]) / 10;
           putdatamap("temperature", String(value, 1));
           RxPowerDataOk = 1;
           growatt_send_command(0x42);
@@ -1200,10 +1207,10 @@ void growatt_read()
         if ((RxBuffer[3] == 0x32) && (RxBuffer[4] == 0x42) && (RxBufferPointer >= 22))
         {
           DEBUG("Received energy data from Growatt Inverter...\n");
-          value = ((uint16_t(RxBuffer[13]) << 8) + RxBuffer[14]) / 10;
+          value = double((uint16_t(RxBuffer[13]) << 8) + RxBuffer[14]) / 10;
           if (getdatamap("pv/1/volt").toInt() > 100) putdatamap("grid/today/kwh", String(value, 1)); // Only reset today value when pv 1 volt is above 100 volt (steady voltage) otherwise this gets resets during shutdown
           else if (getdatamap("grid/today/kwh") == "-") putdatamap("grid/today/kwh", "0.0"); // If inverter is active change - of today kwh to 0.0
-          value = ((uint32_t(RxBuffer[15]) << 24) + (uint32_t(RxBuffer[16]) << 16) + (uint16_t(RxBuffer[17]) << 8) + RxBuffer[18]) / 10;
+          value = double((uint32_t(RxBuffer[15]) << 24) + (uint32_t(RxBuffer[16]) << 16) + (uint16_t(RxBuffer[17]) << 8) + RxBuffer[18]) / 10;
           putdatamap("grid/total/kwh", String(value, 1));
           intvalue = ((uint32_t(RxBuffer[19]) << 24) + (uint32_t(RxBuffer[20]) << 16) + (uint16_t(RxBuffer[21]) << 8) + RxBuffer[22]);
           putdatamap("grid/total/hour", String(intvalue));
@@ -1714,7 +1721,7 @@ int read_opentherm()
     }
     if (topic != "")
     {
-      if (dataMap->get(topic).data != otvalue) dataMap->put(topic, dataStruct{otvalue, true});
+      putdatamap(topic, otvalue);
       returnvalue++;
     }
   }
@@ -2149,7 +2156,7 @@ void debugvoltread()
 
 byte readADSpower(byte adchannel, int32 * mA, int32 * mV, int32 * mW, int32 * mVA)
 {
-#define NROFSAMPLES 250
+#define NROFSAMPLES 200
   int32_t ac_mA[NROFSAMPLES]; // 200 samples is 20 ms
   int32_t ac_mA_offset = 0;
   int32_t ac_mV[NROFSAMPLES];
@@ -2169,7 +2176,7 @@ byte readADSpower(byte adchannel, int32 * mA, int32 * mV, int32 * mW, int32 * mV
   if (adchannel < 7)
   {
     ac_mA_offset = 5; // Offset ad 0
-    ac_mA_gain = 0.01168; // Gain ad 0
+    ac_mA_gain = 0.01168; // Gain ad 0 (calculated: 0.01168)
     adc_cs_amp_pin = ADS0_CS_PIN;
     adc_drdy_amp_pin = ADS0_RDY_PIN;
     setADSch(ADS0_CS_PIN, ADS0_RDY_PIN, adchannel); // Amps
@@ -2183,8 +2190,8 @@ byte readADSpower(byte adchannel, int32 * mA, int32 * mV, int32 * mW, int32 * mV
   }
   else if (adchannel < 14)
   {
-    ac_mA_offset = 2; // Offset ad 1
-    ac_mA_gain = 0.01168; // Gain ad 1
+    ac_mA_offset = 5; // Offset ad 1
+    ac_mA_gain = 0.0145; // Gain ad 1
     adc_cs_amp_pin = ADS1_CS_PIN;
     adc_drdy_amp_pin = ADS1_RDY_PIN;
     setADSch(ADS1_CS_PIN, ADS1_RDY_PIN, adchannel - 7); // Amps
@@ -2254,7 +2261,7 @@ byte readADSpower(byte adchannel, int32 * mA, int32 * mV, int32 * mW, int32 * mV
     ac_mV_calc *= ac_mV_gain;
     sum_mV += abs(ac_mV_calc);
 
-    ac_mV_calc = 236000; // Voltage reading is not working :-(
+    ac_mV_calc = 230000; // Voltage reading is not working :-(
     double mW_calc = ac_mA_calc * ac_mV_calc;
     sum_mW += mW_calc;
     //ac_val_watt += ((adc_val_amp - 0x3ffef0) * (adc_val_volt - 0x3ffef0))/10000; // Calculate milliwatts
@@ -2639,6 +2646,7 @@ byte state = 1;
 byte tarBrightness = 255;
 byte curBrightness = 0;
 byte zcState = 0; // 0 = ready; 1 = processing;
+int dimDelay = 0;
 
 void dimmer_setdimvalue(byte value)
 {
@@ -2658,6 +2666,7 @@ void dimmer_setdimstate(bool value)
 void dimmer_init()
 {
   DEBUG("Dimmer Init!\n");
+//  system_update_cpu_freq(160); // Minimize flickering of lamp
   pinMode(ZEROCROSS, INPUT_PULLUP);
   digitalWrite(PWMOUT, 0);
   pinMode(PWMOUT, OUTPUT);
@@ -2678,27 +2687,25 @@ void dimmer_stop()
 
 void dimmerzcDetectISR() 
 {
-  if (zcState == 0) 
-  {
-    zcState = 1;
-  
-    if (curBrightness < 255) {
-      digitalWrite(PWMOUT, 0);
-    }
-      
-      int dimDelay = 30 * (255 - curBrightness) + 400;
-      hw_timer_arm(dimDelay);
+  if (curBrightness < 255) {
+    hw_timer_arm(dimDelay);
   }
+  else digitalWrite(PWMOUT, 1);
 }
 
 byte fadedelay = 0;
 
 void dimTimerISR() 
 {
-    if (curBrightness >= 0) 
+    digitalWrite(PWMOUT, 1);
+    static bool turnoff = 0;
+    if (turnoff == 1)
     {
-      digitalWrite(PWMOUT, 1);
+      digitalWrite(PWMOUT, 0);
+      turnoff = 0;
+      return;      
     }
+    turnoff = 1;
 
     if (fadedelay < 1) fadedelay++;
     else
@@ -2720,8 +2727,9 @@ void dimTimerISR()
         curBrightness = tarBrightness;
     }
 
+    dimDelay = 30 * (255 - curBrightness) + 400;
 
-    zcState = 0;
+    hw_timer_arm(30);
 }
 #endif
 
