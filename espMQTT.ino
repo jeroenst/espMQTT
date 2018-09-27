@@ -7,13 +7,13 @@
 //#define DUCOBOX
 //#define SONOFFDUAL
 //#define OLDBATHROOM
-//#define SMARTMETER
+#define SMARTMETER
 //#define WATERMETER
 //#define NOISE
 //#define IRRIGATION
 //#define SOIL
 //#define GROWATT
-#define DIMMER
+//#define DIMMER
 //#define SONOFFS20_PRINTER
 
 #ifdef SONOFFS20_PRINTER
@@ -44,6 +44,7 @@ uint32_t sonoffch_starttime[4];
 #define ESPNAME "GROWATT"
 #define FLASHBUTTON D3
 #define ESPLED D4
+#include "growatt.h"
 #endif
 
 #ifdef SOIL
@@ -147,11 +148,7 @@ static bool sonoff_oldbuttons[1] = {1};
 #define FLASHBUTTON D3
 #define ESPLED D4
 #define ONEWIREPIN D6
-#define I2C_SDA D2
-#define I2C_SCL D1
-
-#include <ESP8266WiFi.h>
-WiFiServer otserver(25238);
+#include "opentherm.h"
 #endif
 
 #ifdef WATERMETER
@@ -164,6 +161,8 @@ WiFiServer otserver(25238);
 #define I2C_SCL D1
 #define I2C_EEPROM_ADDRESS 0x50
 #define EE24LC512MAXBYTES  512000
+#include "watermeter.h"
+#include "i2ceeprom_wearleveling.h"
 #endif
 
 #ifdef GARDEN2
@@ -221,6 +220,7 @@ Adafruit_NeoPixel neopixelleds = Adafruit_NeoPixel(2, NEOPIXELPIN, NEO_RGB + NEO
 #define ESPNAME "SMARTMETER"
 #define FLASHBUTTON D3
 #define ESPLED D4
+#include "smartmeter.h"
 #endif
 
 #define EEPROMSTRINGSIZE 40 // 2 positions are used, one for 0 character and one for checksum
@@ -344,7 +344,7 @@ void putdatamap(String topic, String value, bool sendupdate = true, bool forcese
       if (sendupdate)
       {
         mqttclient.publish(mqtttopic.c_str(), value.c_str(), true);
-        DEBUG("MQTT PUBLISHING %s=%s\n", topic.c_str(), value.c_str());
+        DEBUG("MQTT PUBLISHING %s=%s\n", mqtttopic.c_str(), value.c_str());
       }
     }
     else dataMap->put(topic, dataStruct{value, sendupdate});
@@ -374,184 +374,6 @@ void update_systeminfo(bool writestaticvalues = false)
   putdatamap("mqtt/server", String(mqtt_server));
   putdatamap("mqtt/state", mqttclient.connected() ? "connected" : "disconnected");
 }
-
-
-
-#ifdef WATERMETER
-uint32_t watermeter_liter = 0;
-#include <Wire.h>
-
-void i2cEepromWriteByte(uint16_t theMemoryAddress, uint8_t u8Byte)
-{
-  delay(1);
-  Wire.beginTransmission(I2C_EEPROM_ADDRESS);
-  delay(1);
-  Wire.write( (theMemoryAddress >> 8) & 0xFF );
-  delay(1);
-  Wire.write( (theMemoryAddress >> 0) & 0xFF );
-  delay(1);
-  Wire.write(u8Byte);
-  delay(1);
-  if (Wire.endTransmission() != 0) DEBUG("Failing writing I2C eeprom!\n");
-}
-
-uint8_t i2cEepromReadByte(uint16_t theMemoryAddress)
-{
-  uint8_t u8retVal = 0;
-  Wire.beginTransmission(I2C_EEPROM_ADDRESS);
-  Wire.write( (theMemoryAddress >> 8) & 0xFF );
-  Wire.write( (theMemoryAddress >> 0) & 0xFF );
-  Wire.endTransmission();
-  if (Wire.requestFrom(I2C_EEPROM_ADDRESS, 1) == 0) DEBUG("Failing reading I2C eeprom!\n");
-  u8retVal = Wire.read();
-  return u8retVal ;
-}
-
-void i2cEepromWriteuint32crc(uint16_t memoryPage, uint32_t data)
-{
-  uint8_t readbyte = 0;
-  uint8_t calccrc = 0;
-  uint16_t theMemoryAddress = memoryPage * 128;
-  for (uint8_t pointer = 0; pointer < 4; pointer++)
-  {
-    uint8_t writebyte = (data >> (8 * (3 - pointer))) & 0xFF;
-    i2cEepromWriteByte(theMemoryAddress + pointer, writebyte);
-    calccrc += writebyte;
-  }
-  i2cEepromWriteByte(theMemoryAddress + 4, calccrc);
-  DEBUG("Written i2c eeprom startaddress %u, value %u, crc %u\n", theMemoryAddress, data, calccrc);
-}
-
-uint32_t i2cEepromReaduint32crc(uint16_t memoryPage)
-{
-  uint8_t readbyte = 0;
-  uint8_t calccrc = 0;
-  uint16_t theMemoryAddress = memoryPage * 128;
-  uint32_t returnval = 0;
-  for (uint8_t pointer = 0; pointer < 4; pointer++)
-  {
-    readbyte = i2cEepromReadByte(theMemoryAddress + pointer);
-    uint32_t readlong = readbyte;
-    returnval |= readlong << (8 * (3 - pointer));
-    calccrc += readbyte;
-  }
-  uint8_t readcrc = i2cEepromReadByte(theMemoryAddress + 4);
-  if (readcrc != calccrc)
-  {
-    DEBUG("Read i2c eeprom CRC error, page=%u, value=%u, readcrc=%u, calccrc=%u", memoryPage, returnval, readcrc, calccrc);
-    returnval = 0xFFFF;
-  }
-  //  DEBUG("Read i2c eeprom startaddress %u, value %ul, crc %u, calccrc %u\n", theMemoryAddress, returnval, readcrc, calccrc);
-  return returnval;
-}
-
-static uint16_t i2cEepromWritememPage = 0;
-
-uint32_t readWatermeterCounterFromI2cEeprom()
-{
-  uint32_t watermetercounter = 0;
-  uint16_t watermeterpage = 0;
-  for (uint16_t memPage = 0; memPage <= 4000; memPage++) // Read data from different pages
-  {
-    uint32_t eepromdata = i2cEepromReaduint32crc(memPage);
-    i2cEepromWritememPage = memPage;
-    if (eepromdata == 0xFFFF) break;
-    watermetercounter = eepromdata; // Get highest value (= latest value) from eeprom;
-    watermeterpage = memPage;
-    yield();
-    ESP.wdtFeed(); // Prevent HW WD to kick in...
-  }
-  DEBUG("Read %u from memPage %u\n", watermetercounter, watermeterpage);
-  return watermetercounter;
-}
-
-void writeWatermeterCounterToI2cEeprom(uint32_t watermetercounter)
-{
-  if (i2cEepromWritememPage >= 4000) i2cEepromWritememPage = 0;
-  i2cEepromWriteuint32crc(i2cEepromWritememPage, watermetercounter);
-  i2cEepromWriteuint32crc(i2cEepromWritememPage + 1, 0xFFFF);
-  i2cEepromWritememPage++;
-}
-
-/*void handleWatermeterPulseInterrupt()
-  {
-  bool inputpinstate = digitalRead(WATERPULSEPIN);
-  digitalWrite(NODEMCULEDPIN, inputpinstate ? 0:1);
-  long long interrupt_time = millis();
-  static long long last_interrupt_time = 0;
-  static long long last_pulse_time = 0;
-  // If interrupts come faster than 20ms, assume it's a bounce and ignore
-  if (((interrupt_time > 20) && (interrupt_time - last_interrupt_time >= 20)) || ((interrupt_time <= 20) && (interrupt_time > __LONG_LONG_MAX__ - last_interrupt_time)))
-  {
-    if (inputpinstate)
-    {
-      watermeter_updated = true;
-      watermeter_liter++;
-      long long pulse_time = interrupt_time - last_pulse_time;
-      watermeter_lmin = double(60000) / pulse_time;
-      last_pulse_time = interrupt_time;
-    }
-    last_interrupt_time = interrupt_time;
-  }
-  }*/
-
-void init_watermeter()
-{
-  Wire.begin(I2C_SDA, I2C_SCL);
-  pinMode(WATERPULSEPIN, INPUT);
-  pinMode(NODEMCULEDPIN, OUTPUT);
-  //attachInterrupt(digitalPinToInterrupt(WATERPULSEPIN), handleWatermeterPulseInterrupt, CHANGE);
-  digitalWrite(NODEMCULEDPIN, digitalRead(WATERPULSEPIN) ? 0 : 1);
-  watermeter_liter = readWatermeterCounterFromI2cEeprom();
-  putdatamap("water/liter", String(watermeter_liter));
-  putdatamap("water/m3", String(double(watermeter_liter) / 1000, 3));
-  putdatamap("water/lmin", String(0, 3));
-  putdatamap("water/m3h", String(0, 3));
-}
-
-void handle_watermeter()
-{
-  static double watermeter_lmin = 0;
-  static uint16_t lmincountdowntimer = 0;
-  static long long lmincountdownmillis = 0;
-  static long long last_pulse_time = 0;
-  static bool oldinputpinstate = digitalRead(WATERPULSEPIN);
-  bool inputpinstate = digitalRead(WATERPULSEPIN);
-  digitalWrite(NODEMCULEDPIN, !inputpinstate);
-  if ((inputpinstate != oldinputpinstate) && (inputpinstate == 0))
-  {
-    long long pulse_time = millis() - last_pulse_time;
-    last_pulse_time = millis();
-    if (pulse_time > 1200) // Filter pulses less than 1200 ms which is more than 50l/min which is bouncing
-    {
-      DEBUG("Watermeter Last Liter Pulsetime=%ld\n", pulse_time);
-      watermeter_lmin = double(60000) / pulse_time;
-      watermeter_liter++;
-      writeWatermeterCounterToI2cEeprom(watermeter_liter);
-      lmincountdownmillis = millis() + (pulse_time * 2);
-      float m3h = 0;
-      putdatamap("water/liter", String(watermeter_liter));
-      putdatamap("water/lmin", String(watermeter_lmin, 1));
-      putdatamap("water/m3", String(double(watermeter_liter) / 1000, 3));
-      putdatamap("water/m3h", String(double(watermeter_lmin) * 0.06, 2));
-    }
-  }
-  oldinputpinstate = inputpinstate;
-
-  if ((watermeter_lmin > 0) && (lmincountdownmillis < millis()))
-  {
-      watermeter_lmin = watermeter_lmin / 2;
-      lmincountdownmillis = millis() + (60000 / watermeter_lmin) + 1000;
-      if (watermeter_lmin <= 0.5)
-      {
-        watermeter_lmin = 0;
-      }
-      putdatamap("water/lmin", String(watermeter_lmin, 1));
-      putdatamap("water/m3h", String(double(watermeter_lmin) * 0.06, 2));
-  }
-}
-#endif
-
 
 #ifdef DHTPIN
 void update_dht()
@@ -629,16 +451,12 @@ void mqttcallback(char* topic, byte* payload, unsigned int length) {
   if (String(topic) == String("home/" + WiFi.hostname() + "/setthermostattemporary"))
   {
     DEBUG("RECEIVED SETTHERMOSTATTEMPORARY %s", (char*)payload);
-    Serial.print("TT=");
-    Serial.print(payloadstring);
-    Serial.print("\r\n");
+    opentherm_setthermosttattemporary(payloadstring.toFloat());
   }
   if (String(topic) == String("home/" + WiFi.hostname() + "/setthermostatcontinue"))
   {
     DEBUG("RECEIVED SETTHERMOSTATCONTINUE %s\n", (char*)payload);
-    Serial.print("TC=");
-    Serial.print(payloadstring);
-    Serial.print("\r\n");
+    opentherm_setthermosttatcontinue(payloadstring.toFloat());
   }
 #endif
 
@@ -798,19 +616,32 @@ void loop()
 #endif
 
 #ifdef WATERMETER
-  handle_watermeter();
+  static uint32_t watermeter_liters = i2cEeprom_read();
+  if (watermeter_handle())
+  {
+    putdatamap("water/lmin", String(watermeter_getflow()));
+    putdatamap("water/m3h", String(double(watermeter_getflow()) * 0.06, 3));
+
+    if (watermeter_liters != watermeter_getliters())
+    {
+      watermeter_liters = watermeter_getliters();
+      putdatamap("water/liter", String(watermeter_liters));
+      putdatamap("water/m3", String(double(watermeter_liters) / 1000, 3));
+      i2cEeprom_write(watermeter_liters);
+    }
+  }
 #endif
 
 #ifdef OPENTHERM
-  if (read_opentherm()) updatemqtt = 1;
+  opentherm_handle();
 #endif
 
 #ifdef SMARTMETER
-  if (read_smartmeter()) updatemqtt = 1;
+  smartmeter_handle();
 #endif
 
 #ifdef GROWATT
-  growatt_read();
+  growatt_handle();
 #endif
 
   if (timertick == 1) // Every 1 second check sensors and update display (it would be insane to do it more often right?)
@@ -856,8 +687,13 @@ void loop()
       DEBUG("Requesting DS18B20 temperatures...\n");
       //oneWireSensors.setWaitForConversion(false);
       oneWireSensors.requestTemperatures();
-      if (onewire_chReturnWaterEnabled) putdatamap("ow/ch/returnwatertemperature", String(oneWireSensors.getTempC(onewire_chReturnWaterThermometer)));
-      if (onewire_dcwSupplyWaterEnabled) putdatamap("ow/dcw/temperature", String(oneWireSensors.getTempC(onewire_dcwSupplyWaterThermometer)));
+      float temperature;
+      temperature = oneWireSensors.getTempC(onewire_chReturnWaterThermometer);
+      DEBUG("chreturnwatertemp=%f\n", temperature);
+      if ((onewire_chReturnWaterEnabled) && (temperature != -127)) putdatamap("ow/ch/returnwatertemperature", String(temperature,1));
+      temperature = oneWireSensors.getTempC(onewire_dcwSupplyWaterThermometer);
+      DEBUG("dcwsupplywatertemp=%f\n", temperature);
+      if ((onewire_dcwSupplyWaterEnabled) && (temperature != -127)) putdatamap("ow/dcw/temperature", String(temperature,1));
     }
     else ds18b20timer--;
 #endif
@@ -1154,146 +990,6 @@ void timerCallback(void *pArg)
 #endif
 }
 
-#ifdef GROWATT
-void growatt_send_command(uint8_t c1)
-{
-  DEBUG("Requesting Growatt Data %#02x...\n");
-  uint8_t TxBuffer[10];
-  TxBuffer[0] = 0x3F;
-  TxBuffer[1] = 0x23;
-  TxBuffer[2] = 0x01;
-  TxBuffer[3] = 0x32;
-  TxBuffer[4] = c1;
-  TxBuffer[5] = 0x00;
-  uint16_t wStringSum = 0;
-  for (int i = 0; i < 6; i++)
-  {
-    wStringSum = wStringSum + (TxBuffer[i] ^ i);
-    if (wStringSum == 0 || wStringSum > 0xFFFF) wStringSum = 0xFFFF;
-  }
-  TxBuffer[6] = wStringSum >> 8;
-  TxBuffer[7] = wStringSum & 0xFF;
-  for (int i = 0; i < 8; i++)
-  {
-    DEBUG ("Sending to Growatt inverter: %#02x\n", TxBuffer[i]);
-    Serial.write(TxBuffer[i]);
-  }
-}
-
-void growatt_read()
-{
-  static long long nextupdatetime = 0;
-  static uint8_t RxBuffer[50];
-  static uint8_t RxBufferPointer = 0;
-  static bool RxPowerDataOk = 0;
-  static bool firstRun = 1;
-
-  if (millis() > nextupdatetime)
-  {
-    RxBufferPointer = 0;
-
-    if (!RxPowerDataOk)
-    {
-      putdatamap("inverterstatus", "offline");
-      putdatamap("pv/1/volt", "-");
-      putdatamap("pv/2/volt", "-");
-      putdatamap("pv/watt", "-");
-      putdatamap("grid/volt", "-");
-      putdatamap("grid/amp", "-");
-      putdatamap("grid/frequency", "-");
-      putdatamap("grid/watt", "-");
-      putdatamap("fault/temperature", "-");
-      putdatamap("fault/type", "-");
-      putdatamap("temperature", "-");
-      putdatamap("status", "commerror");
-    }
-    RxPowerDataOk = 0;
-
-    if (firstRun)
-    {
-      putdatamap("grid/today/kwh", "-");
-      putdatamap("grid/total/kwh", "-");
-      putdatamap("grid/total/hour", "-");
-      firstRun = 0;
-    }
-    growatt_send_command(0x41);
-    putdatamap("status", "querying");
-    nextupdatetime = millis() + 10000;
-  }
-
-  if (Serial.available())
-  {
-    if (RxBufferPointer < 50)
-    {
-      RxBuffer[RxBufferPointer] = Serial.read();
-      DEBUG ("Received from Growatt inverter: 0x%02x\n", RxBuffer[RxBufferPointer]);
-      if (RxBuffer[0] != 0x23) RxBufferPointer = 0;
-      if (RxBufferPointer == 1)
-      {
-        if (RxBuffer[1] != 0x3F) RxBufferPointer = 0;
-      }
-      RxBufferPointer++;
-    }
-    else
-    {
-      DEBUG("Serial Buffer Overflow!!\n");
-      RxBufferPointer = 0;
-    }
-    if (RxBufferPointer > 5)
-    {
-      if (RxBufferPointer > RxBuffer[5] + 7)
-      {
-        double value = 0;
-        uint32_t intvalue = 0;
-        DEBUG("Received complete message from Growatt Inverter...\n");
-        if ((RxBuffer[3] == 0x32) && (RxBuffer[4] == 0x41) && (RxBufferPointer >= 34))
-        {
-          DEBUG("Received power data from Growatt Inverter...\n");
-          intvalue = RxBuffer[6];
-          putdatamap("inverterstatus/value", String(intvalue));
-          putdatamap("inverterstatus", intvalue == 0 ? "waiting" : intvalue == 1 ? "ready" : intvalue == 3 ? "fault" : "unknown");
-          value = double((uint16_t(RxBuffer[7]) << 8) + RxBuffer[8]) / 10;
-          putdatamap("pv/1/volt", String(value, 1));
-          value = double((uint16_t(RxBuffer[9]) << 8) + RxBuffer[10]) / 10;
-          putdatamap("pv/2/volt", String(value, 1));
-          value = double((uint16_t(RxBuffer[11]) << 8) + RxBuffer[12]) / 10;
-          putdatamap("pv/watt", String(value, 1));
-          value = double((uint16_t(RxBuffer[13]) << 8) + RxBuffer[14]) / 10;
-          putdatamap("grid/volt", String(value, 1));
-          value = double((uint16_t(RxBuffer[15]) << 8) + RxBuffer[16]) / 10;
-          putdatamap("grid/amp", String(value, 1));
-          value = double((uint16_t(RxBuffer[17]) << 8) + RxBuffer[18]) / 100;
-          putdatamap("grid/frequency", String(value, 1));
-          value = double((uint16_t(RxBuffer[19]) << 8) + RxBuffer[20]) / 10;
-          putdatamap("grid/watt", String(value, 1));
-          value = double((uint16_t(RxBuffer[33]) << 8) + RxBuffer[34]) / 10;
-          putdatamap("fault/temperature", String(value, 1));
-          intvalue = double((uint16_t(RxBuffer[35]) << 8) + RxBuffer[36]);
-          putdatamap("fault/type", String(intvalue));
-          value = double((uint16_t(RxBuffer[37]) << 8) + RxBuffer[38]) / 10;
-          putdatamap("temperature", String(value, 1));
-          RxPowerDataOk = 1;
-          growatt_send_command(0x42);
-        }
-        if ((RxBuffer[3] == 0x32) && (RxBuffer[4] == 0x42) && (RxBufferPointer >= 22))
-        {
-          DEBUG("Received energy data from Growatt Inverter...\n");
-          value = double((uint16_t(RxBuffer[13]) << 8) + RxBuffer[14]) / 10;
-          if (getdatamap("pv/1/volt").toInt() > 100) putdatamap("grid/today/kwh", String(value, 1)); // Only reset today value when pv 1 volt is above 100 volt (steady voltage) otherwise this gets resets during shutdown
-          else if (getdatamap("grid/today/kwh") == "-") putdatamap("grid/today/kwh", "0.0"); // If inverter is active change - of today kwh to 0.0
-          value = double((uint32_t(RxBuffer[15]) << 24) + (uint32_t(RxBuffer[16]) << 16) + (uint16_t(RxBuffer[17]) << 8) + RxBuffer[18]) / 10;
-          putdatamap("grid/total/kwh", String(value, 1));
-          intvalue = ((uint32_t(RxBuffer[19]) << 24) + (uint32_t(RxBuffer[20]) << 16) + (uint16_t(RxBuffer[21]) << 8) + RxBuffer[22]);
-          putdatamap("grid/total/hour", String(intvalue));
-          putdatamap("status", "ready");
-        }
-        RxBufferPointer = 0;
-      }
-    }
-  }
-}
-#endif
-
 #ifdef DUCOBOX
 void ducobox_setfan(String source, uint8_t value)
 {
@@ -1536,315 +1232,7 @@ void ducobox_writeserial(const char *message)
 
 #endif
 
-#ifdef SMARTMETER
-int8_t read_smartmeter()
-{
-  float value = 0;
-  int8_t returnvalue = 0;
-  int day, month, year, hour, minute, second;
-  char summerwinter;
-  static char buffer[1000];
-  static uint16_t bufpos = 0;
 
-  while (Serial.available()) {
-    char input = Serial.read() & 127;
-    // Fill buffer up to and including a new line (\n)
-    buffer[bufpos] = input;
-    bufpos++;
-    buffer[bufpos] = 0;
-
-    if (input == '\n')
-    { // We received a new line (data up to \n)
-      buffer[bufpos - 1] = 0; // Remove newline character
-      if (Debug.isActive(Debug.VERBOSE)) {
-        DEBUG("RECEIVED FROM SERIAL:%s\n", buffer);
-      }
-      if (buffer[0] == '/')
-      {
-        putdatamap("status", "receiving");
-      }
-
-      if (buffer[0] == '!')
-      {
-        putdatamap("status", "ready");
-      }
-
-
-      // 1-0:1.8.1 = Electricity low tarif used
-      if (sscanf(buffer, "1-0:1.8.1(%f" , &value) == 1)
-      {
-        putdatamap("electricity/kwh_used1", String(value, 3));
-        returnvalue++;
-      }
-
-      // 1-0:1.8.2 = Electricity high tarif used (DSMR v4.0)
-      if (sscanf(buffer, "1-0:1.8.2(%f" , &value) == 1)
-      {
-        putdatamap("electricity/kwh_used2", String(value, 3));
-        returnvalue++;
-      }
-
-      // 1-0:2.8.1 = Electricity low tarif provided
-      if (sscanf(buffer, "1-0:2.8.1(%f" , &value) == 1)
-      {
-        putdatamap("electricity/kwh_provided1", String(value, 3));
-        returnvalue++;
-      }
-
-      // 1-0:2.8.2 = Electricity high tarif provided (DSMR v4.0)
-      if (sscanf(buffer, "1-0:2.8.2(%f" , &value) == 1)
-      {
-        putdatamap("electricity/kwh_provided2", String(value, 3));
-        returnvalue++;
-      }
-
-      // 1-0:1.7.0 = Electricity actual usage (DSMR v4.0)
-      if (sscanf(buffer, "1-0:1.7.0(%f" , &value) == 1)
-      {
-        putdatamap("electricity/kw_using", String(value, 3));
-        returnvalue++;
-      }
-
-      // 1-0:2.7.0 = Electricity actual providing (DSMR v4.0)
-      if (sscanf(buffer, "1-0:2.7.0(%f" , &value) == 1)
-      {
-        putdatamap("electricity/kw_providing", String(value, 3));
-        returnvalue++;
-      }
-
-      // 0-1:24.2.1 = Gas (DSMR v4.0)
-      if (sscanf(buffer, "0-1:24.2.1(%2d%2d%2d%2d%2d%2d%c)(%f", &day, &month, &year, &hour, &minute, &second, &summerwinter, &value) == 8)
-      {
-        putdatamap("gas/m3", String(value, 3));
-        char gasdatetime[20];
-        sprintf(gasdatetime, "%02ld-%02ld-%02ld %ld:%02ld:%02ld", day, month, year, hour, minute, second);
-        putdatamap("gas/datetime", String(gasdatetime));
-        returnvalue += 2;
-      }
-
-      buffer[0] = 0;
-      bufpos = 0;
-    }
-    yield();
-  }
-  return returnvalue;
-}
-#endif
-
-#ifdef OPENTHERM
-//#include <Wire.h> For now we leave nodo opentherm watchdog because it will break ota due to small timeout...
-
-int read_opentherm()
-{
-  static WiFiClient otclient;
-  static String serialmessage = "";
-  int returnvalue = 0;
-  if (!otclient || !otclient.connected()) otclient = otserver.available();
-  else
-  {
-    while (otclient.available())
-    {
-      yield();
-      Serial.print((char)otclient.read());
-    }
-  }
-
-  while (Serial.available() > 0) {
-    yield();
-    char otchar = char(Serial.read());
-    serialmessage += otchar;
-    if (otclient && otclient.connected())
-    {
-      otclient.print(otchar);
-    }
-  }
-
-
-  while (serialmessage.indexOf(10) >= 0)
-  {
-    yield();
-    int eolchar = serialmessage.indexOf(10);
-    String otmessage = serialmessage.substring(0, eolchar);
-    DEBUG("Received from opentherm:%s\n", otmessage.c_str());
-    serialmessage = serialmessage.substring(eolchar + 1);
-    String otvalue = "";
-    String topic = "";
-
-    if (otmessage.substring(0, 4) == "TC: ")
-    {
-      topic = "thermostat/setpoint";
-      otvalue = otmessage.substring(4);
-    }
-
-    else if (otmessage.substring(0, 4) == "TT: ")
-    {
-      topic = "thermostat/setpoint";
-      otvalue = otmessage.substring(4).c_str();
-    }
-
-    else if (otmessage.substring(0, 4) == "TO: ")
-    {
-      topic = "outside/temperature";
-      otvalue = otmessage.substring(4).c_str();
-    }
-
-    else if (otmessage[0] == 'B')
-    {
-      long otcommand = strtol(otmessage.substring(3, 5).c_str(), 0, 16);
-      DEBUG("BOILER MESSAGE RECEIVED: 0x%s(%d)\n",otmessage.substring(3, 5).c_str(), otcommand);
-      switch (otcommand)
-      {
-        case 14:
-          otvalue = String(otmessage_tofloat(otmessage), 1);
-          topic = "burner/modulation/maxlevel";
-          break;
-        case 17:
-          otvalue = String(otmessage_tofloat(otmessage), 1);
-          topic = "burner/modulation/level";
-          break;
-        case 116:
-          otvalue = String(otmessage_touint(otmessage));
-          topic = "burner/starts";
-          break;
-        case 120:
-          otvalue = String(otmessage_touint(otmessage));
-          topic = "burner/hours";
-          break;
-        case 19:
-          otvalue = String(otmessage_tofloat(otmessage), 1);
-          topic = "dhw/flowrate";
-          break;
-        case 26:
-          otvalue = String(otmessage_tofloat(otmessage), 1);
-          topic = "dhw/temperature";
-          break;
-        case 118:
-          otvalue = String(otmessage_touint(otmessage));
-          topic = "dhw/pump/starts";
-          break;
-        case 122:
-          otvalue = String(otmessage_touint(otmessage));
-          topic = "dhw/pump/hours";
-          break;
-        case 119:
-          otvalue = String(otmessage_touint(otmessage));
-          topic = "dhw/burner/starts";
-          break;
-        case 123:
-          otvalue = String(otmessage_touint(otmessage));
-          topic = "dhw/burner/hours";
-          break;
-        case 25:
-          otvalue = String(otmessage_tofloat(otmessage), 1);
-          topic = "boiler/temperature";
-          break;
-        case 18:
-          otvalue = String(otmessage_tofloat(otmessage), 1);
-          topic = "ch/water/pressure";
-          break;
-        case 117:
-          otvalue = String(otmessage_touint(otmessage));
-          topic = "ch/pump/starts";
-          break;
-        case 121:
-          otvalue = String(otmessage_touint(otmessage));
-          topic = "ch/pump/hours";
-          break;
-        case 56:
-          otvalue = String(otmessage_tofloat(otmessage), 1);
-          topic = "dhw/setpoint";
-          break;
-        case 57:
-          otvalue = String(otmessage_tofloat(otmessage), 1);
-          topic = "dhw/maxsetpoint";
-          break;
-        case 28:
-          otvalue = String(otmessage_tofloat(otmessage), 1);
-          topic = "ch/returnwatertemperature";
-          break;
-        case 27:
-          otvalue = String(otmessage_tofloat(otmessage), 1);
-          topic = "outside/temperature";
-          break;
-        case 33:
-          otvalue = String(otmessage_toint(otmessage));
-          topic = "exhausttemperature";
-          break;
-      }
-    }
-    else if (otmessage[0] == 'T')
-    {
-      long otcommand = strtol(otmessage.substring(3, 5).c_str(), 0, 16);
-      DEBUG("THERMOSTAT MESSAGE RECEIVED: 0x%s(%d)\n", otmessage.substring(3, 5).c_str(), otcommand);
-      switch (otcommand)
-      {
-        case 1:
-          otvalue = String(otmessage_tofloat(otmessage), 1);
-          topic = "thermostat/ch/water/setpoint";
-          break;
-        case 16:
-          otvalue = String(otmessage_tofloat(otmessage), 1);
-          topic = "thermostat/setpoint";
-          break;
-        case 24:
-          otvalue = String(otmessage_tofloat(otmessage), 1);
-          topic = "thermostat/temperature";
-          break;
-      }
-    }
-
-    if (topic != "")
-    {
-      putdatamap(topic, otvalue);
-      returnvalue++;
-    }
-  }
-
-/*  unsigned long wdtimer = 0;
-  if (wdtimer == 0)
-  {
-    Wire.begin(I2C_SDA, I2C_SCL);
-  }
-  if (wdtimer < millis())
-  {
-    wdtimer = millis() + 1000;
-    Wire.beginTransmission(38); // Nodoshop opentherm heeft een watchdog ic op i2c address 38
-    Wire.write(0xA5);
-    Wire.endTransmission();
-  }
- */ 
-  return returnvalue;
-}
-
-uint16_t otmessage_touint(String otmessage)
-{
-  return (strtol(otmessage.substring(5, 7).c_str(), 0, 16) << 8) + (strtol(otmessage.substring(7, 9).c_str(), 0, 16));
-}
-
-int16_t otmessage_toint(String otmessage)
-{
-  return ((strtol(otmessage.substring(5, 7).c_str(), 0, 16) & 0x127) << 8) + (strtol(otmessage.substring(7, 9).c_str(), 0, 16)) * ((strtol(otmessage.substring(5, 7).c_str(), 0, 16) & 0x128) ? -1 : 1);
-}
-
-float twobytestofloat(uint16_t decimal, uint16_t fractional)
-{
-  return ((decimal & 127)  +
-          ((fractional & 128) ? float(1) / 2 : 0) +
-          ((fractional & 64) ? float(1) / 4 : 0) +
-          ((fractional & 32) ? float(1) / 8 : 0) +
-          ((fractional & 16) ? float(1) / 16 : 0) +
-          ((fractional & 8) ? float(1) / 32 : 0) +
-          ((fractional & 4) ? float(1) / 64 : 0) +
-          ((fractional & 2) ? float(1) / 128 : 0) +
-          ((fractional & 1) ? float(1) / 256 : 0)) *
-         ((decimal & 128) ? -1 : 1);
-}
-
-float otmessage_tofloat(String otmessage)
-{
-  return twobytestofloat(strtol(otmessage.substring(5, 7).c_str(), 0, 16), strtol(otmessage.substring(7, 9).c_str(), 0, 16));
-}
-#endif
 
 #ifdef MH_Z19
 void read_MHZ19()
@@ -1946,10 +1334,10 @@ void handleWWWSettings()
       {
         if (webserver.arg(i) != getdatamap("water/liter"))
         {
-          watermeter_liter = atoi(webserver.arg(i).c_str());
-          writeWatermeterCounterToI2cEeprom(watermeter_liter);
-          putdatamap("water/liter", String(watermeter_liter));
-          putdatamap("water/m3", String(double(watermeter_liter) / 1000, 3));
+          watermeter_setliters(atoi(webserver.arg(i).c_str()));
+          i2cEeprom_write(watermeter_getliters());
+          putdatamap("water/liter", String(watermeter_getliters()));
+          putdatamap("water/m3", String(double(watermeter_getliters()) / 1000, 3));
         }
       }
 #endif
@@ -2551,6 +1939,21 @@ double calcIrms(unsigned int Number_of_Samples)
 #endif
 
 
+void openthermcallback (String topic, String payload)
+{
+  putdatamap(topic, payload);
+}
+
+void growattcallback (String topic, String payload)
+{
+  putdatamap(topic, payload);
+}
+
+void smartmetercallback (String topic, String payload)
+{
+  putdatamap(topic, payload);
+}
+
 void setup() {
 
   ESP.wdtDisable(); // Use hardware watchdog of 6 seconds to prevent auto reboot when function takes more time..
@@ -2651,7 +2054,7 @@ void setup() {
 #endif
 
 #ifdef WATERMETER
-  init_watermeter();
+  watermeter_init(WATERPULSEPIN, NODEMCULEDPIN, i2cEeprom_read());
 #endif
 
 #ifdef MAINPOWERMETER
@@ -2696,15 +2099,18 @@ void setup() {
 #endif;
 
 #ifdef SMARTMETER
-  U0C0 = BIT(UCRXI) | BIT(UCBN) | BIT(UCBN + 1) | BIT(UCSBN); // Inverse RX
+  smartmeter_init(smartmetercallback);
 #endif;
 
 
   mqttclient.setCallback(mqttcallback);
 
 #ifdef OPENTHERM
-  otserver.begin();
-  Serial.print("\r\n");
+  opentherm_init(openthermcallback);
+#endif
+
+#ifdef GROWATT
+  growatt_init(growattcallback);
 #endif
 
 #ifdef DUCOBOX
@@ -2734,11 +2140,11 @@ void processCmdRemoteDebug()
   if (lastCmd == "help") DEBUG("  watermeterreadeeprom\n  watermeterwriteeeprom\n");
   if (lastCmd == "watermeterreadeeprom")
   {
-    readWatermeterCounterFromI2cEeprom();
+    watermeter_setliters(i2cEeprom_read());
   }
   if (lastCmd == "watermeterwriteeeprom")
   {
-    writeWatermeterCounterToI2cEeprom(watermeter_liter);
+    i2cEeprom_write(watermeter_getliters());
   }
 #endif
 }
