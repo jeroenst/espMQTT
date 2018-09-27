@@ -6,11 +6,12 @@ void smartmeter_init(void(*callback)(String,String))
 {
   _smartmeter_callback = callback;
   
-  U0C0 = BIT(UCRXI) | BIT(UCBN) | BIT(UCBN + 1) | BIT(UCSBN); // Inverse RX
 
   Serial.setRxBufferSize(2048); 
-  Serial.begin(9600);  //Init serial 9600 baud
+  Serial.begin(115200);  //Init serial 115200 baud
   Serial.setDebugOutput(false);
+
+  U0C0 = BIT(UCRXI) | BIT(UCBN) | BIT(UCBN + 1) | BIT(UCSBN); // Inverse RX
 
 }
 
