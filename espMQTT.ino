@@ -2,7 +2,7 @@
 //#define BEDROOM2
 //#define GARDEN //ESP8285
 //#define MAINPOWERMETER
-#define OPENTHERM
+//#define OPENTHERM
 //#define SONOFF4CH //ESP8285
 //#define DUCOBOX
 //#define SONOFFDUAL
@@ -13,15 +13,23 @@
 //#define IRRIGATION
 //#define SOIL
 //#define GROWATT
-//#define DIMMER
+#define DIMMER
+//#define SONOFFS20_PRINTER
+
+#ifdef SONOFFS20_PRINTER
+#define ESPNAME "SONOFFS20_PRINTER"
+#define SONOFFS20
+#define SONOFFCH_TIMEOUT 1800
+uint32_t sonoffch_starttime[4];
+#endif
 
 #ifdef DIMMER
 #define ESPNAME "DIMMER"
-#define PWMOUT D1
-#define ZEROCROSS D2
+#define TRIAC_PIN D1
+#define ZEROCROSS_PIN D2
 #define FLASHBUTTON D3
 #define ESPLED D4
-#include "hw_timer.h"
+#include "dimmer.h"
 #endif
 
 #ifdef NOISE
@@ -67,8 +75,8 @@ WiFiServer ducoserver(2233);
 
 #ifdef IRRIGATION
 #define ESPNAME "IRRIGATION"
-uint32_t irrigation_starttime[4];
-#define IRRIGATION_TIMEOUT 1800
+uint32_t sonoffch_starttime[4];
+#define SONOFFCH_TIMEOUT 1800
 #ifndef ARDUINO_ESP8266_ESP01
 #error "Wrong board selected! Select Generic ESP8285 module"
 #endif
@@ -106,6 +114,21 @@ const byte sonoff_buttons[2] = {0, 9};
 static bool sonoff_oldbuttons[2] = {1, 1};
 #endif
 
+#ifdef SONOFFS20
+// Remember: board: generic esp8266 module, flashmode=dio
+#ifndef ESPNAME
+#define ESPNAME "SONOFFS20"
+#endif
+#ifndef ARDUINO_ESP8266_ESP01
+#error "Wrong board selected! Select Generic ESP8285 module"
+#endif
+#define FLASHBUTTON 0
+#define ESPLED 13
+#define SONOFFCH 1
+const byte sonoff_relays[1] = {12};
+const byte sonoff_buttons[1] = {0};
+static bool sonoff_oldbuttons[1] = {1};
+#endif
 
 #ifdef MAINPOWERMETER
 #define ESPNAME "MAINPOWERMETER"
@@ -123,7 +146,10 @@ static bool sonoff_oldbuttons[2] = {1, 1};
 #define ESPNAME "OPENTHERM"
 #define FLASHBUTTON D3
 #define ESPLED D4
-#define ONEWIREPIN D2
+#define ONEWIREPIN D6
+#define I2C_SDA D2
+#define I2C_SCL D1
+
 #include <ESP8266WiFi.h>
 WiFiServer otserver(25238);
 #endif
@@ -254,10 +280,11 @@ OneWire oneWire(ONEWIREPIN);
 // Pass our oneWire reference to Dallas Temperature.
 DallasTemperature oneWireSensors(&oneWire);
 
-DeviceAddress chReturnWaterThermometer, chSupplyWaterThermometer;
-float chReturnWaterTemperature = -127, chSupplyWaterTemperature = -127;
-float oldchReturnWaterTemperature = -127, oldchSupplyWaterTemperature = -127;
-bool chReturnWaterEnabled = false, chSupplyWaterEnabled = false;
+
+DeviceAddress onewire_chReturnWaterThermometer, onewire_dcwSupplyWaterThermometer;
+float onewire_chReturnWaterTemperature = -127, onewire_dcwSupplyWaterTemperature = -127;
+float oldonewire_chReturnWaterTemperature = -127, oldonewire_dcwSupplyWaterTemperature = -127;
+bool onewire_chReturnWaterEnabled = false, onewire_dcwSupplyWaterEnabled = false;
 #endif
 
 WiFiClient wifiClient;
@@ -282,12 +309,13 @@ uint8_t ledofftime = 1;
 
 void initSerial()
 {
+  Serial.setRxBufferSize(2048); 
 #if defined(MH_Z19) || defined(OPENTHERM) || defined(GROWATT)
   Serial.begin(9600);  //Init serial 9600 baud
+  Serial.setDebugOutput(false);
 #else
   Serial.begin(115200); //Init serial 19200 baud
 #endif
-  Serial.setRxBufferSize(2048); 
 }
 
 String getdatamap(String topic)
@@ -582,11 +610,15 @@ void mqttcallback(char* topic, byte* payload, unsigned int length) {
   {
     if (String(topic) == String("home/" + WiFi.hostname() + "/setrelay/" + i))
     {
-      if (payloadstring == "0") digitalWrite(sonoff_relays[i], 0);
-      if (payloadstring == "1") digitalWrite(sonoff_relays[i], 1);
-#ifdef IRRIGATION
-      if (payloadstring == "0") irrigation_starttime[i] = 0;
-      if (payloadstring == "1") irrigation_starttime[i] = uptime;
+      bool inverse = false;
+      #ifdef SONOFFCHINVERSE
+        inverse = true;
+      #endif
+      if (payloadstring == "0") digitalWrite(sonoff_relays[i], inverse ? 1:0);
+      if (payloadstring == "1") digitalWrite(sonoff_relays[i], inverse ? 0:1);
+#ifdef SONOFFCH_TIMEOUT
+      if (payloadstring == "0") sonoffch_starttime[i] = 0;
+      if (payloadstring == "1") sonoffch_starttime[i] = uptime;
 #endif
       updatemqtt = 1;
     }
@@ -627,8 +659,11 @@ void mqttcallback(char* topic, byte* payload, unsigned int length) {
       DEBUG("RECEIVED SETMINFANSPEED %d\n", minfanspeed);
       if ((minfanspeed > 0) && (minfanspeed <= 3000)) ducobox_minfanspeed = minfanspeed;
     }*/
-  if (String(topic) == String("home/" + WiFi.hostname() + "/setdimvalue")) dimmer_setdimvalue(payloadstring.toInt());
-  if (String(topic) == String("home/" + WiFi.hostname() + "/setdimstate")) dimmer_setdimstate(payloadstring.toInt() ? 1 : 0);
+  if (String(topic) == String("home/" + WiFi.hostname() + "/setdimvalue"))
+  {
+    dimmer_setdimvalue(payloadstring.toInt());
+    putdatamap ("dimvalue", String(dimmer_getdimvalue()));
+  }
 #endif
 }
 
@@ -819,9 +854,10 @@ void loop()
     {
       ds18b20timer = 10;
       DEBUG("Requesting DS18B20 temperatures...\n");
+      //oneWireSensors.setWaitForConversion(false);
       oneWireSensors.requestTemperatures();
-      if (chReturnWaterEnabled) dataMap->put("chReturnWaterTemperature", dataStruct{String(oneWireSensors.getTempC(chReturnWaterThermometer)), true});
-      if (chSupplyWaterEnabled) dataMap->put("chSupplyWaterTemperature", dataStruct{String(oneWireSensors.getTempC(chSupplyWaterThermometer)), true});
+      if (onewire_chReturnWaterEnabled) putdatamap("ow/ch/returnwatertemperature", String(oneWireSensors.getTempC(onewire_chReturnWaterThermometer)));
+      if (onewire_dcwSupplyWaterEnabled) putdatamap("ow/dcw/temperature", String(oneWireSensors.getTempC(onewire_dcwSupplyWaterThermometer)));
     }
     else ds18b20timer--;
 #endif
@@ -917,15 +953,37 @@ void loop()
 }
 
 #ifdef SONOFFCH
+void init_sonoff()
+{
+  bool inverse = false;
+  #ifdef SONOFFCHINVERSE
+    inverse = true;
+  #endif
+  for (byte i = 0; i < SONOFFCH; i++)
+  {
+    digitalWrite(sonoff_relays[i], inverse ? true : false);
+    pinMode(sonoff_relays[i], OUTPUT);
+    pinMode(sonoff_buttons[i], INPUT_PULLUP);
+  }
+
+#ifdef SONOFFCH_TIMEOUT
+  for (uint8_t i = 0; i < SONOFFCH; i++) sonoffch_starttime[i] = 0;
+#endif
+}
+
 void handle_sonoff()
 {
-#ifdef IRRIGATION
+#ifdef SONOFFCH_TIMEOUT
   for (uint8_t i = 0; i < SONOFFCH; i++)
   {
-    if ((irrigation_starttime[i] > 0) && (irrigation_starttime[i] + IRRIGATION_TIMEOUT < uptime))
+    if ((sonoffch_starttime[i] > 0) && (sonoffch_starttime[i] + SONOFFCH_TIMEOUT < uptime))
     {
-      irrigation_starttime[i] = 0;
-      digitalWrite(sonoff_relays[i], 0);
+      sonoffch_starttime[i] = 0;
+      bool inverse = false;
+      #ifdef SONOFFCHINVERSE
+        inverse = true;
+      #endif
+      digitalWrite(sonoff_relays[i], inverse ? 1 : 0);
     }
   }
 #endif
@@ -941,9 +999,13 @@ void handle_sonoff()
         {
           DEBUG ("SONOFF BUTTON %d PRESSED\n", i);
           digitalWrite(sonoff_relays[i], digitalRead(sonoff_relays[i]) ? 0 : 1);
-#ifdef IRRIGATION
-          if (digitalRead(sonoff_relays[i])) irrigation_starttime[i] = uptime;
-          else irrigation_starttime[i] = 0;
+          bool inverse = false;
+          #ifdef SONOFFCHINVERSE
+            inverse = true;
+          #endif
+#ifdef SONOFFCH_TIMEOUT
+          if (digitalRead(sonoff_relays[i]) != inverse) sonoffch_starttime[i] = uptime;
+          else sonoffch_starttime[i] = 0;
 #endif
           updatemqtt = 1;
         }
@@ -953,7 +1015,11 @@ void handle_sonoff()
   }
   for (int i = 0; i < SONOFFCH; i++)
   {
-    String relaystate = digitalRead(sonoff_relays[i]) ? "1" : "0";
+    bool inverse = false;
+    #ifdef SONOFFCHINVERSE
+      inverse = true;
+    #endif
+    String relaystate = digitalRead(sonoff_relays[i]) != inverse ? "1" : "0";
     putdatamap ("relay/" + String(i), relaystate);
   }
 }
@@ -1076,8 +1142,13 @@ void timerCallback(void *pArg)
   }
 #ifdef ESPLED
   static uint8_t ledtimer = 0;
+  #ifdef ESPLEDINVERSE
+  if ((ledtimer == ledontime) && (ledofftime > 0)) digitalWrite(ESPLED, 0);
+  if ((ledtimer == 0) && (ledontime > 0)) digitalWrite(ESPLED, 1);
+  #else
   if ((ledtimer == ledontime) && (ledofftime > 0)) digitalWrite(ESPLED, 1);
   if ((ledtimer == 0) && (ledontime > 0)) digitalWrite(ESPLED, 0);
+  #endif
   ledtimer++;
   if (ledtimer >= ledontime + ledofftime) ledtimer = 0;
 #endif
@@ -1561,6 +1632,8 @@ int8_t read_smartmeter()
 #endif
 
 #ifdef OPENTHERM
+//#include <Wire.h> For now we leave nodo opentherm watchdog because it will break ota due to small timeout...
+
 int read_opentherm()
 {
   static WiFiClient otclient;
@@ -1618,7 +1691,7 @@ int read_opentherm()
     else if (otmessage[0] == 'B')
     {
       long otcommand = strtol(otmessage.substring(3, 5).c_str(), 0, 16);
-      DEBUG("BOILER MESSAGE RECEIVED: %c%c=%s=%d\n", otmessage[3], otmessage[4], otmessage.substring(3, 5).c_str(), otcommand);
+      DEBUG("BOILER MESSAGE RECEIVED: 0x%s(%d)\n",otmessage.substring(3, 5).c_str(), otcommand);
       switch (otcommand)
       {
         case 14:
@@ -1702,7 +1775,7 @@ int read_opentherm()
     else if (otmessage[0] == 'T')
     {
       long otcommand = strtol(otmessage.substring(3, 5).c_str(), 0, 16);
-      DEBUG("THERMOSTAT MESSAGE RECEIVED: %c%c=%s=%d\n", otmessage[3], otmessage[4], otmessage.substring(3, 5).c_str(), otcommand);
+      DEBUG("THERMOSTAT MESSAGE RECEIVED: 0x%s(%d)\n", otmessage.substring(3, 5).c_str(), otcommand);
       switch (otcommand)
       {
         case 1:
@@ -1719,12 +1792,27 @@ int read_opentherm()
           break;
       }
     }
+
     if (topic != "")
     {
       putdatamap(topic, otvalue);
       returnvalue++;
     }
   }
+
+/*  unsigned long wdtimer = 0;
+  if (wdtimer == 0)
+  {
+    Wire.begin(I2C_SDA, I2C_SCL);
+  }
+  if (wdtimer < millis())
+  {
+    wdtimer = millis() + 1000;
+    Wire.beginTransmission(38); // Nodoshop opentherm heeft een watchdog ic op i2c address 38
+    Wire.write(0xA5);
+    Wire.endTransmission();
+  }
+ */ 
   return returnvalue;
 }
 
@@ -2499,6 +2587,9 @@ void setup() {
     esp_hostname = String("ESP_") + ESPNAME;
   }
 
+#ifdef SONOFFCH
+  init_sonoff();
+#endif
   WiFi.setAutoReconnect(true);
   WiFi.setSleepMode(WIFI_NONE_SLEEP);
   WiFi.mode(WIFI_STA);
@@ -2531,7 +2622,7 @@ void setup() {
   ArduinoOTA.onEnd([]() {
     initSerial();
 #ifdef DIMMER
-    dimmer_init();
+    dimmer_init(ZEROCROSS_PIN, TRIAC_PIN);
 #endif
   });
 
@@ -2568,15 +2659,15 @@ void setup() {
 #endif
 
 #ifdef ONEWIREPIN
-  if (!oneWireSensors.getAddress(chReturnWaterThermometer, 0)) {
-    DEBUG("Unable to find address for Device chReturnWaterThermometer\n");
+  if (!oneWireSensors.getAddress(onewire_dcwSupplyWaterThermometer, 0)) {
+    DEBUG("Unable to find address for onewire_dcwSupplyWaterThermometer\n");
+  }
+  else onewire_dcwSupplyWaterEnabled = true;
+  if (!oneWireSensors.getAddress(onewire_chReturnWaterThermometer, 1)) {
+    DEBUG("Unable to find address for Device onewire_chReturnWaterThermometer\n");
 
   }
-  else chReturnWaterEnabled = true;
-  if (!oneWireSensors.getAddress(chSupplyWaterThermometer, 1)) {
-    DEBUG("Unable to find address for chSupplyWaterThermometer\n");
-  }
-  else chSupplyWaterEnabled = true;
+  else onewire_chReturnWaterEnabled = true;
 #endif
 
 
@@ -2592,7 +2683,12 @@ void setup() {
 
 #ifdef ESPLED
   pinMode(ESPLED, OUTPUT);
+  #ifdef ESPLEDINVERSE
+  digitalWrite(ESPLED, 1);
+  #else
   digitalWrite(ESPLED, 0);
+  #endif
+  
 #endif
 
 #ifdef FLASHBUTTON
@@ -2606,14 +2702,6 @@ void setup() {
 
   mqttclient.setCallback(mqttcallback);
 
-#ifdef SONOFFCH
-  for (byte i = 0; i < SONOFFCH; i++)
-  {
-    digitalWrite(sonoff_relays[i], 0);
-    pinMode(sonoff_relays[i], OUTPUT);
-    pinMode(sonoff_buttons[i], INPUT_PULLUP);
-  }
-#endif
 #ifdef OPENTHERM
   otserver.begin();
   Serial.print("\r\n");
@@ -2624,10 +2712,6 @@ void setup() {
   Serial.print("\r\n");
 #endif
 
-#ifdef IRRIGATION
-  for (uint8_t i = 0; i < 4; i++) irrigation_starttime[i] = 0;
-#endif
-
 #ifdef NEOPIXELPIN
   neopixelleds.begin();               // init van de strip
   neopixelleds.setPixelColor(0, neopixelleds.Color(0, 0, 0));
@@ -2636,102 +2720,9 @@ void setup() {
 #endif
 
 #ifdef DIMMER
-  dimmer_init();  
+  dimmer_init(ZEROCROSS_PIN, TRIAC_PIN);  
 #endif
 }
-
-#ifdef DIMMER
-byte fade = 1;
-byte state = 1;
-byte tarBrightness = 255;
-byte curBrightness = 0;
-byte zcState = 0; // 0 = ready; 1 = processing;
-int dimDelay = 0;
-
-void dimmer_setdimvalue(byte value)
-{
-  DEBUG("Dimmer set %d\n", value);
-  tarBrightness = value;
-  putdatamap ("dimvalue", String(value));
-  dimmer_setdimstate(value ? 1 : 0);
-}
-
-void dimmer_setdimstate(bool value)
-{
-  DEBUG("Dimmer set state %d\n", value);
-  state = value;
-  putdatamap ("dimstate", String(value));
-}
-
-void dimmer_init()
-{
-  DEBUG("Dimmer Init!\n");
-//  system_update_cpu_freq(160); // Minimize flickering of lamp
-  pinMode(ZEROCROSS, INPUT_PULLUP);
-  digitalWrite(PWMOUT, 0);
-  pinMode(PWMOUT, OUTPUT);
-  hw_timer_init(NMI_SOURCE, 0);
-  hw_timer_set_func(dimTimerISR);
-  attachInterrupt(ZEROCROSS, dimmerzcDetectISR, RISING);
-  dimmer_setdimvalue(0);
-}
-
-void dimmer_stop()
-{
-    DEBUG("Dimmer Stop!\n");
-    detachInterrupt(ZEROCROSS);
-    hw_timer_set_func(0);
-    hw_timer_deinit();
-    digitalWrite(PWMOUT, 0);
-}
-
-void dimmerzcDetectISR() 
-{
-  if (curBrightness < 255) {
-    hw_timer_arm(dimDelay);
-  }
-  else digitalWrite(PWMOUT, 1);
-}
-
-byte fadedelay = 0;
-
-void dimTimerISR() 
-{
-    digitalWrite(PWMOUT, 1);
-    static bool turnoff = 0;
-    if (turnoff == 1)
-    {
-      digitalWrite(PWMOUT, 0);
-      turnoff = 0;
-      return;      
-    }
-    turnoff = 1;
-
-    if (fadedelay < 1) fadedelay++;
-    else
-    {
-      fadedelay = 0;
-      if (fade == 1) {
-        if (curBrightness > tarBrightness && curBrightness > 0) {
-          --curBrightness;
-        }
-        else if (curBrightness < tarBrightness && curBrightness < 255 ) {
-          if ((curBrightness == 0) && (tarBrightness > 15)) curBrightness = 15;
-          ++curBrightness;
-        }
-      }
-    }
-
-    if (fade == 0)
-    {
-        curBrightness = tarBrightness;
-    }
-
-    dimDelay = 30 * (255 - curBrightness) + 400;
-
-    hw_timer_arm(30);
-}
-#endif
 
 void processCmdRemoteDebug()
 {
