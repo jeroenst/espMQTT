@@ -4,10 +4,10 @@
 //#define MAINPOWERMETER
 //#define OPENTHERM
 //#define SONOFF4CH //ESP8285
-//#define DUCOBOX
+#define DUCOBOX
 //#define SONOFFDUAL
 //#define OLDBATHROOM
-#define SMARTMETER
+//#define SMARTMETER
 //#define WATERMETER
 //#define NOISE
 //#define IRRIGATION
@@ -61,9 +61,7 @@ uint32_t sonoffch_starttime[4];
 #define SONOFFDUAL
 #define FLASHBUTTON 10
 #define ESPLED 13
-uint16_t ducobox_minfanspeed = 0;
-#include <ESP8266WiFi.h>
-WiFiServer ducoserver(2233);
+#include "ducobox.h";
 #endif
 
 #ifdef GARDEN
@@ -133,14 +131,13 @@ static bool sonoff_oldbuttons[1] = {1};
 
 #ifdef MAINPOWERMETER
 #define ESPNAME "MAINPOWERMETER"
-#include <SPI.h>
 #define FLASHBUTTON D3
 #define ESPLED D4
-#define ADS_SPISPEED 1250000
 #define ADS0_RDY_PIN    D0 //ADS1256 data ready
 #define ADS0_CS_PIN    D1 //ADS1256 chip select
 #define ADS1_RDY_PIN    D2 //ADS1256 data ready
 #define ADS1_CS_PIN    D8 //ADS1256 chip select
+#include "circuitspowermeter.h"
 #endif
 
 #ifdef OPENTHERM
@@ -242,7 +239,7 @@ struct dataStruct
   bool sendMQTT;
 };
 
-SimpleMap<String, dataStruct> *dataMap = new SimpleMap<String, dataStruct>([](String &a, String &b) -> int {
+SimpleMap<String, String> *dataMap = new SimpleMap<String, String>([](String &a, String &b) -> int {
   if (a == b) return 0;      // a and b are equal
   else if (a > b) return 1;  // a is bigger than b
   else return -1;            // a is smaller than b
@@ -320,26 +317,26 @@ void initSerial()
 
 String getdatamap(String topic)
 {
-  return dataMap->get(topic).data;
+  return dataMap->get(topic);
 }
 
 void showdatamap()
 {
   for (int i = 0; i < dataMap->size(); i++)
   {
-    DEBUG("%s=%s\n", dataMap->getKey(i).c_str(), dataMap->getData(i).data.c_str());
+    DEBUG("%s=%s\n", dataMap->getKey(i).c_str(), dataMap->getData(i).c_str());
     yield();
   }
 }
 
 void putdatamap(String topic, String value, bool sendupdate = true, bool forcesend = false)
 {
-  if ((dataMap->get(topic).data != value) || forcesend)
+  if (((dataMap->get(topic) != value) || forcesend) && sendupdate)
   {
     DEBUGV ("DATAMAP %s=%s\n", topic.c_str(), value.c_str());
+    dataMap->put(topic, value);
     if (mqttclient.connected())
     {
-      dataMap->put(topic, dataStruct{value, false});
       String mqtttopic = String("home/" + WiFi.hostname() + "/" + topic);
       if (sendupdate)
       {
@@ -347,8 +344,8 @@ void putdatamap(String topic, String value, bool sendupdate = true, bool forcese
         DEBUG("MQTT PUBLISHING %s=%s\n", mqtttopic.c_str(), value.c_str());
       }
     }
-    else dataMap->put(topic, dataStruct{value, sendupdate});
   }
+  else dataMap->put(topic, value);
 }
 
 void update_systeminfo(bool writestaticvalues = false)
@@ -461,13 +458,7 @@ void mqttcallback(char* topic, byte* payload, unsigned int length) {
 #endif
 
 #ifdef DUCOBOX
-  /*  if (String(topic) == String("home/" + WiFi.hostname() + "/setminfanspeed"))
-    {
-      uint16_t minfanspeed = payloadstring.toInt();
-      DEBUG("RECEIVED SETMINFANSPEED %d\n", minfanspeed);
-      if ((minfanspeed > 0) && (minfanspeed <= 3000)) ducobox_minfanspeed = minfanspeed;
-    }*/
-  if (String(topic) == String("home/" + WiFi.hostname() + "/setfan")) ducobox_setfan("mqtt", payloadstring.toInt());
+  if (String(topic) == String("home/" + WiFi.hostname() + "/setfan")) ducobox_setfan(payloadstring.toInt());
 #endif
 
 #ifdef DIMMER
@@ -604,7 +595,7 @@ void loop()
   yield();
 
 #ifdef SONOFFCH
-  handle_sonoff();
+  sonoff_handle();
 #endif
 
 #ifdef NOISE
@@ -652,7 +643,19 @@ void loop()
     update_systeminfo();
 
 #ifdef MAINPOWERMETER
-    update_mainpowermeter();
+  static uint8_t circuitnr = 0;
+  int32_t mW;
+  int32_t mVA;
+  int32_t mA;
+  int32_t mV;
+  uint8_t nrofsamples;
+  circuitspowermeter_read(circuitnr, mW, mVA, mA, mV, 10);
+  if (circuitnr==0) putdatamap("mainsvoltage", String(mV / 1000));
+  putdatamap("circuit/" + String((circuitnr + 1)) + "/mA", String(mA));
+  putdatamap("circuit/" + String((circuitnr + 1)) + "/W", String(mW / 1000));
+  putdatamap("circuit/" + String((circuitnr + 1)) + "/VA", String(mVA / 1000));
+  if (circuitnr < 14) circuitnr++;
+  else circuitnr = 0;
 #endif
 
     if (wifiTimer < 20) wifiTimer++;
@@ -789,7 +792,7 @@ void loop()
 }
 
 #ifdef SONOFFCH
-void init_sonoff()
+void sonoff_init()
 {
   bool inverse = false;
   #ifdef SONOFFCHINVERSE
@@ -807,7 +810,7 @@ void init_sonoff()
 #endif
 }
 
-void handle_sonoff()
+void sonoff_handle()
 {
 #ifdef SONOFFCH_TIMEOUT
   for (uint8_t i = 0; i < SONOFFCH; i++)
@@ -881,10 +884,9 @@ void publishdatamap()
   for (int i = 0; i < dataMap->size(); i++)
   {
     String topic = String("home/" + WiFi.hostname() + "/" + dataMap->getKey(i));
-    String payload = dataMap->getData(i).data;
+    String payload = dataMap->getData(i);
     mqttclient.publish(topic.c_str(), payload.c_str(), true);
     DEBUG("MQTT PUBLISHING %s=%s\n", topic.c_str(), payload.c_str());
-    dataMap->put(dataMap->getKey(i), dataStruct{payload, false});
   }
 }
 
@@ -990,250 +992,6 @@ void timerCallback(void *pArg)
 #endif
 }
 
-#ifdef DUCOBOX
-void ducobox_setfan(String source, uint8_t value)
-{
-  static SimpleMap<String, uint8_t> *ducodataMap = new SimpleMap<String, uint8_t>([](String & a, String & b) -> int {
-    if (a == b) return 0;      // a and b are equal
-    else if (a > b) return 1;  // a is bigger than b
-    else return -1;            // a is smaller than b
-  });
-
-  ducodataMap->put(source, value);
-
-  uint8_t newvalue = 0;
-
-  for (int i = 0; i < ducodataMap->size(); i++)
-  {
-    newvalue = max(newvalue, ducodataMap->getData(i));
-  }
-
-  DEBUG("ducobox_setfan newvalue=%d\n", newvalue);
-
-  digitalWrite(sonoff_relays[0], newvalue == 1 ? 1 : 0);
-  digitalWrite(sonoff_relays[1], newvalue > 1 ? 1 : 0);
-}
-
-// This function reads the ducobox fanspeed, node 2 co2 and node 2 temperature.
-// It also can write the minimum fanspeed to the ducobox
-// minfanspeed : this value will be written to the ducobox upon change
-// return: 0 if no new data was received, 1 if new data is available
-int ducobox_handle()
-{
-  static String serialmessage = "";
-  static uint8_t ducocmd = 0;
-  static unsigned long nextupdatetime = millis();
-  int returnvalue = 0;
-  String topic = "";
-  String ducovalue = "";
-  static bool firstrun = 1;
-
-  if (firstrun)
-  {
-    putdatamap("1/fanspeed", "-");
-    putdatamap("1/minfanspeed", "-");
-    putdatamap("2/co2", "-");
-    putdatamap("2/co2/retries", "-");
-    putdatamap("2/temperature", "-");
-    putdatamap("2/temperature/retries", "-");
-    firstrun = 0;
-  }
-
-  static WiFiClient ducoclient;
-  if (!ducoclient || !ducoclient.connected()) ducoclient = ducoserver.available();
-  else
-  {
-    while (ducoclient.available())
-    {
-      yield();
-      delay(10);
-      Serial.print((char)ducoclient.read());
-    }
-  }
-
-  while (Serial.available() > 0) {
-    char ducochar = char(Serial.read());
-    serialmessage += ducochar;
-  }
-  yield();
-
-  if (ducoclient && ducoclient.connected())
-  {
-    for (int i = 0; i < serialmessage.length(); i++)
-    {
-      yield();
-      char ducochar = serialmessage.charAt(i);
-      ducoclient.print(ducochar);
-      if (ducochar == '\r') ducoclient.print('\n');
-    }
-    serialmessage = "";
-  }
-  else
-  {
-    if (millis() > nextupdatetime)
-    {
-
-      nextupdatetime = millis() + 30000; // Retry after 30 seconds
-      if (!ducoclient.connected())
-      {
-        DEBUG("Requesting Fanspeed from ducobox...\n");
-        ducobox_writeserial("\r\nfanspeed\r\n");                // Request fanspeed
-        ducocmd = 0;
-      }
-    }
-
-
-    while (serialmessage.indexOf('\r') >= 0)
-    {
-      yield();
-      int eolchar = serialmessage.indexOf('\r');
-      String ducomessage = serialmessage.substring(0, eolchar);
-      serialmessage = serialmessage.substring(eolchar + 1);
-      DEBUG("Received from ducobox:%s\n", ducomessage.c_str());
-
-
-      if (ducomessage.indexOf("  FanSpeed:") == 0)
-      {
-        // Read fanspeed
-        ducovalue = ducomessage.substring(19);
-        ducovalue = ducovalue.substring(0, ducovalue.indexOf(' '));
-        DEBUG("DUCOBOX FANSPEED=%s\n", ducovalue.c_str());
-
-        topic = "1/fanspeed";
-        putdatamap(topic, ducovalue);
-        returnvalue = 1;
-        DEBUG("Requesting min fan speed from ducobox...\n");
-        ducobox_writeserial("fanparaget\r\n");       // Request TEMPERATURE of node 2
-        ducocmd  = 1;
-      }
-
-      if (ducomessage.indexOf("   2. MIN FAN SPEED") == 0)
-      {
-        ducovalue = ducomessage.substring(ducomessage.indexOf(":") + 2);
-        ducovalue = ducovalue.substring(0, ducovalue.indexOf(" ["));
-        topic = "1/minfanspeed";
-        putdatamap(topic, ducovalue);
-        DEBUG("DUCOBOX MINFANSPEED=%s\n", ducovalue.c_str());
-      }
-
-      if ((ducocmd == 1) && (ducomessage.indexOf("> ") == 0))
-      {
-        DEBUG("Requesting Temperature from node 2 from ducobox...\n");
-        ducobox_writeserial("nodeparaget 2 73\r\n");       // Request TEMPERATURE of node 2
-        ducocmd = 2;
-      }
-
-      if ((ducomessage.indexOf("  -->") == 0) || (ducomessage.indexOf("  Failed") == 0))
-      {
-        if (ducomessage.indexOf("  Failed") == 0)
-        {
-          ducomessage = "";
-        }
-        switch (ducocmd)
-        {
-          case 2:
-            // Read node 2 temperature
-            static uint8_t tempretry = 0;
-            if (ducomessage != "")
-            {
-              ducovalue = String(float(ducomessage.substring(6).toInt()) / 10, 1);
-              putdatamap("2/temperature", ducovalue);
-              tempretry = 0;
-            }
-            else
-            {
-              tempretry++;
-              if (tempretry == 0) tempretry--;
-            }
-            if (tempretry == 10) putdatamap("2/temperature", "-");
-            putdatamap("2/temperature/retries", String(tempretry));
-            DEBUG("DUCOBOX NODE 2 TEMPERATURE=%s\n", ducovalue.c_str());
-            returnvalue = 1;
-
-            DEBUG("Requesting CO2 from node 2 from ducobox...\n");
-            ducobox_writeserial("nodeparaget 2 74\r\n");       // Request CO2 of sensor 2
-            ducocmd = 3;
-            break;
-          case 3:
-            // Read node 2 co2
-            static uint8_t co2retry = 0;
-            if (ducomessage != "")
-            {
-              ducovalue = ducomessage.substring(6);
-              putdatamap("2/co2", ducovalue);
-              co2retry = 0;
-            }
-            else
-            {
-              co2retry++;
-              if (co2retry == 0) co2retry--;
-            }
-            if (co2retry == 10) putdatamap("2/co2", "-");
-            putdatamap("2/co2/retries", String(co2retry));
-            DEBUG("DUCOBOX NODE 2 CO2=%s\n", ducovalue.c_str());
-            returnvalue = 1;
-
-            ducocmd = 4;
-            nextupdatetime = millis() + 5000; // Next update over 5 seconds
-            break;
-        }
-      }
-
-      if ((ducocmd == 4))// && (oldminfanspeed != setminfanspeed))
-      {
-        static uint16_t co2 = 0;
-        static uint8_t fanspeed = 0;
-        static uint8_t oldfanspeed = 255;
-        if (getdatamap("2/co2") != "-")
-        {
-          co2 = getdatamap("2/co2").toInt();
-          DEBUG ("CO2=%d\n", co2);
-          switch (fanspeed)
-          {
-            case 0:
-              if (co2 >= 1000) fanspeed = 1;
-              break;
-            case 1:
-              if (co2 < 800) fanspeed = 0;
-              if (co2 >= 1200) fanspeed = 2;
-              break;
-            case 2:
-              if (co2 < 1000) fanspeed = 1;
-              break;
-          }
-          if (oldfanspeed != fanspeed)
-          {
-            ducobox_setfan("co2", fanspeed);
-            oldfanspeed = fanspeed;
-          }
-        }
-
-        /* Setting fanspeed by serial command is disabled because it can break the onboard flash of the ducobox when used to many times (>10.000)
-          oldminfanspeed = setminfanspeed;
-          String cmd = "fanparaset 2 " + String(setminfanspeed) + "\r\n";
-          ducobox_writeserial(cmd.c_str());
-          nextupdatetime = millis() + 2000; // Next update over 2 seconds
-        */
-      }
-    }
-  }
-  return returnvalue;
-}
-
-void ducobox_writeserial(const char *message)
-{
-  for (int i = 0; i < strlen(message); i++)
-  {
-    Serial.print (message[i]);
-    yield();
-    delay(10);
-  }
-}
-
-#endif
-
-
-
 #ifdef MH_Z19
 void read_MHZ19()
 {
@@ -1322,6 +1080,9 @@ void handleWWWSettings()
         delay(3000);
         ESP.restart();
       }
+    }
+    for (uint8_t i = 0; i < webserver.args(); i++)
+    {
       if (webserver.argName(i) == "wifissid") postwifissid = webserver.arg(i);
       if (webserver.argName(i) == "wifikey") postwifikey = webserver.arg(i);
       if (webserver.argName(i) == "mqttserver") mqtt_server = webserver.arg(i);
@@ -1378,7 +1139,7 @@ void handleWWWSettings()
 #ifdef WATERMETER
   webpage += String("<TR><TD>Watermeter Liter</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"64\" name=\"watermeterliter\" value=\"") + getdatamap("water/liter") + "\"></TD></TR>";
 #endif
-  webpage += "</TABLE><BR><CENTER><input type=\"submit\" value=\"Save Settings\"></form><BR><BR><form action=\"/settings\" method=\"post\" autocomplete=\"off\"><input type=\"hidden\" name=\"rebootdevice\" value=\"1\"><input type=\"submit\" value=\"Reboot Device\"></form><BR><A HREF=\"/\">Return to main page</A></CENTER></div></BODY></HTML>";
+  webpage += "</TABLE><BR><CENTER><input type=\"hidden\" name=\"rebootdevice\" value=\"1\"><input type=\"submit\" value=\"Reboot Device\">&nbsp;&nbsp;&nbsp;&nbsp;<input type=\"submit\" value=\"Save Settings\"></form><BR><BR><A HREF=\"/\">Return to main page</A></CENTER></div></BODY></HTML>";
   webserver.send(200, "text/html", webpage);
 }
 
@@ -1386,7 +1147,7 @@ void handleJsonData() {
   String json = "{";
   for (int i = 0; i < dataMap->size(); i++)
   {
-    json += "\"" + dataMap->getKey(i) + "\":\"" + dataMap->getData(i).data + "\",";
+    json += "\"" + dataMap->getKey(i) + "\":\"" + dataMap->getData(i) + "\",";
   }
   json.remove(json.length() - 1);
   json += "}";
@@ -1398,546 +1159,10 @@ void handleWWWRoot() {
   webserver.send_P(200, "text/html", webpage_P);
 }
 
-#ifdef MAINPOWERMETER
-void init_mainpowermeter()
+void ducoboxcallback (String topic, String payload)
 {
-  system_update_cpu_freq(160);
-  initADS(ADS0_CS_PIN, ADS0_RDY_PIN);
-  initADS(ADS1_CS_PIN, ADS1_RDY_PIN);
+  putdatamap(topic, payload);
 }
-
-void update_mainpowermeter()
-{
-  //debugvoltread();
-  //return;
-  // Every round update a circuit channel
-  static uint8_t i = 0;
-
-  int32_t powermeter_mW = 0;
-  int32_t powermeter_mVA = 0;
-  int32_t powermeter_mA = 0;
-  int32_t powermeter_mV = 0;
-
-  // Read 10 samples from a circuit
-  for (uint8_t y = 0; y < 10; y++)
-  {
-    int32_t powermeterpart_mW = 0;
-    int32_t powermeterpart_mVA = 0;
-    int32_t powermeterpart_mA = 0;
-    int32_t powermeterpart_mV = 0;
-    readADSpower(i, &powermeterpart_mA, &powermeterpart_mV, &powermeterpart_mW, &powermeterpart_mVA);
-    powermeter_mW += powermeterpart_mW / 10;
-    powermeter_mVA += powermeterpart_mVA / 10;
-    powermeter_mA += powermeterpart_mA / 10;
-    powermeter_mV += powermeterpart_mV / 10;
-  }
-
-  DEBUG("Circuit %d:%dmV, %dmA, %dmW, %dmVA\n", i + 1, powermeter_mV, powermeter_mA, powermeter_mW, powermeter_mVA);
-  if (i==0) putdatamap("mainsvoltage", String(powermeter_mV / 1000));
-  putdatamap("circuit/" + String((i + 1)) + "/mA", String(powermeter_mA));
-  putdatamap("circuit/" + String((i + 1)) + "/W", String(powermeter_mW / 1000));
-  putdatamap("circuit/" + String((i + 1)) + "/VA", String(powermeter_mVA / 1000));
-
-  i++;
-  if (i == 14) i = 0;
-}
-
-void initADS(byte cspin, byte drdypin)
-{
-  pinMode(cspin, OUTPUT);
-  pinMode(drdypin, INPUT);
-
-  SPI.begin();
-
-  SPI.beginTransaction(SPISettings(ADS_SPISPEED, MSBFIRST, SPI_MODE1));
-  delayMicroseconds(10);
-  digitalWrite(cspin, LOW); // select ADS
-  delayMicroseconds(50);
-
-  //Reset to Power-Up Values (FEh)
-  SPI.transfer(0xFE);
-  delayMicroseconds(100);
-
-  byte status_reg = 0 ;  // address (datasheet p. 30)
-  byte status_data = 0x01; //status: Most Significant Bit First, Auto-Calibration Disabled, Analog Input Buffer Disabled
-  //0x03; //to activate buffer
-  SPI.transfer(0x50 | status_reg);
-  SPI.transfer(0x00);   // 2nd command byte, write one register only
-  SPI.transfer(status_data);   // write the databyte to the register
-  delayMicroseconds(10);
-
-  //PGA SETTING
-  //1 ±5V        000 (1)
-  //2 ±2.5V      001 (2)
-  //4 ±1.25V     010 (3)
-  //8 ±0.625V    011 (4)
-  //16 ±312.5mV  100 (5)
-  //32 ±156.25mV 101 (6)
-  //64 ±78.125mV 110 (7) OR 111 (8)
-  byte adcon_reg = 2; //A/D Control Register (Address 02h)
-  byte adcon_data = 0x20; // 0 01 00 000 => Clock Out Frequency = fCLKIN, Sensor Detect OFF, gain 1
-  //0x25 for setting gain to 32, 0x27 to 64
-  SPI.transfer(0x50 | adcon_reg);
-  SPI.transfer(0x00);   // 2nd command byte, write one register only
-  SPI.transfer(adcon_data);   // write the databyte to the register
-  delayMicroseconds(10);
-
-  //Set sampling rate
-  byte drate_reg = 3; // Choosing Data Rate register = third register.
-  byte drate_data = 0b11110000; // 11110000 = 30,000SPS 11000000 = 3,750SPS
-  SPI.transfer(0x50 | drate_reg);
-  SPI.transfer(0x00);   // 2nd command byte, write one register only
-  SPI.transfer(drate_data);   // write the databyte to the register
-  delayMicroseconds(10);
-
-  //done with settings, can close SPI transaction now
-  digitalWrite(cspin, HIGH); //unselect ADS
-  SPI.endTransaction();
-  delayMicroseconds(50);
-
-  DEBUG("ADS1256 configured\n");
-}
-
-void setADSch(byte cspin, byte drdypin, byte channel)
-{
-  SPI.beginTransaction(SPISettings(ADS_SPISPEED, MSBFIRST, SPI_MODE1));
-  digitalWrite(cspin, LOW);
-  delayMicroseconds(50);
-  while (!digitalRead(drdypin)) {} ; // Wait for DRDY pin to become high..
-  while (digitalRead(drdypin)) {} ; // Wait for DRDY pin to become low..
-
-  // Stop Read Data Continuesly 0000  1111 (0Fh)
-  SPI.transfer(0x0F);
-  delayMicroseconds(50);
-
-  byte data = (channel << 4) | 0b1000; //AIN-channel and AINCOM
-  SPI.transfer(0x50 | 1); // write (0x50) MUX register (0x01)
-  SPI.transfer(0x00);   // number of registers to be read/written − 1, write one register only
-  SPI.transfer(data);   // write the databyte to the register
-  delayMicroseconds(10);
-
-  //SYNC command 1111 1100
-  SPI.transfer(0xFC);
-  delayMicroseconds(10);
-
-  //WAKEUP 0000 0000
-  SPI.transfer(0x00);
-  delayMicroseconds(10);
-
-  for (int i = 5; i--; i > 0) // Wait 5 drdy periods for analog input to settle (settling time)
-  {
-    while (!digitalRead(drdypin)) {} ; // Wait for DRDY pin to become high..
-    while (digitalRead(drdypin)) {} ; // Wait for DRDY pin to become low..
-  }
-
-  // Read Data Continuesly 0000  0011 (03h)
-  SPI.transfer(0x03);
-  delayMicroseconds(50);
-
-  //done, can close SPI transaction now
-  digitalWrite(cspin, HIGH); //unselect ADS
-  SPI.endTransaction();
-}
-
-long readADS(byte cspin, byte drdypin)
-{
-  long adc_val;
-
-  SPI.beginTransaction(SPISettings(ADS_SPISPEED, MSBFIRST, SPI_MODE1));
-  digitalWrite(cspin, LOW);
-
-  while (!digitalRead(drdypin)) {}; // Wait for DRDY pin to become high..
-  while (digitalRead(drdypin)) {} ; // Wait for DRDY pin to become low..
-
-  adc_val = SPI.transfer(0);
-  adc_val <<= 8; //shift to left
-  adc_val |= SPI.transfer(0);
-  adc_val <<= 8;
-  adc_val |= SPI.transfer(0);
-
-  //The ADS1255/6 output 24 bits of data in Binary Two’s
-  //Complement format. The LSB has a weight of
-  //2VREF/(PGA(223 − 1)). A positive full-scale input produces
-  //an output code of 7FFFFFh and the negative full-scale
-  //input produces an output code of 800000h.
-  if (adc_val > 0x7fffff) { //if MSB == 1
-    adc_val = 16777216ul - adc_val; //do 2's complement, discard sign
-  }
-
-  //done with settings, can close SPI transaction now
-  digitalWrite(cspin, HIGH); //unselect ADS
-  delayMicroseconds(50);
-  SPI.endTransaction();
-
-  return adc_val;
-}
-
-long readADSac(byte cspin, byte drdypin)
-{
-  uint64_t ac_val = 0;
-  uint64_t acm_val = 0;
-  long adc_val;
-  int i = 0;
-
-  SPI.beginTransaction(SPISettings(ADS_SPISPEED, MSBFIRST, SPI_MODE1));
-  digitalWrite(cspin, LOW);
-
-  for (int y = 0; y < 2; y++) // sample 2 sine waves (at 50hz)
-  {
-    ac_val = 0;
-    cli(); // Disable interrupts
-    for (i = 0; i < 600; i++)
-    {
-      while (!digitalRead(drdypin)) {}; // Wait for DRDY pin to become high..
-      while (digitalRead(drdypin)) {} ; // Wait for DRDY pin to become low..
-
-      adc_val = 0;
-      adc_val = SPI.transfer(0);
-      adc_val <<= 8; //shift to left
-      adc_val |= SPI.transfer(0);
-      adc_val <<= 8;
-      adc_val |= SPI.transfer(0);
-      ac_val += abs(adc_val - 0x3ffef0); // Center measurement
-    }
-    sei(); // Enable interrupts
-    acm_val += ac_val / 600;
-  }
-
-  //done with settings, can close SPI transaction now
-  digitalWrite(cspin, HIGH); //unselect ADS
-  delayMicroseconds(50);
-  SPI.endTransaction();
-
-  return max(long(acm_val / 2) - 252, long(0)); // Filter noise
-}
-
-void debugvoltread()
-{
-   setADSch(ADS0_CS_PIN, ADS0_RDY_PIN, 7); // Volt
-   while (!digitalRead(ADS0_RDY_PIN)) {}; // Wait for DRDY pin to become high..
-   while (digitalRead(ADS0_RDY_PIN)) {} ; // Wait for DRDY pin to become low..
-
-    uint32_t adc_val_volt = 0;
-    digitalWrite(ADS0_CS_PIN, LOW);
-    adc_val_volt = 0;
-    adc_val_volt = SPI.transfer(0);
-    adc_val_volt <<= 8; //shift to left
-    adc_val_volt |= SPI.transfer(0);
-    adc_val_volt <<= 8;
-    adc_val_volt |= SPI.transfer(0);
-    digitalWrite(ADS0_CS_PIN, HIGH);
-
-    DEBUG("ADC READ=%d\n", adc_val_volt);
-}
-
-byte readADSpower(byte adchannel, int32 * mA, int32 * mV, int32 * mW, int32 * mVA)
-{
-#define NROFSAMPLES 200
-  int32_t ac_mA[NROFSAMPLES]; // 200 samples is 20 ms
-  int32_t ac_mA_offset = 0;
-  int32_t ac_mV[NROFSAMPLES];
-  int32_t ac_mV_offset = 0;
-  double ac_mA_gain = 1;
-  double ac_mV_gain = 1;
-
-  int32_t adc_val_amp = 0;
-  int32_t adc_val_volt = 0;
-
-  int i = 0;
-  byte adc_cs_amp_pin;
-  byte adc_drdy_amp_pin;
-  byte adc_cs_volt_pin;
-  byte adc_drdy_volt_pin;
-  // Set adc channels for measuring volt and amps
-  if (adchannel < 7)
-  {
-    ac_mA_offset = 5; // Offset ad 0
-    ac_mA_gain = 0.01168; // Gain ad 0 (calculated: 0.01168)
-    adc_cs_amp_pin = ADS0_CS_PIN;
-    adc_drdy_amp_pin = ADS0_RDY_PIN;
-    setADSch(ADS0_CS_PIN, ADS0_RDY_PIN, adchannel); // Amps
-
-
-    ac_mV_offset = 0; // Offset ad 1
-    ac_mV_gain = 0.092; // Gain ad 1
-    adc_cs_volt_pin = ADS1_CS_PIN;
-    adc_drdy_volt_pin = ADS1_RDY_PIN;
-    setADSch(ADS1_CS_PIN, ADS1_RDY_PIN, 7); // Volt
-  }
-  else if (adchannel < 14)
-  {
-    ac_mA_offset = 5; // Offset ad 1
-    ac_mA_gain = 0.0145; // Gain ad 1
-    adc_cs_amp_pin = ADS1_CS_PIN;
-    adc_drdy_amp_pin = ADS1_RDY_PIN;
-    setADSch(ADS1_CS_PIN, ADS1_RDY_PIN, adchannel - 7); // Amps
-
-    ac_mV_offset = 0; // Offset ad 0 mV
-    ac_mV_gain = 0.092; // Gain ad 0
-    adc_cs_volt_pin = ADS0_CS_PIN;
-    adc_drdy_volt_pin = ADS0_RDY_PIN;
-    setADSch(ADS0_CS_PIN, ADS0_RDY_PIN, 7); // Volt
-  }
-  else return -1;
-
-  //DEBUG ("Reading AD channel %d\n",adchannel);
-  SPI.beginTransaction(SPISettings(ADS_SPISPEED, MSBFIRST, SPI_MODE1));
-
-  cli(); // Disable interrupts
-  for (i = 0; i < NROFSAMPLES; i++)
-  {
-    while (!digitalRead(adc_drdy_amp_pin)) {}; // Wait for DRDY pin to become high..
-    while (digitalRead(adc_drdy_amp_pin)) {} ; // Wait for DRDY pin to become low..
-
-    digitalWrite(adc_cs_amp_pin, LOW);
-    adc_val_amp = 0;
-    adc_val_amp = SPI.transfer(0);
-    adc_val_amp <<= 8; //shift to left
-    adc_val_amp |= SPI.transfer(0);
-    adc_val_amp <<= 8;
-    adc_val_amp |= SPI.transfer(0);
-    digitalWrite(adc_cs_amp_pin, HIGH);
-
-    ac_mA[i] = adc_val_amp;
-
-    while (!digitalRead(adc_drdy_volt_pin)) {}; // Wait for DRDY pin to become high..
-    while (digitalRead(adc_drdy_volt_pin)) {} ; // Wait for DRDY pin to become low..
-
-    digitalWrite(adc_cs_volt_pin, LOW);
-    adc_val_volt = 0;
-    adc_val_volt = SPI.transfer(0);
-    adc_val_volt <<= 8; //shift to left
-    adc_val_volt |= SPI.transfer(0);
-    adc_val_volt <<= 8;
-    adc_val_volt |= SPI.transfer(0);
-    digitalWrite(adc_cs_volt_pin, HIGH);
-
-    ac_mV[i] = adc_val_volt;
-  }
-  sei(); // Enable interrupts
-
-  //done with settings, can close SPI transaction now
-  delayMicroseconds(50);
-  SPI.endTransaction();
-
-  int64_t sum_mA = 0;
-  int64_t sum_mV = 0;
-  int64_t sum_mW = 0;
-  for (i = 0; i < NROFSAMPLES; i++)
-  {
-    double ac_mA_calc = 0;
-    ac_mA_calc = (ac_mA[i] - 0x400000); // Center measurement and calculate mains current in mA
-    ac_mA_calc += ac_mA_offset;
-    ac_mA_calc *= ac_mA_gain;
-    sum_mA += abs(ac_mA_calc);
-
-    double ac_mV_calc = 0;
-    ac_mV_calc = (ac_mV[i] - 0x400000);
-    ac_mV_calc += ac_mV_offset;
-    ac_mV_calc *= ac_mV_gain;
-    sum_mV += abs(ac_mV_calc);
-
-    ac_mV_calc = 230000; // Voltage reading is not working :-(
-    double mW_calc = ac_mA_calc * ac_mV_calc;
-    sum_mW += mW_calc;
-    //ac_val_watt += ((adc_val_amp - 0x3ffef0) * (adc_val_volt - 0x3ffef0))/10000; // Calculate milliwatts
-    //DEBUG ("%.3f,%.3f\n", ac_mA[i], ac_volt[i]);
-    //DEBUG ("%d\n", ac_mA[i]);
-    yield();
-  }
-
-  *mA = sum_mA / NROFSAMPLES;
-  *mV = sum_mV / NROFSAMPLES;
-  *mW = (sum_mW / NROFSAMPLES) / 1000;
-  *mVA = (*mA * *mV) / 1000;
-}
-
-
-/*
-
-//Maximum value of ADS
-#define ADC_COUNTS 32768
-#define PHASECAL 1.7
-#define VCAL 0.6
-#define ICAL 0.003
-
-double filteredI;
-double lastFilteredV, filteredV; //Filtered_ is the raw analog value minus the DC offset
-int sampleV;                    //sample_ holds the raw analog read value
-int sampleI;
-
-double offsetV;                          //Low-pass filter output
-double offsetI;                          //Low-pass filter output
-
-double realPower,
-       apparentPower,
-       powerFactor,
-       Vrms,
-       Irms;
-double phaseShiftedV; //Holds the calibrated phase shifted voltage.
-int startV; //Instantaneous voltage at start of sample window.
-double sqV, sumV, sqI, sumI, instP, sumP; //sq = squared, sum = Sum, inst = instantaneous
-boolean lastVCross, checkVCross; //Used to measure number of times threshold is crossed.
-
-double squareRoot(double fg)
-{
-  double n = fg / 2.0;
-  double lstX = 0.0;
-  while (n != lstX)
-  {
-    lstX = n;
-    n = (n + fg / n) / 2.0;
-  }
-  return n;
-}
-
-
-void calcVI(unsigned int crossings, unsigned int timeout)
-{
-
-  unsigned int crossCount = 0;                             //Used to measure number of times threshold is crossed.
-  unsigned int numberOfSamples = 0;                        //This is now incremented
-
-  //-------------------------------------------------------------------------------------------------------------------------
-  // 1) Waits for the waveform to be close to 'zero' (mid-scale adc) part in sin curve.
-  //-------------------------------------------------------------------------------------------------------------------------
-  boolean st = false;                                //an indicator to exit the while loop
-
-  unsigned long start = millis();    //millis()-start makes sure it doesnt get stuck in the loop if there is an error.
-
-  while (st == false)                                //the while loop...
-  {
-    //     startV = ads0.readADC_SingleEnded(0);                    //using the voltage waveform
-    if ((abs(startV) < (ADC_COUNTS * 0.55)) && (abs(startV) > (ADC_COUNTS * 0.45))) st = true; //check its within range
-    if ((millis() - start) > timeout) st = true;
-  }
-
-  //-------------------------------------------------------------------------------------------------------------------------
-  // 2) Main measurement loop
-  //-------------------------------------------------------------------------------------------------------------------------
-  start = millis();
-
-  while ((crossCount < crossings) && ((millis() - start) < timeout))
-  {
-    numberOfSamples++;                       //Count number of times looped.
-    lastFilteredV = filteredV;               //Used for delay/phase compensation
-
-    //-----------------------------------------------------------------------------
-    // A) Read in raw voltage and current samples
-    //-----------------------------------------------------------------------------
-    //    sampleV = ads0.readADC_SingleEnded(0);                 //Read in raw voltage signal
-    //   sampleI = ads0.readADC_SingleEnded(1);                 //Read in raw current signal
-
-    //-----------------------------------------------------------------------------
-    // B) Apply digital low pass filters to extract the 2.5 V or 1.65 V dc offset,
-    //     then subtract this - signal is now centred on 0 counts.
-    //-----------------------------------------------------------------------------
-    offsetV = offsetV + ((sampleV - offsetV) / 1024);
-    filteredV = sampleV - offsetV;
-    offsetI = offsetI + ((sampleI - offsetI) / 1024);
-    filteredI = sampleI - offsetI;
-
-    //-----------------------------------------------------------------------------
-    // C) Root-mean-square method voltage
-    //-----------------------------------------------------------------------------
-    sqV = filteredV * filteredV;                //1) square voltage values
-    sumV += sqV;                                //2) sum
-
-    //-----------------------------------------------------------------------------
-    // D) Root-mean-square method current
-    //-----------------------------------------------------------------------------
-    sqI = filteredI * filteredI;                //1) square current values
-    sumI += sqI;                                //2) sum
-
-    //-----------------------------------------------------------------------------
-    // E) Phase calibration
-    //-----------------------------------------------------------------------------
-    phaseShiftedV = lastFilteredV + PHASECAL * (filteredV - lastFilteredV);
-
-    //-----------------------------------------------------------------------------
-    // F) Instantaneous power calc
-    //-----------------------------------------------------------------------------
-    instP = phaseShiftedV * filteredI;          //Instantaneous Power
-    sumP += instP;                              //Sum
-
-    //-----------------------------------------------------------------------------
-    // G) Find the number of times the voltage has crossed the initial voltage
-    //    - every 2 crosses we will have sampled 1 wavelength
-    //    - so this method allows us to sample an integer number of half wavelengths which increases accuracy
-    //-----------------------------------------------------------------------------
-    lastVCross = checkVCross;
-    if (sampleV > startV) checkVCross = true;
-    else checkVCross = false;
-    if (numberOfSamples == 1) lastVCross = checkVCross;
-
-    if (lastVCross != checkVCross) crossCount++;
-  }
-
-  DEBUG((String("Nr of samples:") + numberOfSamples + "\n").c_str());
-  DEBUG((String("Nr of crosses:") + crossCount + "\n").c_str());
-
-  //-------------------------------------------------------------------------------------------------------------------------
-  // 3) Post loop calculations
-  //-------------------------------------------------------------------------------------------------------------------------
-  //Calculation of the root of the mean of the voltage and current squared (rms)
-  //Calibration coefficients applied.
-  float multiplier = 0.125F; // ADS1115 @ +/- 4.096V gain (16-bit results) 
-  double V_RATIO = VCAL * multiplier;
-  Vrms = V_RATIO * squareRoot(sumV / numberOfSamples);
-
-  double I_RATIO = ICAL * multiplier;
-  Irms = I_RATIO * squareRoot(sumI / numberOfSamples);
-
-  //Calculation power values
-  realPower = V_RATIO * I_RATIO * sumP / numberOfSamples;
-  apparentPower = Vrms * Irms;
-  powerFactor = realPower / apparentPower;
-
-  //Reset accumulators
-  sumV = 0;
-  sumI = 0;
-  sumP = 0;
-
-  DEBUG((String("Vrms=") + Vrms + "\n").c_str());
-  DEBUG((String("Irms=") + Irms + "\n").c_str());
-  DEBUG((String("realPower (W)=") + realPower + "\n").c_str());
-  DEBUG((String("apparentPower (VA)=") + apparentPower).c_str());
-  DEBUG((String("powerFactor=") + powerFactor + "\n").c_str());
-  //--------------------------------------------------------------------------------------
-}
-
-double calcIrms(unsigned int Number_of_Samples)
-{
-  // Be sure to update this value based on the IC and the gain settings!
-  float multiplier = 0.125F;    // ADS1115 @ +/- 4.096V gain (16-bit results) 
-  for (unsigned int n = 0; n < Number_of_Samples; n++)
-  {
-    //sampleI = ads0.readADC_Differential_0_1();
-
-    // Digital low pass filter extracts the 2.5 V or 1.65 V dc offset,
-    //  then subtract this - signal is now centered on 0 counts.
-    offsetI = (offsetI + (sampleI - offsetI) / 1024);
-    filteredI = sampleI - offsetI;
-    //filteredI = sampleI * multiplier;
-
-    // Root-mean-square method current
-    // 1) square current values
-    sqI = filteredI * filteredI;
-    // 2) sum
-    sumI += sqI;
-  }
-
-  Irms = squareRoot(sumI / Number_of_Samples) * multiplier;
-
-  //Reset accumulators
-  sumI = 0;
-  //--------------------------------------------------------------------------------------
-
-  return Irms;
-}
-*/
-#endif
-
 
 void openthermcallback (String topic, String payload)
 {
@@ -1991,7 +1216,7 @@ void setup() {
   }
 
 #ifdef SONOFFCH
-  init_sonoff();
+  sonoff_init();
 #endif
   WiFi.setAutoReconnect(true);
   WiFi.setSleepMode(WIFI_NONE_SLEEP);
@@ -2058,7 +1283,7 @@ void setup() {
 #endif
 
 #ifdef MAINPOWERMETER
-  init_mainpowermeter();
+  circuitspowermeter_init(ADS0_CS_PIN, ADS0_RDY_PIN, ADS1_CS_PIN, ADS1_RDY_PIN);
 #endif
 
 #ifdef ONEWIREPIN
@@ -2113,11 +1338,6 @@ void setup() {
   growatt_init(growattcallback);
 #endif
 
-#ifdef DUCOBOX
-  ducoserver.begin();
-  Serial.print("\r\n");
-#endif
-
 #ifdef NEOPIXELPIN
   neopixelleds.begin();               // init van de strip
   neopixelleds.setPixelColor(0, neopixelleds.Color(0, 0, 0));
@@ -2127,6 +1347,10 @@ void setup() {
 
 #ifdef DIMMER
   dimmer_init(ZEROCROSS_PIN, TRIAC_PIN);  
+#endif
+
+#ifdef DUCOBOX
+  ducobox_init(sonoff_relays[0], sonoff_relays[1], 10, ducoboxcallback);
 #endif
 }
 
