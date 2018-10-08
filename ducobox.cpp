@@ -18,10 +18,28 @@ void ducobox_writeserial(const char *message)
   }
 }
 
+void ducobox_setfan_internal(uint8_t id, uint8_t value)
+{
+  #define ducobox_setfan_internal_count 2
+  static uint8_t fanspeed[ducobox_setfan_internal_count] = {0,0};
+  if (id < ducobox_setfan_internal_count)
+  {
+    fanspeed[id] = value;
+    uint8_t newfanspeed = 0;
+
+    for (uint8_t i = 0; i < ducobox_setfan_internal_count; i++)
+    {
+      if (fanspeed[i] > newfanspeed) newfanspeed = fanspeed[i];
+    }
+
+    digitalWrite(_ducobox_relay0, newfanspeed == 1 ? 1 : 0);
+    digitalWrite(_ducobox_relay1, newfanspeed > 1 ? 1 : 0);
+  }
+}
+
 void ducobox_setfan(uint8_t value)
 {
-  digitalWrite(_ducobox_relay0, value == 1 ? 1 : 0);
-  digitalWrite(_ducobox_relay1, value > 1 ? 1 : 0);
+  ducobox_setfan_internal(1, value);
 }
 
 // This function reads the ducobox fanspeed, node 2 co2 and node 2 temperature.
@@ -85,6 +103,7 @@ int ducobox_handle()
       nextupdatetime = millis() + (_ducobox_refreshtime * 1000); // Next update over _duco_refreshtime seconds
       if (!ducoclient.connected())
       {
+        _ducobox_callback("status", "queuering");
         ducobox_writeserial("\r\nfanspeed\r\n");                // Request fanspeed
         ducocmd = 0;
       }
@@ -185,23 +204,24 @@ int ducobox_handle()
 
       if (ducocmd == 4)
       {
+        _ducobox_callback("status", "ready");
         static uint8_t fanspeed = 0;
         switch (fanspeed)
         {
           case 0:
-            if (_ducobox_co2 >= 1000) fanspeed = 1;
+            if (_ducobox_co2 >= 900) fanspeed = 1;
             break;
           case 1:
             if (_ducobox_co2 < 800) fanspeed = 0;
-            if (_ducobox_co2 >= 1200) fanspeed = 2;
+            if (_ducobox_co2 >= 1000) fanspeed = 2;
             break;
           case 2:
-            if (_ducobox_co2 < 1000) fanspeed = 1;
+            if (_ducobox_co2 < 900) fanspeed = 1;
             break;
         }
         if (_ducobox_co2 == 0) fanspeed = 1; // When no co2 reading do some extra ventilation to prevent high co2...
 
-        ducobox_setfan(fanspeed);
+        ducobox_setfan_internal(0, fanspeed);
 
         /* Setting fanspeed by serial command is disabled because it can break the onboard flash of the ducobox when used to many times (>10.000)
           oldminfanspeed = setminfanspeed;
