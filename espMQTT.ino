@@ -1,3 +1,4 @@
+
 //#define BATHROOM
 //#define BEDROOM2
 //#define GARDEN //ESP8285
@@ -13,9 +14,12 @@
 //#define IRRIGATION
 //#define SOIL
 //#define GROWATT
-#define DIMMER
+//#define DIMMER
+//#define SONOFFS20
+#define SONOFFBULB
 //#define SONOFFS20_PRINTER
 //#define SONOFFPOW
+
 
 #ifdef SONOFFS20_PRINTER
 #define ESPNAME "SONOFFS20_PRINTER"
@@ -159,10 +163,34 @@ void ICACHE_RAM_ATTR hlw8012_cf_interrupt() {
 
 #endif
 
+#ifdef SONOFFBULB
+// Remember: board: generic esp8266 module, flashmode=dio
+#ifndef ESPNAME
+#define ESPNAME "SONOFFBULB"
+#define APONBOOT 1
+#include "my92xx.h";
+my92xx * _my92xx;
+#define MY92XX_MODEL        MY92XX_MODEL_MY9231
+#define MY92XX_CHIPS        2
+#define MY92XX_DI_PIN       12
+#define MY92XX_DCKI_PIN     14
+
+#define MY92XX_RED          4
+#define MY92XX_GREEN        3
+#define MY92XX_BLUE         5
+#define MY92XX_CW           1
+#define MY92XX_WW           0 
+#endif
+#ifndef ARDUINO_ESP8266_ESP01
+#error "Wrong board selected! Select Generic ESP8285 module"
+#endif
+#endif
+
+
 #ifdef SONOFFS20
 // Remember: board: generic esp8266 module, flashmode=dio
 #ifndef ESPNAME
-#define ESPNAME "SONOFFS20"
+#define ESPNAME "SONOFFBULB"
 #endif
 #ifndef ARDUINO_ESP8266_ESP01
 #error "Wrong board selected! Select Generic ESP8285 module"
@@ -278,12 +306,6 @@ Adafruit_NeoPixel neopixelleds = Adafruit_NeoPixel(2, NEOPIXELPIN, NEO_RGB + NEO
 #include <RemoteDebug.h>
 #include <user_interface.h>
 #include "SimpleMap.h";
-
-struct dataStruct
-{
-  String data;
-  bool sendMQTT;
-};
 
 SimpleMap<String, String> *dataMap = new SimpleMap<String, String>([](String &a, String &b) -> int {
   if (a == b) return 0;      // a and b are equal
@@ -514,6 +536,22 @@ void mqttcallback(char* topic, byte* payload, unsigned int length) {
     putdatamap ("dimvalue", String(dimmer_getdimvalue()));
   }
 #endif
+
+#ifdef SONOFFBULB
+  if (String(topic) == String("home/" + WiFi.hostname() + "/setcolor"))
+  {
+    long number = strtol(payloadstring.substring(0,6).c_str(), NULL, 16);
+    _my92xx->setChannel(MY92XX_RED, (number >> 16) & 0xFF);
+    _my92xx->setChannel(MY92XX_GREEN, (number >> 8) & 0xFF);
+    _my92xx->setChannel(MY92XX_BLUE, number & 0xFF);
+
+    number = strtol(payloadstring.substring(6,10).c_str(), NULL, 16);
+    _my92xx->setChannel(MY92XX_CW, (number >> 8) & 0xFF);
+    _my92xx->setChannel(MY92XX_WW, number & 0xFF);
+    _my92xx->update();
+    putdatamap ("color", payloadstring);
+  }
+#endif
 }
 
 String uint64ToString(uint64_t input) {
@@ -684,6 +722,21 @@ void loop()
     timertick = 0;
     updatemqtt = 1;
 
+#ifdef APONBOOT
+    if ((uptime == 30) && (WiFi.status() != WL_CONNECTED))
+    {
+      DEBUG("Connection to wifi failed, starting accesspoint");
+      if (!WiFi.softAP(WiFi.hostname().c_str(), "esplogin", 6, 0)) DEBUG("Failed setting WiFi.softAP()");
+      WiFi.mode(WIFI_AP_STA);
+      esp_password = "esplogin";      
+    }
+    if (uptime == 330)
+    {
+      DEBUG("Stopping accesspoint");
+      WiFi.mode(WIFI_STA);
+    }
+#endif
+
     update_systeminfo();
 
 #ifdef MAINPOWERMETER
@@ -804,6 +857,9 @@ void loop()
 #ifdef DIMMER
           mqttclient.subscribe(("home/" + WiFi.hostname() + "/setdimvalue").c_str());
           mqttclient.subscribe(("home/" + WiFi.hostname() + "/setdimstate").c_str());
+#endif
+#ifdef SONOFFBULB
+          mqttclient.subscribe(("home/" + WiFi.hostname() + "/setcolor").c_str());
 #endif
         }
       }
@@ -989,8 +1045,8 @@ void flashbutton_handle()
     if (flashbuttontimer == 3) // After 3 seconds clear passwords
     {
       flashbuttonstatus = 2;
-      esp_password = "";
-      DEBUG("Web Password cleared until reboot!\n");
+      esp_password = "esplogin";
+      DEBUG("Web Password defaulted to esplogin until reboot!\n");
       ledontime = 1;
       ledofftime = 4;
     }
@@ -998,7 +1054,7 @@ void flashbutton_handle()
     if (flashbuttontimer == 6) // After 6 seconds start access point
     {
       flashbuttonstatus = 1;
-      if (!WiFi.softAP(WiFi.hostname().c_str(), "", 6, 0)) DEBUG("Failed setting WiFi.softAP()");
+      if (!WiFi.softAP(WiFi.hostname().c_str(), "esplogin", 6, 0)) DEBUG("Failed setting WiFi.softAP()");
       WiFi.mode(WIFI_AP_STA);
       DEBUG("Wifi Accesspoint started!\n");
       ledontime = 1;
@@ -1285,11 +1341,12 @@ void setup() {
   if (!read_eeprom(&esp_password, 3))
   {
     Serial.println("Error reading web password from internal eeprom\n");
+    esp_password = "esplogin";
   }
   if (!read_eeprom(&esp_hostname, 4))
   {
     Serial.println("Error reading hostname from internal eeprom\n");
-    esp_hostname = String("ESP_") + ESPNAME;
+    esp_hostname = String("ESP_") + chipid;
   }
 
 #ifdef SONOFFCH
@@ -1430,6 +1487,12 @@ void setup() {
 
 #ifdef DUCOBOX
   ducobox_init(sonoff_relays[0], sonoff_relays[1], 10, ducoboxcallback);
+#endif
+
+#ifdef SONOFFBULB
+    // MY9291 with 4 channels (like the AiThinker Ai-Light)
+    _my92xx = new my92xx(MY92XX_MODEL, MY92XX_CHIPS, MY92XX_DI_PIN, MY92XX_DCKI_PIN, MY92XX_COMMAND_DEFAULT);
+    _my92xx->setState(true);
 #endif
 
 }
