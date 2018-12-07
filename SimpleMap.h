@@ -24,8 +24,8 @@ class SimpleMap {
 
         virtual int size();
         virtual void clear();
-        virtual void remove(T key);
-        virtual void remove(int i);
+        virtual void removekey(T key);
+        virtual void removeindex(int i);
         virtual void put(T key, U obj);
         virtual U get(T key);
         virtual T getKey(int i);
@@ -222,7 +222,7 @@ void SimpleMap<T, U>::put(T key, U obj) {
 }
 
 template<typename T, typename U>
-void SimpleMap<T, U>::remove(T key) {
+void SimpleMap<T, U>::removekey(T key) {
     if ((listSize > 0) && !locked) {
         if ((compare(key, listBegin->key) < 0) || (compare(key, listEnd->key) > 0)) return;
 
@@ -251,7 +251,7 @@ void SimpleMap<T, U>::remove(T key) {
 }
 
 template<typename T, typename U>
-void SimpleMap<T, U>::remove(int i) {
+void SimpleMap<T, U>::removeindex(int i) {
     if (listSize > 0) {
         SimpleMapNode<T, U>* h = getNodeIndex(i);
 

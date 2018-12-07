@@ -9,7 +9,6 @@ uint8_t dimmer_curBrightness = 0;
 uint16_t dimmer_dimDelay = 0;
 uint8_t dimmer_zerocrosspin = 0;
 uint8_t dimmer_triacpin = 0;
-uint8_t dimmer_fadedelay = 0;
 
 void dimmer_dimTimerISR();
 void dimmer_zcDetectISR();
@@ -74,24 +73,19 @@ void dimmer_dimTimerISR()
 {
   digitalWrite(dimmer_triacpin, 1);
 
-  if (dimmer_fadedelay < 1) dimmer_fadedelay++;
-  else
-  {
-    dimmer_fadedelay = 0;
-    if (dimmer_fade == 1) {
-      if (dimmer_curBrightness > dimmer_tarBrightness && dimmer_curBrightness > 0) {
-        --dimmer_curBrightness;
-      }
-      else if (dimmer_curBrightness < dimmer_tarBrightness && dimmer_curBrightness < 255 ) {
-        if ((dimmer_curBrightness == 0) && (dimmer_tarBrightness > 15)) dimmer_curBrightness = 15;
-        ++dimmer_curBrightness;
-      }
-    }
-  }
-
   if (dimmer_fade == 0)
   {
     dimmer_curBrightness = dimmer_tarBrightness;
+  }
+  else
+  {
+    if (dimmer_curBrightness > dimmer_tarBrightness && dimmer_curBrightness > 0) {
+      --dimmer_curBrightness;
+    }
+    else if (dimmer_curBrightness < dimmer_tarBrightness && dimmer_curBrightness < 255 ) {
+      if ((dimmer_curBrightness == 0) && (dimmer_tarBrightness > 15)) dimmer_curBrightness = 15;
+      ++dimmer_curBrightness;
+    }
   }
 
   dimmer_dimDelay = (30 * (255 - dimmer_curBrightness)) + 400;

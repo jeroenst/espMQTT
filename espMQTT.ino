@@ -1,3 +1,24 @@
+/*
+   Needed libraries:
+    https://github.com/jeroenst/RemoteDebug
+    https://github.com/jeroenst/ESPAsyncTCP
+    https://github.com/jeroenst/async-mqtt-client
+
+   Optional libraries depending on defines:
+    (Sonoff POW) https://github.com/jeroenst/hlw8012
+    (RGB LED) https://github.com/jeroenst/my92xx
+    (DS18B20) https://github.com/jeroenst/OneWire
+    (DS18B20) https://github.com/jeroenst/Arduino-Temperature-Control-Library
+    (I2C OLED DISPLAY) https://github.com/jeroenst/esp8266-oled-ssd1306
+    
+   Libraries via Arduino Library Manager:
+    (I2C) Wire
+
+
+   Known bugs:
+    MQTT SSL not working
+    
+*/
 
 //#define BATHROOM
 //#define BEDROOM2
@@ -16,10 +37,12 @@
 //#define GROWATT
 //#define DIMMER
 //#define SONOFFS20
-#define SONOFFBULB
+//#define SONOFFBULB
 //#define SONOFFS20_PRINTER
-//#define SONOFFPOW
-
+//#define SONOFFPOW // not finished yet
+//#define SONOFFPOWR2
+//#define WEATHER
+#define AMGPELLETSTOVE
 
 #ifdef SONOFFS20_PRINTER
 #define ESPNAME "SONOFFS20_PRINTER"
@@ -45,6 +68,25 @@ uint32_t sonoffch_starttime[1];
 #define ESPLED D4
 #endif
 
+
+#ifdef AMGPELLETSTOVE
+#define ESPNAME "AMGPELLETSTOVE"
+#define NODEMCULEDPIN D0
+#define FLASHBUTTON D3
+#define ESPLED D4
+#include "amgpelletstove.h";
+#endif
+
+#ifdef WEATHER
+#define ESPNAME "WEATHER"
+#define NODEMCULEDPIN D0
+#define FLASHBUTTON D3
+#define ESPLED D4
+#define ONEWIREPIN D5
+#define RAINMETERPIN D1
+#endif
+
+
 #ifdef GROWATT
 #define ESPNAME "GROWATT"
 #define NODEMCULEDPIN D0
@@ -57,6 +99,7 @@ uint32_t sonoffch_starttime[1];
 #define ESPNAME "SOIL"
 #define FLASHBUTTON D3
 #define ESPLED D4
+#define SERIALLLOG
 #endif
 
 #ifdef DUCOBOX
@@ -163,6 +206,23 @@ void ICACHE_RAM_ATTR hlw8012_cf_interrupt() {
 
 #endif
 
+#ifdef SONOFFPOWR2
+#define ESPNAME "SONOFFPOWR2"
+#ifndef ARDUINO_ESP8266_ESP01
+#error "Wrong board selected! Select Generic ESP8285 module"
+#endif
+#define FLASHBUTTON 0
+#define ESPLED 13
+#define SONOFFCH 1
+
+const byte sonoff_relays[1] = {12};
+const byte sonoff_buttons[1] = {0};
+static bool sonoff_oldbuttons[1] = {1};
+double voltval = 0;
+double currentval = 0;
+double powerval = 0;
+#endif
+
 #ifdef SONOFFBULB
 // Remember: board: generic esp8266 module, flashmode=dio
 #ifndef ESPNAME
@@ -179,7 +239,7 @@ my92xx * _my92xx;
 #define MY92XX_GREEN        3
 #define MY92XX_BLUE         5
 #define MY92XX_CW           1
-#define MY92XX_WW           0 
+#define MY92XX_WW           0
 #endif
 #ifndef ARDUINO_ESP8266_ESP01
 #error "Wrong board selected! Select Generic ESP8285 module"
@@ -253,7 +313,7 @@ static bool sonoff_oldbuttons[1] = {1};
 #define OLED_ADDRESS 0x3c
 #define FLASHBUTTON D3
 #define ESPLED D4
-#define ESPLED_TIMEOUT_OFF 60 // In bathroom we want the led to go off after some time
+#define ESPLED_TIMEOUT_OFF 60 // In bedroom we want the led to go off after some time
 #define DHTPIN D5
 #define DHTTYPE DHT22   // there are multiple kinds of DHT sensors
 #define OLEDX 32
@@ -299,7 +359,9 @@ Adafruit_NeoPixel neopixelleds = Adafruit_NeoPixel(2, NEOPIXELPIN, NEO_RGB + NEO
 #include <EEPROM.h>
 #include <ESP8266WiFi.h>
 #include <WiFiUdp.h>
-#include <PubSubClient.h>
+//#include <PubSubClient.h>
+#include <AsyncMqttClient.h>
+AsyncMqttClient mqttClient;
 #include <ESP8266WebServer.h>
 #include <ArduinoOTA.h>
 #include <ESP8266mDNS.h>        // Include the mDNS library
@@ -307,16 +369,31 @@ Adafruit_NeoPixel neopixelleds = Adafruit_NeoPixel(2, NEOPIXELPIN, NEO_RGB + NEO
 #include <user_interface.h>
 #include "SimpleMap.h";
 
+struct Mainstate {
+  bool wificonnected = false;
+  bool mqttconnected = false;
+  bool mqttsenddatamap = false;
+  bool defaultpassword = false;
+  bool accesspoint = false;
+} mainstate;
+
 SimpleMap<String, String> *dataMap = new SimpleMap<String, String>([](String &a, String &b) -> int {
   if (a == b) return 0;      // a and b are equal
   else if (a > b) return 1;  // a is bigger than b
   else return -1;            // a is smaller than b
 });
 
+SimpleMap<int, String> *eepromMap = new SimpleMap<int, String>([](int &a, int &b) -> int {
+  if (a == b) return 0;      // a and b are equal
+  else if (a > b) return 1;  // a is bigger than b
+  else return -1;            // a is smaller than b
+});
+
+
 RemoteDebug Debug;
 bool updatemqtt = 0;
 
-static const char webpage_P[] PROGMEM = "<!DOCTYPE html><html><meta charset=\"UTF-8\"><meta name=\"google\" content=\"notranslate\"><meta http-equiv=\"Content-Language\" content=\"en\"><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><style>table{width: 400px; margin: auto;}</style></head><body><CENTER><div align='center' style='width:400px; margin:auto'><CENTER><H1><p id='header'></p></H1></CENTER><p id='table'></p><A HREF='settings'>Settings</A></div></CENTER><script>function refreshsite(){var obj,dbParam,xmlhttp,myObj,x,txt ='';xmlhttp=new XMLHttpRequest();xmlhttp.onreadystatechange=function(){if(this.readyState==4&&this.status==200){myObj=JSON.parse(this.responseText);txt+='<TABLE>';for (x in myObj){if(x=='espname')document.getElementById('header').innerHTML=myObj[x].toUpperCase();txt+='<tr><td>'+x.split('/').join(' ')+'</td><td>'+myObj[x]+'</td></tr>';}txt+='</table>';document.getElementById('table').innerHTML = txt;}};xmlhttp.open('POST','data.json',true);xmlhttp.setRequestHeader('Content-type','application/x-www-form-urlencoded');xmlhttp.send();}refreshsite();window.setInterval(refreshsite, 5000);</script></body></html>";
+static const char webpage_P[] PROGMEM = "<!DOCTYPE html><html><meta charset=\"UTF-8\"><meta name=\"google\" content=\"notranslate\"><meta http-equiv=\"Content-Language\" content=\"en\"><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><style>table{width: 400px; margin: auto;}</style></head><body><CENTER><div align='center' style='width:400px; margin:auto'><CENTER><H1><p id='header'></p></H1></CENTER><p id='table'></p><A HREF='settings'>Settings</A></div></CENTER><script>function refreshsite(){var obj,dbParam,xmlhttp,myObj,x,txt ='';xmlhttp=new XMLHttpRequest();xmlhttp.onreadystatechange=function(){if(this.readyState==4&&this.status==200){myObj=JSON.parse(this.responseText);txt+='<TABLE>';for (x in myObj){if(x=='hostname')document.getElementById('header').innerHTML=myObj[x].toUpperCase();txt+='<tr><td>'+x.split('/').join(' ')+'</td><td>'+myObj[x]+'</td></tr>';}txt+='</table>';document.getElementById('table').innerHTML = txt;}};xmlhttp.open('POST','data.json',true);xmlhttp.setRequestHeader('Content-type','application/x-www-form-urlencoded');xmlhttp.send();}refreshsite();window.setInterval(refreshsite, 5000);</script></body></html>";
 
 extern "C" {
 #include "user_interface.h"
@@ -345,16 +422,24 @@ OneWire oneWire(ONEWIREPIN);
 // Pass our oneWire reference to Dallas Temperature.
 DallasTemperature oneWireSensors(&oneWire);
 
-
-DeviceAddress onewire_chReturnWaterThermometer, onewire_dcwSupplyWaterThermometer;
+#ifdef OPENTHERM
+DeviceAddress f_chReturnWaterThermometer, onewire_dcwSupplyWaterThermometer;
 float onewire_chReturnWaterTemperature = -127, onewire_dcwSupplyWaterTemperature = -127;
 float oldonewire_chReturnWaterTemperature = -127, oldonewire_dcwSupplyWaterTemperature = -127;
 bool onewire_chReturnWaterEnabled = false, onewire_dcwSupplyWaterEnabled = false;
 #endif
 
-WiFiClient wifiClient;
+#ifdef WEATHER
+DeviceAddress onewire_OutsideAddress;
+float onewire_chOutsideTemperature = -127;
+float oldonewire_chOutsideTemperature = -127;
+#endif
+#endif
+
+//WiFiClientSecure wifiClientSecure;
+//WiFiClient wifiClient;
 static uint8_t wifiTimer = 0;
-PubSubClient mqttclient(wifiClient);
+//PubSubClient mqttClient;
 ESP8266WebServer webserver(80);
 
 String chipid;
@@ -364,22 +449,136 @@ os_timer_t myTimer;
 String mqtt_server = "";
 String mqtt_username = "";
 String mqtt_password = "";
-String esp_password = "";
+int mqtt_port = 1883;
+bool mqtt_ssl = 0;
+String esp_password = "esplogin";
 String esp_hostname = "";
 String esp_orig_hostname = "";
 static bool debug;
-uint8_t ledontime = 1;
-uint8_t ledofftime = 1;
 #include "esp8266_peri.h";
+
+#if defined(MH_Z19) || defined(OPENTHERM) || defined (DUCOBOX) || defined (SMARTMETER) || defined (GROWATT) || defined (SONOFFPOWR2) || defined (AMGPELLETSTOVE)
+#undef SERIALLOG
+#else
+#define SERIALLOG
+#endif
+
+WiFiEventHandler wifiConnectHandler;
+WiFiEventHandler wifiDisconnectHandler;
+#include <Ticker.h>
+Ticker mqttReconnectTimer;
+Ticker wifiReconnectTimer;
+
+void onWifiConnect(const WiFiEventStationModeGotIP& event)
+{
+  DEBUG("Connected to Wi-Fi.\n");
+  mainstate.wificonnected = true;
+  connectToMqtt();
+}
+
+void onWifiDisconnect(const WiFiEventStationModeDisconnected& event)
+{
+  DEBUG("Disconnected from Wi-Fi.\n");
+  mainstate.wificonnected = false;
+  mqttReconnectTimer.detach(); // ensure we don't reconnect to MQTT while reconnecting to Wi-Fi
+  wifiReconnectTimer.once(2, connectToWifi);
+}
+
+void initWifi()
+{
+  wifiConnectHandler = WiFi.onStationModeGotIP(onWifiConnect);
+  wifiDisconnectHandler = WiFi.onStationModeDisconnected(onWifiDisconnect);
+  //WiFi.setAutoReconnect(true);
+  //WiFi.setSleepMode(WIFI_NONE_SLEEP);
+  WiFi.mode(WIFI_STA);
+  DEBUG("Wifi hostname=%s\n", esp_hostname.c_str());
+  WiFi.hostname(esp_hostname);
+}
+
+void connectToWifi()
+{
+  DEBUG("Connecting to Wi-Fi...");
+  WiFi.begin();
+}
+
+void initMqtt()
+{
+  mqttClient.setCredentials(mqtt_username.c_str(), mqtt_password.c_str());
+  mqttClient.setServer(mqtt_server.c_str(), mqtt_port);
+  mqttClient.setClientId(("ESP8266Client" + chipid).c_str());
+  mqttClient.setWill(String("home/" + WiFi.hostname() + "/status").c_str(), 0, 1, "offline");
+  mqttClient.setSecure(mqtt_ssl);  
+  mqttClient.onMessage(onMqttMessage);
+  mqttClient.onDisconnect(onMqttDisconnect);
+  mqttClient.onConnect(onMqttConnect);
+  //mqttClient.onSubscribe(onMqttSubscribe);
+  //mqttClient.onUnsubscribe(onMqttUnsubscribe);
+  //mqttClient.onPublish(onMqttPublish);
+}
+
+void connectToMqtt()
+{
+  DEBUG("Connecting mqtt\n");
+  mqttClient.connect();
+}
+
+void onMqttDisconnect(AsyncMqttClientDisconnectReason reason)
+{
+  DEBUG("Disconnected from MQTT (%d).\n",int(reason));
+
+  if (reason == AsyncMqttClientDisconnectReason::TLS_BAD_FINGERPRINT) {
+    DEBUG("Bad server fingerprint.\n");
+  }
+
+  mainstate.mqttconnected = false;
+
+  if (WiFi.isConnected()) {
+    mqttReconnectTimer.once(2, connectToMqtt);
+  }
+}
+
+void onMqttConnect(bool sessionPresent) {
+  DEBUG("Connected to MQTT SessionPresent=%d.\n",int(sessionPresent));
+  mainstate.mqttconnected = true;
+  publishdatamap();
+
+#ifdef SONOFFCH
+  for (byte i = 0; i < SONOFFCH; i++) mqttClient.subscribe(("home/" + WiFi.hostname() + "/setrelay/" + String(i)).c_str(), 0);
+#endif
+#ifdef OPENTHERM
+  mqttClient.subscribe(("home/" + WiFi.hostname() + "/setthermostattemporary").c_str(), 0);
+  mqttClient.subscribe(("home/" + WiFi.hostname() + "/setthermostatcontinue").c_str(), 0);
+#endif
+#ifdef DUCOBOX
+  mqttClient.subscribe(("home/" + WiFi.hostname() + "/setfan").c_str());
+#endif
+#ifdef DIMMER
+  mqttClient.subscribe(("home/" + WiFi.hostname() + "/setdimvalue").c_str(), 0);
+  mqttClient.subscribe(("home/" + WiFi.hostname() + "/setdimstate").c_str(), 0);
+#endif
+#ifdef SONOFFBULB
+  mqttClient.subscribe(("home/" + WiFi.hostname() + "/setcolor").c_str(), 0);
+#endif
+#ifdef AMGPELLETSTOVE
+  mqttClient.subscribe(("home/" + WiFi.hostname() + "/setonoff").c_str(), 0);
+  mqttClient.subscribe(("home/" + WiFi.hostname() + "/setpower").c_str(), 0);
+  mqttClient.subscribe(("home/" + WiFi.hostname() + "/settemperature").c_str(), 0);
+#endif
+}
 
 void initSerial()
 {
   Serial.setRxBufferSize(2048);
 #if defined(MH_Z19) || defined(OPENTHERM) || defined(GROWATT)
-  Serial.begin(9600);  //Init serial 9600 baud
   Serial.setDebugOutput(false);
+  Serial.begin(9600);  //Init serial 9600 baud
+#elif defined (SONOFFPOWR2)
+  Serial.setDebugOutput(false);
+  Serial.begin(4800, SERIAL_8E1);
+#elif defined (AMGPELLETSTOVE)
+  amgpelletstove_init(amgpelletstovecallback, logdebug);
 #else
-  Serial.begin(115200); //Init serial 19200 baud
+  Serial.begin(115200); //Init serial 115200 baud
 #endif
 }
 
@@ -403,13 +602,14 @@ void putdatamap(String topic, String value, bool sendupdate = true, bool forcese
   {
     DEBUGV ("DATAMAP %s=%s\n", topic.c_str(), value.c_str());
     dataMap->put(topic, value);
-    if (mqttclient.connected())
+    if (mqttClient.connected())
     {
       String mqtttopic = String("home/" + WiFi.hostname() + "/" + topic);
       if (sendupdate)
       {
-        mqttclient.publish(mqtttopic.c_str(), value.c_str(), true);
+        mqttClient.publish(mqtttopic.c_str(), 0, true, value.c_str());
         DEBUG("MQTT PUBLISHING %s=%s\n", mqtttopic.c_str(), value.c_str());
+        yield();
       }
     }
   }
@@ -428,6 +628,12 @@ void update_systeminfo(bool writestaticvalues = false)
     putdatamap("compiletime", String(__DATE__) + " " + __TIME__);
     putdatamap("chipid", String(chipid));
     putdatamap("status", "online");
+    putdatamap("flash/id", String(ESP.getFlashChipId()));
+    putdatamap("flash/size/real", String(ESP.getFlashChipRealSize()));
+    putdatamap("flash/size/ide", String(ESP.getFlashChipSize()));
+    FlashMode_t ideMode = ESP.getFlashChipMode();
+    putdatamap("flash/mode", (ideMode == FM_QIO ? "QIO" : ideMode == FM_QOUT ? "QOUT" : ideMode == FM_DIO ? "DIO" : ideMode == FM_DOUT ? "DOUT" : "UNKNOWN"));
+    putdatamap("flash/speed", String(ESP.getFlashChipSpeed()));
   }
   putdatamap("uptime", String(uptimestr), uptime % 60 == 0);
   putdatamap("freeram", String(system_get_free_heap_size()), uptime % 60 == 0);
@@ -437,7 +643,9 @@ void update_systeminfo(bool writestaticvalues = false)
   putdatamap("wifi/rssi", String(WiFi.RSSI()), uptime % 10 == 0);
   putdatamap("wifi/channel", String(WiFi.channel()));
   putdatamap("mqtt/server", String(mqtt_server));
-  putdatamap("mqtt/state", mqttclient.connected() ? "connected" : "disconnected");
+  putdatamap("mqtt/port", String(mqtt_port));
+  putdatamap("mqtt/ssl", String(mqtt_ssl));
+  putdatamap("mqtt/state", mqttClient.connected() ? "connected" : "disconnected");
 }
 
 #ifdef DHTPIN
@@ -461,7 +669,7 @@ void update_dht()
   }
   else errors = 0;
 
-  DEBUG(("dht22temp=" + String(temp, 1) + " dht22rh=" + String(rh, 1) + " dht22hi=" + String(hi, 1) + "\n").c_str());
+  DEBUG("%s", ("dht22temp=" + String(temp, 1) + " dht22rh=" + String(rh, 1) + " dht22hi=" + String(hi, 1) + "\n").c_str());
 
   if (errors == 0)
   {
@@ -487,10 +695,10 @@ void update_dht()
 }
 #endif
 
-void mqttcallback(char* topic, byte* payload, unsigned int length) {
-  String payloadstring = "";
-  for (byte i = 0; i < length; i++) payloadstring += char(payload[i]);
-  DEBUG("MQTT RECEIVED %s=%s\n", topic, payloadstring.c_str());
+void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total) {
+  String payloadstring = payload;
+  String topicstring = topic;
+  DEBUG("MQTT RECEIVED %s=%s\n", topic, payload);
 
 #ifdef SONOFFCH
   for (byte i = 0; i < SONOFFCH; i++)
@@ -540,17 +748,21 @@ void mqttcallback(char* topic, byte* payload, unsigned int length) {
 #ifdef SONOFFBULB
   if (String(topic) == String("home/" + WiFi.hostname() + "/setcolor"))
   {
-    long number = strtol(payloadstring.substring(0,6).c_str(), NULL, 16);
+    long number = strtol(payloadstring.substring(0, 6).c_str(), NULL, 16);
     _my92xx->setChannel(MY92XX_RED, (number >> 16) & 0xFF);
     _my92xx->setChannel(MY92XX_GREEN, (number >> 8) & 0xFF);
     _my92xx->setChannel(MY92XX_BLUE, number & 0xFF);
 
-    number = strtol(payloadstring.substring(6,10).c_str(), NULL, 16);
+    number = strtol(payloadstring.substring(6, 10).c_str(), NULL, 16);
     _my92xx->setChannel(MY92XX_CW, (number >> 8) & 0xFF);
     _my92xx->setChannel(MY92XX_WW, number & 0xFF);
     _my92xx->update();
     putdatamap ("color", payloadstring);
   }
+#endif
+
+#ifdef AMGPELLETSTOVE
+  amgpelletstove_receivemqtt(topicstring, payloadstring);
 #endif
 }
 
@@ -668,7 +880,7 @@ void loop()
   Debug.handle();
 
 
-  mqttclient.loop();
+  //mqttClient.loop();
   webserver.handleClient();
   yield();
 
@@ -683,6 +895,71 @@ void loop()
 #ifdef DUCOBOX
   ducobox_handle();
 #endif
+
+
+#ifdef RAINMETERPIN
+#define PULSEMM 0.3636
+  static uint32_t rainpinmillis = 0;
+  static uint32_t rainpulses = 0;
+  static uint32_t rainpulsesminute = 0;
+  static uint32_t rainpulseshour = 0;
+  bool rainpinstate = 0;
+  static bool count = 0;
+  rainpinstate = digitalRead(RAINMETERPIN);
+  if ((rainpinstate == 1) && (millis() - 50 > rainpinmillis) && count)
+  {
+    rainpulses++; // Pulse has to settle for 50ms before counting
+    rainpulseshour++; // Pulse has to settle for 50ms before counting
+    rainpulsesminute++; // Pulse has to settle for 50ms before counting
+    String mqtttopic = String("home/" + WiFi.hostname() + "/rain/pulse");
+    mqttClient.publish(mqtttopic.c_str(), 0, false, "1");
+    count = 0;
+  }
+  if (rainpinstate == 0)
+  {
+    rainpinmillis = millis();
+    count = 1;
+  }
+  putdatamap ("rain/pulses", String(rainpulses));
+  putdatamap ("rain/mm", String((double(rainpulses)*PULSEMM), 1));
+
+  static bool hourreg = false;
+  static bool firsthourreg = true;
+  if ((uptime % 3600) || (firsthourreg))
+  {
+    putdatamap ("rain/hour/pulses", String(rainpulseshour));
+    putdatamap ("rain/hour/mm", String((double(rainpulseshour)*PULSEMM), 1));
+    firsthourreg = false;
+    if (!hourreg)
+    {
+      putdatamap ("rain/lasthour/pulses", String(rainpulseshour));
+      putdatamap ("rain/lasthour/mm", String((double(rainpulseshour)*PULSEMM), 1));
+      rainpulseshour = 0;
+      hourreg = true;
+    }
+  }
+  else hourreg = false;
+
+  static bool minreg = false;
+  static bool firstminreg = true;
+  if ((uptime % 60) || (firstminreg))
+  {
+    putdatamap ("rain/minute/pulses", String(rainpulsesminute));
+    putdatamap ("rain/minute/mm", String((double(rainpulsesminute)*PULSEMM), 1));
+    firstminreg = false;
+    if (!minreg)
+    {
+      putdatamap ("rain/lastminute/pulses", String(rainpulsesminute));
+      putdatamap ("rain/lastminute/mm", String((double(rainpulsesminute)*PULSEMM), 1));
+      rainpulsesminute = 0;
+      minreg = true;
+    }
+  }
+  else minreg = false;
+
+  digitalWrite(NODEMCULEDPIN, rainpinstate);
+#endif
+
 
 #ifdef WATERMETER
   static uint32_t watermeter_liters = i2cEeprom_read();
@@ -714,7 +991,63 @@ void loop()
 #endif
 
 #ifdef FLASHBUTTON
-    flashbutton_handle();
+  flashbutton_handle();
+#endif
+
+#ifdef AMGPELLETSTOVE
+  amgpelletstove_handle();
+#endif
+
+#ifdef SONOFFPOWR2
+  static char serbuffer[100];
+  static int serpointer = -1;
+  static char oldserval = 0;
+  if (Serial.available() > 0)
+  {
+    int serval = Serial.read();
+    if ((serpointer >= 0) && (serpointer < 100))
+    {
+      serbuffer[serpointer] = serval;
+      serpointer++;
+    }
+    if (serpointer >= 100)
+    {
+      Serial.flush();
+      serpointer = -1;
+    }
+    if (((oldserval == 0x55) || ((oldserval & 0xf0) == 0xf0) || (oldserval == 0xAA)) && (serval == 0x5A))
+    {
+      static uint8_t statusbyte = 0;
+      if ((oldserval & 0xf0) == 0xf0) statusbyte = (oldserval & 0x0f);
+      else statusbyte = 0;
+      if (serpointer == 24)
+      {
+        uint32_t valueco = 0;
+        uint32_t valueca = 0;
+        float value = 0;
+        valueco = (uint32_t(serbuffer[0]) << 16) + (uint16_t(serbuffer[1]) << 8) + serbuffer[2];
+        valueca = (uint32_t(serbuffer[3]) << 16) + (uint16_t(serbuffer[4]) << 8) + serbuffer[5];
+        if (valueca > 0) voltval = double(double(valueco) / double(valueca));
+        else voltval = 0;
+
+        valueco = (uint32_t(serbuffer[6]) << 16) + (uint16_t(serbuffer[7]) << 8) + serbuffer[8];
+        valueca = (uint32_t(serbuffer[9]) << 16) + (uint16_t(serbuffer[10]) << 8) + serbuffer[11];
+        if (valueca > 0) currentval = double(double(valueco) / double(valueca));
+        else currentval = 0;
+        if (statusbyte & 0x02) currentval = 0;
+
+        valueco = (uint32_t(serbuffer[12]) << 16) + (uint16_t(serbuffer[13]) << 8) + serbuffer[14];
+        valueca = (uint32_t(serbuffer[15]) << 16) + (uint16_t(serbuffer[16]) << 8) + serbuffer[17];
+        if (valueca > 0) powerval = double(double(valueco) / double(valueca));
+        else powerval = 0;
+        if (statusbyte & 0x02) powerval = 0;
+        Serial.flush();
+        serpointer = -1;
+      }
+      serpointer = 0;
+    }
+    oldserval = serval;
+  }
 #endif
 
   if (timertick == 1) // Every 1 second check sensors and update display (it would be insane to do it more often right?)
@@ -722,13 +1055,24 @@ void loop()
     timertick = 0;
     updatemqtt = 1;
 
+#ifdef SONOFFPOWR2
+    static uint8_t powr2sec = 0;
+    if (powr2sec++ > 5) // Every 5 seconds send update about power usage
+    {
+      putdatamap("voltage", String(voltval, 1));
+      putdatamap("power", String(powerval, 1));
+      putdatamap("current", String(currentval, 3));
+      powr2sec = 0;
+    }
+#endif
+
 #ifdef APONBOOT
     if ((uptime == 30) && (WiFi.status() != WL_CONNECTED))
     {
       DEBUG("Connection to wifi failed, starting accesspoint");
       if (!WiFi.softAP(WiFi.hostname().c_str(), "esplogin", 6, 0)) DEBUG("Failed setting WiFi.softAP()");
       WiFi.mode(WIFI_AP_STA);
-      esp_password = "esplogin";      
+      esp_password = "esplogin";
     }
     if (uptime == 330)
     {
@@ -757,25 +1101,12 @@ void loop()
 
     if (wifiTimer < 20) wifiTimer++;
 
-#ifdef ESPLED_TIMEOUT_OFF
-    static uint16_t esp_timeout_off_timer = 0;
-    if (ledontime > 0)
-    {
-      esp_timeout_off_timer++;
-      if (esp_timeout_off_timer > ESPLED_TIMEOUT_OFF)
-      {
-        ledontime = 0;
-        ledofftime = 1;
-      }
-    }
-    else esp_timeout_off_timer = 0;
-#endif
 
 #ifdef DHTPIN
     update_dht();
 #endif
 
-#ifdef OPENTHERM
+#ifdef ONEWIREPIN
     static uint8_t ds18b20timer = 0;
     if (ds18b20timer == 0)
     {
@@ -784,12 +1115,20 @@ void loop()
       //oneWireSensors.setWaitForConversion(false);
       oneWireSensors.requestTemperatures();
       float temperature;
+#ifdef OPENTHERM
       temperature = oneWireSensors.getTempC(onewire_chReturnWaterThermometer);
       DEBUG("chreturnwatertemp=%f\n", temperature);
       if ((onewire_chReturnWaterEnabled) && (temperature != -127)) putdatamap("ow/ch/returnwatertemperature", String(temperature, 1));
       temperature = oneWireSensors.getTempC(onewire_dcwSupplyWaterThermometer);
       DEBUG("dcwsupplywatertemp=%f\n", temperature);
       if ((onewire_dcwSupplyWaterEnabled) && (temperature != -127)) putdatamap("ow/dcw/temperature", String(temperature, 1));
+#endif
+#ifdef WEATHER
+      temperature = oneWireSensors.getTempC(onewire_OutsideAddress);
+      DEBUG("Outside Temperature=%f\n", temperature);
+      if (temperature != -127) putdatamap("temperature", String(temperature, 1));
+
+#endif
     }
     else ds18b20timer--;
 #endif
@@ -812,57 +1151,12 @@ void loop()
         neopixelleds.setPixelColor(0, neopixelleds.Color(30, 15, 0));
         neopixelleds.show();
 #endif
-        if (flashbuttonstatus == 0)
-        {
-          ledontime = 10;
-          ledofftime = 10;
-        }
-        mqttreconnecttimer = 1; // reconnect mqtt
       }
 
-      static bool mqttnewconnection = false;
-      if (mqttreconnecttimer > 0) mqttreconnecttimer--;
-      if (!mqttclient.connected())
-      {
-        if (mqttreconnecttimer == 0)
-        {
-          DEBUG("Connecting mqtt\n");
-          mqttclient.connect(("ESP8266Client" + chipid).c_str(), mqtt_username.c_str(), mqtt_password.c_str(), String("home/" + WiFi.hostname() + "/status").c_str(), 0, 1, "offline"); // Every 10 seconds try to reconnect...
-          mqttreconnecttimer = 10;
-        }
-        mqttnewconnection = true;
-      }
-      else
-      {
 #ifdef NEOPIXELPIN
         neopixelleds.setPixelColor(0, neopixelleds.Color(0, 20, 0));
         neopixelleds.show();
 #endif
-        if (mqttnewconnection)
-        {
-          mqttnewconnection = false;
-          // Publish all values to mqtt upon connect
-          publishdatamap();
-
-#ifdef SONOFFCH
-          for (byte i = 0; i < SONOFFCH; i++) mqttclient.subscribe(("home/" + WiFi.hostname() + "/setrelay/" + String(i)).c_str());
-#endif
-#ifdef OPENTHERM
-          mqttclient.subscribe(("home/" + WiFi.hostname() + "/setthermostattemporary").c_str());
-          mqttclient.subscribe(("home/" + WiFi.hostname() + "/setthermostatcontinue").c_str());
-#endif
-#ifdef DUCOBOX
-          mqttclient.subscribe(("home/" + WiFi.hostname() + "/setfan").c_str());
-#endif
-#ifdef DIMMER
-          mqttclient.subscribe(("home/" + WiFi.hostname() + "/setdimvalue").c_str());
-          mqttclient.subscribe(("home/" + WiFi.hostname() + "/setdimstate").c_str());
-#endif
-#ifdef SONOFFBULB
-          mqttclient.subscribe(("home/" + WiFi.hostname() + "/setcolor").c_str());
-#endif
-        }
-      }
     }
     else
     {
@@ -872,15 +1166,14 @@ void loop()
 #endif
       if (flashbuttonstatus == 0)
       {
-        ledontime = 1;
-        ledofftime = 1;
-      }
-      if (wifiTimer >= 30)
-      {
-        WiFi.disconnect(false);
-        delay(10);
-        WiFi.begin();
-        wifiTimer = 0;
+
+        /*if (wifiTimer >= 30)
+        {
+          WiFi.disconnect(false);
+          delay(10);
+          WiFi.begin();
+          wifiTimer = 0;
+        }*/
       }
     }
     previouswifistatus = WiFi.status();
@@ -924,6 +1217,7 @@ void sonoff_init()
   attachInterrupt(SONOFFPOW_CF1_PIN, hlw8012_cf1_interrupt, FALLING);
   attachInterrupt(SONOFFPOW_CF_PIN, hlw8012_cf_interrupt, FALLING);
 #endif
+
 }
 
 void sonoff_handle()
@@ -983,35 +1277,21 @@ void sonoff_handle()
   if (millis() > nextupdatetime)
   {
     putdatamap("voltage", String(hlw8012.getVoltage()));
-    putdatamap("voltage/multiplier", String(hlw8012.getVoltageMultiplier(),2));
+    putdatamap("voltage/multiplier", String(hlw8012.getVoltageMultiplier(), 2));
     putdatamap("current", String(hlw8012.getCurrent(), 2));
-    putdatamap("current/multiplier", String(hlw8012.getCurrentMultiplier(),2));
+    putdatamap("current/multiplier", String(hlw8012.getCurrentMultiplier(), 2));
     putdatamap("power/active", String(hlw8012.getActivePower()));
     putdatamap("power/apparent", String(hlw8012.getApparentPower()));
     putdatamap("power/reactive", String(hlw8012.getReactivePower()));
     putdatamap("power/ws", String(hlw8012.getEnergy()));
     putdatamap("power/factor", String(hlw8012.getPowerFactor(), 2));
-    putdatamap("power/multiplier", String(hlw8012.getPowerMultiplier(),2));
+    putdatamap("power/multiplier", String(hlw8012.getPowerMultiplier(), 2));
     nextupdatetime = millis() + 2000;
   }
 #endif
 }
 #endif
 
-void write_eeprom(String data, byte eepromindex)
-{
-  //DEBUG("(String("write_eeprom(" + data + "," + eepromindex = ");\n")).c_str());
-  char checksum = 20;
-  for (int i = 0; i < EEPROMSTRINGSIZE - 1; i++)
-  {
-    char chr = data.c_str()[i];
-    checksum += chr;
-    EEPROM.write(i + (EEPROMSTRINGSIZE * eepromindex), chr);
-    EEPROM.write(i + (EEPROMSTRINGSIZE * eepromindex) + 1, checksum);
-    if (chr == 0) break;
-  }
-  EEPROM.commit();
-}
 
 void publishdatamap()
 {
@@ -1019,8 +1299,9 @@ void publishdatamap()
   {
     String topic = String("home/" + WiFi.hostname() + "/" + dataMap->getKey(i));
     String payload = dataMap->getData(i);
-    mqttclient.publish(topic.c_str(), payload.c_str(), true);
+    mqttClient.publish(topic.c_str(), 0, true, payload.c_str());
     DEBUG("MQTT PUBLISHING %s=%s\n", topic.c_str(), payload.c_str());
+//    yield();
   }
 }
 
@@ -1047,8 +1328,7 @@ void flashbutton_handle()
       flashbuttonstatus = 2;
       esp_password = "esplogin";
       DEBUG("Web Password defaulted to esplogin until reboot!\n");
-      ledontime = 1;
-      ledofftime = 4;
+      mainstate.defaultpassword = true;
     }
 
     if (flashbuttontimer == 6) // After 6 seconds start access point
@@ -1057,8 +1337,7 @@ void flashbutton_handle()
       if (!WiFi.softAP(WiFi.hostname().c_str(), "esplogin", 6, 0)) DEBUG("Failed setting WiFi.softAP()");
       WiFi.mode(WIFI_AP_STA);
       DEBUG("Wifi Accesspoint started!\n");
-      ledontime = 1;
-      ledofftime = 0;
+      mainstate.accesspoint = true;
     }
 
     if (flashbuttontimer == 10) ESP.reset();
@@ -1066,9 +1345,11 @@ void flashbutton_handle()
 }
 #endif
 
-uint8_t read_eeprom(String * data, byte eepromindex)
+uint8_t read_oldeeprom(String * data, byte eepromindex)
 {
-  Serial.println(String("read_eeprom(" + String(eepromindex) + ");\n").c_str());
+#ifdef SERIALLOG
+  Serial.println(String("read_oldeeprom(" + String(eepromindex) + ");\n").c_str());
+#endif
   String eepromstring = "";
   char calcchecksum = 20;
   char readchecksum = 0;
@@ -1088,6 +1369,95 @@ uint8_t read_eeprom(String * data, byte eepromindex)
   else return 0;
 }
 
+byte read_oldeeprom()
+{
+  byte eepromindex = 0;
+  String data = "";
+  while (read_oldeeprom(&data, eepromindex))
+  {
+    eepromMap->put(eepromindex, data);
+    eepromindex++;
+  }
+  return eepromindex;
+}
+
+void commit_eeprom()
+{
+  DEBUG("commit_eeprom();\n");
+  int eeprompointer = 0;
+  for (int i = 0; i < eepromMap->size(); i++)
+  {
+    uint8_t checksum = 20;
+    String eepromdata = eepromMap->get(i);
+    DEBUG("EEPROM.write(%d,%d) (length)\n", eeprompointer, eepromdata.length() + 1);
+    EEPROM.write(eeprompointer++, eepromdata.length() + 1);
+    for (int pos = 0; pos < eepromdata.length(); pos++)
+    {
+      char chr = eepromdata.c_str()[pos];
+      DEBUG("EEPROM.write(%d,%c) (data)\n", eeprompointer, chr);
+      EEPROM.write(eeprompointer++, chr);
+      checksum += chr;
+    }
+    DEBUG("EEPROM.write(%d,%d) (checksum)\n", eeprompointer, checksum);
+    EEPROM.write(eeprompointer++, checksum);
+  }
+  EEPROM.write(eeprompointer++, 0);
+  EEPROM.commit();
+}
+
+void write_eeprom(String value, int eepromindex)
+{
+  DEBUG("write_eeprom %d,%s\n", eepromindex, value.c_str());
+  for (int i = 0; i < eepromindex; i++)
+  {
+    if (!eepromMap->has(i)) eepromMap->put(i, "");
+  }
+  eepromMap->put(eepromindex, value);
+  commit_eeprom();
+}
+
+void init_eeprom ()
+{
+  if (read_oldeeprom())
+  {
+    commit_eeprom();
+  }
+  read_eeprom();
+}
+
+uint8_t read_eeprom()
+{
+  DEBUG("read_eeprom();\n");
+  int eeprompointer = 0;
+  int index = 0;
+  while (eeprompointer < 512)
+  {
+    int datasize = EEPROM.read(eeprompointer++);
+    DEBUG("datasize=%d\n", datasize);
+    if (datasize == 0) return (0);
+    byte checksum = 20;
+    String data = "";
+    for (int pos = 0; pos < datasize - 1; pos++)
+    {
+      data += String(char(EEPROM.read(eeprompointer)));
+      checksum += char(EEPROM.read(eeprompointer++));
+    }
+    byte eepromchecksum = EEPROM.read(eeprompointer++);
+    DEBUG("Read from eeprom %d=%s (%d=%d)\n", eeprompointer, data.c_str(), checksum, eepromchecksum);
+    if (eepromchecksum != checksum) return 0;
+    eepromMap->put(index++, data);
+  }
+  return 1;
+}
+
+uint8_t read_eeprom(String * data, byte eepromindex)
+{
+  DEBUG("read_eeprom(%d)\n", eepromindex);
+  if (eepromindex >= eepromMap->size()) return 0;
+  *data = eepromMap->getData(eepromindex);
+  DEBUG("read_eeprom(%d)=%s\n", eepromindex, data->c_str());
+  return 1;
+}
 
 void timerCallback(void *pArg)
 {
@@ -1100,7 +1470,17 @@ void timerCallback(void *pArg)
     ms = 0;
   }
 #ifdef ESPLED
-  static uint8_t ledtimer = 0;
+  static uint8_t ledtimer = 0, ledontime = 1, ledofftime = 1;
+  if (mainstate.accesspoint) { ledontime = 1; ledofftime = 0; }
+  else if (mainstate.defaultpassword) { ledontime = 1; ledofftime = 4; }
+  else if (mainstate.mqttconnected) { ledontime = 10; ledofftime = 10; }
+  else if (mainstate.wificonnected) { ledontime = 19; ledofftime = 1; }
+
+#ifdef ESPLED_TIMEOUT_OFF
+  // set led off after period of time
+  if (uptime > ESPLED_TIMEOUT_OFF) { ledontime = 0; ledofftime = 1; }
+#endif
+  
 #ifdef ESPLEDINVERSE
   if ((ledtimer == ledontime) && (ledofftime > 0)) digitalWrite(ESPLED, 0);
   if ((ledtimer == 0) && (ledontime > 0)) digitalWrite(ESPLED, 1);
@@ -1197,6 +1577,7 @@ void handleWWWSettings()
         ESP.restart();
       }
     }
+    mqtt_ssl = 0;
     for (uint8_t i = 0; i < webserver.args(); i++)
     {
       if (webserver.argName(i) == "wifissid") postwifissid = webserver.arg(i);
@@ -1204,6 +1585,8 @@ void handleWWWSettings()
       if (webserver.argName(i) == "mqttserver") mqtt_server = webserver.arg(i);
       if (webserver.argName(i) == "mqttusername") mqtt_username = webserver.arg(i);
       if (webserver.argName(i) == "mqttpassword") mqtt_password = webserver.arg(i);
+      if (webserver.argName(i) == "mqttport") mqtt_port = String(webserver.arg(i)).toInt();
+      if (webserver.argName(i) == "mqttssl") mqtt_ssl = 1;
       if (webserver.argName(i) == "webpassword") esp_password = webserver.arg(i);
       if (webserver.argName(i) == "hostname") esp_hostname = webserver.arg(i);
 #ifdef WATERMETER
@@ -1224,17 +1607,22 @@ void handleWWWSettings()
     write_eeprom(mqtt_password, 2);
     write_eeprom(esp_password, 3);
     write_eeprom(esp_hostname, 4);
+    write_eeprom(String(mqtt_port), 5);
+    write_eeprom(String(mqtt_ssl), 6);
+
     ArduinoOTA.setPassword(esp_password.c_str());
+    ArduinoOTA.setHostname(esp_hostname.c_str());
     Debug.setPassword(esp_password);
-    mqttclient.disconnect(); // Disconnect mqtt server, it will auto reconnect in main loop...
-    mqttclient.setServer(mqtt_server.c_str(), 1883);
+    mqttClient.disconnect(); // Disconnect mqtt server, it will auto reconnect...
+    initMqtt();
     WiFi.mode(WIFI_STA); // After saving settings return to wifi client mode and disable AP
 
+    update_systeminfo();
     if ((postwifissid != WiFi.SSID()) || (postwifikey != WiFi.psk()) || (esp_hostname != WiFi.hostname()))
     {
       webserver.send(200, "text/html", "<HTML><BODY>Settings Saved.<BR>Please connect to proper wifi network and open the page of the saved hostname.</BODY></HTML>");
-      delay(3000);
-      if (esp_hostname != "") WiFi.hostname(esp_hostname);
+      delay(1000);
+      WiFi.hostname(esp_hostname);
       WiFi.disconnect(true);
       WiFi.begin(postwifissid.c_str(), postwifikey.c_str()); // Save wifi ssid and key and also activate new hostname...
       flashbuttonstatus = 0;
@@ -1257,10 +1645,12 @@ void handleWWWSettings()
     webpage += String("<TR><TD>Hostname</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"") + String(EEPROMSTRINGSIZE - 2) + "\" name=\"hostname\" value=\"" + WiFi.hostname() + "\"></TD></TR>";
     webpage += String("<TR><TD>WifiSSID</TD><TD><select style=\"width:200\" name=\"wifissid\">") + wifiselectoptions + "</select></TD></TR>";
     webpage += String("<TR><TD>WifiKEY</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"64\" name=\"wifikey\" value=\"") + String(WiFi.psk()) + "\"></TD></TR>";
-    webpage += String("<TR><TD>MQTT Server</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"") + String(EEPROMSTRINGSIZE - 2) + "\" name=\"mqttserver\" value=\"" + mqtt_server + "\"></TD></TR>";
-    webpage += String("<TR><TD>MQTT Username</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"") + String(EEPROMSTRINGSIZE - 2) + "\" name=\"mqttusername\" value=\"" + mqtt_username + "\"></TD></TR>";
-    webpage += String("<TR><TD>MQTT Password</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"") + String(EEPROMSTRINGSIZE - 2) + "\" name=\"mqttpassword\" value=\"" + mqtt_password + "\"></TD></TR>";
-    webpage += String("<TR><TD>Settings Password</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"") + String(EEPROMSTRINGSIZE - 2) + "\" name=\"webpassword\" value=\"" + esp_password + "\"></TD></TR>";
+    webpage += String("<TR><TD>MQTT Server</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttserver\" value=\"") + mqtt_server + "\"></TD></TR>";
+    webpage += String("<TR><TD>MQTT Port</TD><TD><input style=\"width:200\" type=\"number\" maxlength=\"5\" name=\"mqttport\" value=\"") + String(mqtt_port) + "\"></TD></TR>";
+    webpage += String("<TR><TD>MQTT Ssl</TD><TD ALIGN=\"left\"><input type=\"checkbox\" name=\"mqttssl\" ") + (mqtt_ssl ? "checked" : "") + "></TD></TR>";
+    webpage += String("<TR><TD>MQTT Username</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttusername\" value=\"") + mqtt_username + "\"></TD></TR>";
+    webpage += String("<TR><TD>MQTT Password</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttpassword\" value=\"") + mqtt_password + "\"></TD></TR>";
+    webpage += String("<TR><TD>ESP Password</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"webpassword\" value=\"") + esp_password + "\"></TD></TR>";
 #ifdef WATERMETER
     webpage += String("<TR><TD>Watermeter Liter</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"64\" name=\"watermeterliter\" value=\"") + getdatamap("water/liter") + "\"></TD></TR>";
 #endif
@@ -1288,6 +1678,16 @@ void handleWWWRoot() {
 void ducoboxcallback (String topic, String payload)
 {
   putdatamap(topic, payload);
+}
+
+void amgpelletstovecallback (String topic, String payload)
+{
+  putdatamap(topic, payload);
+}
+
+void logdebug (String message)
+{
+  DEBUG("%s", message.c_str());
 }
 
 void openthermcallback (String topic, String payload)
@@ -1318,54 +1718,74 @@ void setup() {
   EEPROM.begin(512);
 
   initSerial();
-  Serial.println("\n\nInitializing ESP8266...\n\n");
+
+#ifdef SERIALLOG
+  Debug.setSerialEnabled(true);
+#else
+  Debug.setSerialEnabled(false);
+#endif
+
+  Debug.begin("");
+  DEBUG("\n\nInitializing ESP8266...\n\n");
 
   char buffer[25];
   snprintf(buffer, 25, "%08X", ESP.getChipId());
   chipid = buffer;
 
   // Read settings from EEPROM
-  Serial.println("Reading internal EEPROM...\n");
+  DEBUG("Reading internal EEPROM...\n");
+  init_eeprom();
   if (!read_eeprom(&mqtt_server, 0))
   {
-    Serial.println("Error reading mqtt server from internal eeprom\n");
+    DEBUG("Error reading mqtt server from internal eeprom\n");
   }
   if (!read_eeprom(&mqtt_username, 1))
   {
-    Serial.println("Error reading mqtt username from internal eeprom\n");
+    DEBUG("Error reading mqtt username from internal eeprom\n");
   }
   if (!read_eeprom(&mqtt_password, 2))
   {
-    Serial.println("Error reading mqtt password from internal eeprom\n");
+    DEBUG("Error reading mqtt password from internal eeprom\n");
   }
   if (!read_eeprom(&esp_password, 3))
   {
-    Serial.println("Error reading web password from internal eeprom\n");
-    esp_password = "esplogin";
+    DEBUG("Error reading web password from internal eeprom\n");
   }
   if (!read_eeprom(&esp_hostname, 4))
   {
-    Serial.println("Error reading hostname from internal eeprom\n");
-    esp_hostname = String("ESP_") + chipid;
+    DEBUG("Error reading hostname from internal eeprom\n");
+    esp_hostname = ESPNAME;
+  }
+
+  String mqttportstr = "";
+  if (!read_eeprom(&mqttportstr, 5))
+  {
+    DEBUG("Error reading mqttport from internal eeprom\n");
+  }
+  else
+  {
+    if ((mqttportstr != "") && (mqttportstr.toInt() > 0 ) && (mqttportstr.toInt() < 65536)) mqtt_port = mqttportstr.toInt();
+  }
+
+  String mqttsslstr = "";
+  if (!read_eeprom(&mqttsslstr, 6))
+  {
+    DEBUG("Error reading hostname from internal eeprom\n");
+  }
+  else
+  {
+    if (mqttsslstr != "") mqtt_ssl = mqttsslstr == "1" ? 1 : 0;
   }
 
 #ifdef SONOFFCH
   sonoff_init();
 #endif
-  WiFi.setAutoReconnect(true);
-  WiFi.setSleepMode(WIFI_NONE_SLEEP);
-  WiFi.mode(WIFI_STA);
-  Serial.println("Wifi hostname=" + esp_hostname + "\n\n");
-  WiFi.hostname(esp_hostname);
-  WiFi.begin();
+  initWifi();
+  initMqtt();
+  connectToWifi();
 
   ArduinoOTA.setHostname(esp_hostname.c_str());
 
-#if defined(MH_Z19) || defined(OPENTHERM) || defined (DUCOBOX) || defined (SMARTMETER) || defined (GROWATT)
-  Debug.setSerialEnabled(false);
-#else
-  Debug.setSerialEnabled(true);
-#endif
   Debug.begin(esp_hostname.c_str());
   Debug.setPassword(esp_password);
   Debug.setResetCmdEnabled(true);
@@ -1422,6 +1842,7 @@ void setup() {
 #endif
 
 #ifdef ONEWIREPIN
+#ifdef OPENTHERM
   if (!oneWireSensors.getAddress(onewire_dcwSupplyWaterThermometer, 0)) {
     DEBUG("Unable to find address for onewire_dcwSupplyWaterThermometer\n");
   }
@@ -1433,18 +1854,22 @@ void setup() {
   else onewire_chReturnWaterEnabled = true;
 #endif
 
+#ifdef WEATHER
+  if (!oneWireSensors.getAddress(onewire_OutsideAddress, 0)) {
+    DEBUG("Unable to find address for onewire_outsidetemp\n");
+  }
+#endif
+#endif
 
   webserver.on("/", handleWWWRoot);
   webserver.on("/data.json", handleJsonData);
   webserver.on("/settings", handleWWWSettings);
   webserver.begin();
 
-  mqttclient.setServer(mqtt_server.c_str(), 1883);
-  mqttclient.setCallback(mqttcallback);
 
   MDNS.begin(esp_hostname.c_str());
   MDNS.addService("http", "tcp", 80);
-  
+
   os_timer_setfn(&myTimer, timerCallback, NULL);
   os_timer_arm(&myTimer, 100, true);
 
@@ -1490,9 +1915,18 @@ void setup() {
 #endif
 
 #ifdef SONOFFBULB
-    // MY9291 with 4 channels (like the AiThinker Ai-Light)
-    _my92xx = new my92xx(MY92XX_MODEL, MY92XX_CHIPS, MY92XX_DI_PIN, MY92XX_DCKI_PIN, MY92XX_COMMAND_DEFAULT);
-    _my92xx->setState(true);
+  // MY9291 with 4 channels (like the AiThinker Ai-Light)
+  _my92xx = new my92xx(MY92XX_MODEL, MY92XX_CHIPS, MY92XX_DI_PIN, MY92XX_DCKI_PIN, MY92XX_COMMAND_DEFAULT);
+  _my92xx->setState(true);
+#endif
+
+#ifdef RAINMETERPIN
+  pinMode(RAINMETERPIN, INPUT_PULLUP);
+#endif
+
+#ifdef NODEMCULEDPIN
+  pinMode(NODEMCULEDPIN, OUTPUT);
+  digitalWrite(NODEMCULEDPIN, 1);
 #endif
 
 }
@@ -1500,8 +1934,19 @@ void setup() {
 void processCmdRemoteDebug()
 {
   String lastCmd = Debug.getLastCommand();
-  if (lastCmd == "help") DEBUG("Available Debug Commands:\n");
-  if (lastCmd == "help") DEBUG("showdatamap\n");
+  String lastArg = "";
+  if (lastCmd.indexOf(" ") > 0)
+  {
+    lastArg = lastCmd.substring(lastCmd.indexOf(" ") + 1);
+    lastCmd = lastCmd.substring(0, lastCmd.indexOf(" "));
+  }
+  DEBUG("[%s]  [%s]\n", lastCmd.c_str(), lastArg.c_str());
+  if (lastCmd == "help")
+  {
+    DEBUG("Available Debug Commands:\n");
+    DEBUG("showdatamap\n");
+  }
+
   if (lastCmd == "showdatamap") showdatamap();
 #ifdef WATERMETER
   if (lastCmd == "help") DEBUG("  watermeterreadeeprom\n  watermeterwriteeeprom\n");
@@ -1514,4 +1959,268 @@ void processCmdRemoteDebug()
     i2cEeprom_write(watermeter_getliters());
   }
 #endif
+#ifdef AMGPELLETSTOVE
+  if (lastCmd == "stoveoff")
+  {
+    DEBUG("Setting Stove Off...\n");
+    //byte message [] = {0x80, 0x21, 0x06, 0xA7};
+    byte message [] = {0x80, 0x21, 0x00, 0xA1};
+    Serial.write (message, sizeof (message));
+  }
+  if (lastCmd == "stoveon")
+  {
+    DEBUG("Setting Stove On...\n");
+    byte message [] = {0x80, 0x21, 0x01, 0xA2};
+    Serial.write (message, sizeof (message));
+  }
+  if (lastCmd == "setbaud")
+  {
+    if (lastArg.toInt() > 0)
+    {
+      DEBUG("BAUDRATE=%d\n", lastArg.toInt());
+      Serial.begin (lastArg.toInt());
+      U0C0 = BIT(UCRXI) | BIT(UCBN) | BIT(UCBN + 1) | BIT(UCSBN) | BIT(UCTXI); // Inverse RX + TX
+    }
+  }
+  if (lastCmd == "inv")
+  {
+    U0C0 = BIT(UCRXI) | BIT(UCBN) | BIT(UCBN + 1) | BIT(UCSBN) | BIT(UCTXI); // Inverse RX + TX
+  }
+  if (lastCmd == "noinv")
+  {
+    U0C0 = BIT(UCBN) | BIT(UCBN + 1) | BIT(UCSBN) + BIT(UCSBN + 1); // No Inverse RX + TX
+  }
+  if (lastCmd == "getbaud")
+  {
+    pinMode(3, INPUT_PULLUP);      // make sure serial in is a input pin
+    digitalWrite (3, HIGH); // pull up enabled just for noise protection
+
+    long baudRate = detRate(3);  // Function finds a standard baudrate of either
+    // 1200,2400,4800,9600,14400,19200,28800,38400,57600,115200
+    // by having sending circuit send "U" characters.
+    // Returns 0 if none or under 1200 baud
+
+    DEBUG("BAUDRATE=%d\n", baudRate);
+  }
+  if (lastCmd == "1")
+  {
+    Serial.write (27);
+    Serial.print ("RDA00067&");
+  }
+  if (lastCmd == "2")
+  {
+    Serial.write (27);
+    Serial.print ("RD90005F&");
+  }
+  if (lastCmd == "3") // Current Measured Room Temp * 10
+  {
+    Serial.write (27);
+    Serial.print ("RD100057&");
+  }
+  if (lastCmd == "4") // Auger speed
+  {
+    Serial.write (27);
+    Serial.print ("RD40005A&"); //00020022
+  }
+  if (lastCmd == "5")
+  {
+    Serial.write (27);
+    Serial.print ("RDC00069&"); // 920002B
+  }
+  if (lastCmd == "6")
+  {
+    Serial.write (27);
+    Serial.print ("RC400059&"); //000020
+  }
+  if (lastCmd == "7")
+  {
+    Serial.write (27);
+    Serial.print ("RC50005A&"); // Current setpoint power 00020022 = power setpoint 2
+  }
+  if (lastCmd == "8")
+  {
+    Serial.write (27);
+    Serial.print ("RC60005B&"); // Current setpoint temperature 00180029 = 24 degrees celcius
+  }
+  if (lastCmd == "9") // Exhaust temp
+  {
+    Serial.write (27);
+    Serial.print ("RD000056&");
+  }
+  if (lastCmd == "10") // 00000020 S2 temp?
+  {
+    Serial.write (27);
+    Serial.print ("RD70005D&");
+  }
+  if (lastCmd == "11") // 00220024 // Board temp
+  {
+    Serial.write (27);
+    Serial.print ("RDF0006C&");
+  }
+  if (lastCmd == "12") // Measured room temp 00cb0045
+  {
+    Serial.write (27);
+    Serial.print ("RD100057&");
+  }
+  if (lastCmd == "13") // Fluespeed 0030023
+  {
+    Serial.write (27);
+    Serial.print ("RD200058&");
+  }
+  if (lastCmd == "14") // Fanspeed roomfan 0030023
+  {
+    Serial.write (27);
+    Serial.print ("RD300059&");
+  }
+  if (lastCmd == "15") // Augerspeed 0030023
+  {
+    Serial.write (27);
+    Serial.print ("RD40005A&");
+  }
+  if (lastCmd == "16") // ?? 01000021 // extractor sensor level
+  {
+    Serial.write (27);
+    Serial.print ("RDB00068&");
+  }
+  if (lastCmd == "17")
+  {
+    Serial.write (27);
+    Serial.print ("RDD0006A&"); // ??? 0000020 Fluegas motor correction (rpm*10)
+  }
+  if (lastCmd == "18")
+  {
+    Serial.write (27);
+    Serial.print ("RDE0006B&"); // ??? 0000020 Pellet correction (%)
+  }
+  if (lastCmd == "19")
+  {
+    Serial.write (27);
+    Serial.print ("RDA00067&"); // 000020 // error code
+  }
+  if (lastCmd == "20")
+  {
+    Serial.write (27);
+    Serial.print ("RD90005F&"); // 02010023 // cycle phase
+  }
+  if (lastCmd == "21")
+  {
+    Serial.write (27);
+    Serial.print ("RD80005E&"); // TIMER TO NEXT PHASE
+  }
+  if (lastCmd == "22")
+  {
+    Serial.write (27);
+    Serial.print ("REF0006D&"); // 00D20036  // FANSPEED EXHAUST
+  }
+  if (lastCmd == "23")
+  {
+    Serial.write (27);
+    Serial.print ("RC000055&"); // 00000020 // Inputs
+  }
+
+
+  if (lastCmd == "p5")
+  {
+    Serial.write (27);
+    Serial.print ("RF00505D&");
+  }
+  if (lastCmd == "p4")
+  {
+    Serial.write (27);
+    Serial.print ("RF00405C&");
+  }
+  if (lastCmd == "p3")
+  {
+    Serial.write (27);
+    Serial.print ("RF00305B&");
+  }
+  if (lastCmd == "p2")
+  {
+    Serial.write (27);
+    Serial.print ("RF00205A&");
+  }
+  if (lastCmd == "p1")
+  {
+    Serial.write (27);
+    Serial.print ("RF001059&");
+  }
+  if (lastCmd == "t19")
+  {
+    Serial.write (27);
+    Serial.print ("RF21305E&");
+  }
+  if (lastCmd == "t20")
+  {
+    Serial.write (27);
+    Serial.print ("RF21405F&");
+  }
+  if (lastCmd == "t21")
+  {
+    Serial.write (27);
+    Serial.print ("RF215060&");
+  }
+  if (lastCmd == "t22")
+  {
+    Serial.write (27);
+    Serial.print ("RF216061&");
+  }
+  if (lastCmd == "t23")
+  {
+    Serial.write (27);
+    Serial.print ("RF217062&");
+  }
+  if (lastCmd == "on")
+  {
+    Serial.write (27);
+    Serial.print ("RF00505D&");
+  }
+  if (lastCmd == "off")
+  {
+    Serial.write (27);
+    Serial.print ("RF000058&");
+  }
+
+#endif
+}
+
+
+
+long detRate(int recpin)  // function to return valid received baud rate
+// Note that the serial monitor has no 600 baud option and 300 baud
+// doesn't seem to work with version 22 hardware serial library
+{
+  //  while(digitalRead(recpin) == 0){} // wait for low bit to start
+  long baud;
+  long rate = pulseIn(recpin, HIGH, 3000000);  // measure zero bit width from character 'U'
+  if (rate < 3)
+    baud = 0;
+  else if (rate < 6)
+    baud = 230400;
+  else if (rate < 12)
+    baud = 115200;
+  else if (rate < 20)
+    baud = 57600;
+  else if (rate < 29)
+    baud = 38400;
+  else if (rate < 40)
+    baud = 28800;
+  else if (rate < 60)
+    baud = 19200;
+  else if (rate < 80)
+    baud = 14400;
+  else if (rate < 150)
+    baud = 9600;
+  else if (rate < 300)
+    baud = 4800;
+  else if (rate < 600)
+    baud = 2400;
+  else if (rate < 1200)
+    baud = 1200;
+  else if (rate < 2400)
+    baud = 600;
+  else if (rate < 4800)
+    baud = 300;
+  else
+    baud = 0;
+  return baud;
 }
