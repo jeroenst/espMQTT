@@ -511,9 +511,9 @@ void initMqtt()
   mqttClient.onMessage(onMqttMessage);
   mqttClient.onDisconnect(onMqttDisconnect);
   mqttClient.onConnect(onMqttConnect);
-  //mqttClient.onSubscribe(onMqttSubscribe);
-  //mqttClient.onUnsubscribe(onMqttUnsubscribe);
-  //mqttClient.onPublish(onMqttPublish);
+  mqttClient.onSubscribe(onMqttSubscribe);
+  mqttClient.onUnsubscribe(onMqttUnsubscribe);
+  mqttClient.onPublish(onMqttPublish);
 }
 
 void connectToMqtt()
@@ -537,10 +537,21 @@ void onMqttDisconnect(AsyncMqttClientDisconnectReason reason)
   }
 }
 
+void onMqttUnsubscribe(uint16_t packetId) {
+  DEBUG ("Unsubscribe acknowledged. packetid=%d\n", packetId);
+}
+
+void onMqttSubscribe(uint16_t packetId, uint8_t qos) {
+  DEBUG ("Subscribe acknowledged packetid=%d, qos=%d\n", packetId, qos);
+}
+
+void onMqttPublish(uint16_t packetId) {
+  DEBUG ("Publish acknowledged packetid=%d\n", packetId);
+}
+
 void onMqttConnect(bool sessionPresent) {
   DEBUG("Connected to MQTT SessionPresent=%d.\n",int(sessionPresent));
   mainstate.mqttconnected = true;
-  publishdatamap();
 
 #ifdef SONOFFCH
   for (byte i = 0; i < SONOFFCH; i++) mqttClient.subscribe(("home/" + WiFi.hostname() + "/setrelay/" + String(i)).c_str(), 0);
@@ -564,6 +575,8 @@ void onMqttConnect(bool sessionPresent) {
   mqttClient.subscribe(("home/" + WiFi.hostname() + "/setpower").c_str(), 0);
   mqttClient.subscribe(("home/" + WiFi.hostname() + "/settemperature").c_str(), 0);
 #endif
+
+  publishdatamap();
 }
 
 void initSerial()
@@ -696,9 +709,13 @@ void update_dht()
 #endif
 
 void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total) {
-  String payloadstring = payload;
+  String payloadstring = "";
+  for (int i = 0; i < len; i++)
+  {
+    payloadstring += char(payload[i]);
+  }
   String topicstring = topic;
-  DEBUG("MQTT RECEIVED %s=%s\n", topic, payload);
+  DEBUG("MQTT RECEIVED len=%d %s=%s\n", len, topicstring.c_str(), payloadstring.c_str());
 
 #ifdef SONOFFCH
   for (byte i = 0; i < SONOFFCH; i++)
