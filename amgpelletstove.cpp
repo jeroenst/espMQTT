@@ -17,14 +17,9 @@ void amgpelletstove_init(void(*callback)(String,String),void(*debugcallback)(Str
 
 void amgpelletstove_receivemqtt(String topicstring, String payloadstring)
 {
-  if (topicstring == String("home/" + WiFi.hostname() + "/setonoff"))
-  {
-    if (payloadstring == "on") amgcmd = "RF00505D&";
-    if (payloadstring == "off") amgcmd = "RF000058&";
-
-  }
   if (topicstring == String("home/" + WiFi.hostname() + "/setpower"))
   {
+    if (payloadstring == "0") amgcmd = "RF000058&";
     if (payloadstring == "1") amgcmd = "RF001059&";
     if (payloadstring == "2") amgcmd = "RF00205A&";
     if (payloadstring == "3") amgcmd = "RF00305B&";
@@ -98,7 +93,7 @@ void _amgpelletstove_sendserial()
         break;
       case 12:
         Serial.write (27);
-        Serial.print ("RD90005F&"); // 02010023 // cycle phase
+        Serial.print ("REF0006D&"); // 00D20036  // FANSPEED EXHAUST
         break;
       case 13:
         Serial.write (27);
@@ -121,7 +116,7 @@ void _amgpelletstove_sendserial()
       default:
         amgcmdnr = 0;
         Serial.write (27);
-        Serial.print ("REF0006D&"); // 00D20036  // FANSPEED EXHAUST
+        Serial.print ("RD90005F&"); // 02010023 // cycle phase
         break;
 
     }
@@ -129,6 +124,7 @@ void _amgpelletstove_sendserial()
 
 void amgpelletstove_handle()
 {
+  static unsigned long nextupdatetime = millis();
   static String serstr = "";
   while (Serial.available() > 0)
   {
@@ -145,7 +141,7 @@ void amgpelletstove_handle()
         serstr="";
         switch (amgcmdnr)
         {
-          case 0:
+          case 12:
             _amgpelletstove_callback("exhaust/fanspeed/measured", String(value * 10));
             break;
           case 1:
@@ -181,7 +177,7 @@ void amgpelletstove_handle()
           case 11:
             _amgpelletstove_callback("board/errorcode", String(value));
             break;
-          case 12:
+          case 0:
             switch (value)
             {
               case 0:
@@ -226,14 +222,14 @@ void amgpelletstove_handle()
           case 255:
             break;
         }
+        nextupdatetime = millis() + 250; // After successfull transfer wait 250ms before requesting next value
       }
     }
   }
 
-  static unsigned long nextupdatetime = millis();
   if (millis() > nextupdatetime)
   {
-    nextupdatetime = millis() + 1000;
+    nextupdatetime = millis() + 2000; // On first or failed transefer wait 2 second before next (re)try
     _amgpelletstove_sendserial();
   }  
 }

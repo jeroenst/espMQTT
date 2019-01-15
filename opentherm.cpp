@@ -81,19 +81,25 @@ int opentherm_handle()
     if (otmessage.substring(0, 4) == "TC: ")
     {
       topic = "thermostat/setpoint";
-      otvalue = otmessage.substring(4);
+      otvalue = String(otmessage.substring(4).toFloat(),1);
     }
 
     else if (otmessage.substring(0, 4) == "TT: ")
     {
       topic = "thermostat/setpoint";
-      otvalue = otmessage.substring(4).c_str();
+      otvalue = String(otmessage.substring(4).toFloat(),1);
     }
 
     else if (otmessage.substring(0, 4) == "TO: ")
     {
       topic = "outside/temperature";
-      otvalue = otmessage.substring(4).c_str();
+      otvalue = String(otmessage.substring(4).toFloat(),1);
+    }
+
+    else if (otmessage.substring(0, 4) == "CS: ")
+    {
+      topic = "otgw/ch/water/setpoint";
+      otvalue = String(otmessage.substring(4).toFloat(),1);
     }
 
     else if (otmessage[0] == 'B')
@@ -219,6 +225,13 @@ void opentherm_setthermosttattemporary(double value)
 void opentherm_setthermosttatcontinue(double value)
 {
     Serial.print("TC=");
+    Serial.print(String(value,1));
+    Serial.print("\r\n");
+}
+
+void opentherm_setchwatertemperature(double value)
+{
+    Serial.print("CS=");
     Serial.print(String(value,1));
     Serial.print("\r\n");
 }
