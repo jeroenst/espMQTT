@@ -26,7 +26,7 @@
 //#define GARDEN //ESP8285
 //#define MAINPOWERMETER
 //#define OPENTHERM
-//#define SONOFF4CH //ESP8285
+#define SONOFF4CH //ESP8285
 //#define DUCOBOX
 //#define SONOFFDUAL
 //#define OLDBATHROOM
@@ -42,7 +42,7 @@
 //#define SONOFFS20_PRINTER
 //#define SONOFFPOW // not finished yet
 //#define SONOFFPOWR2
-#define WEATHER
+//#define WEATHER
 //#define AMGPELLETSTOVE
 
 #ifdef SONOFFS20_PRINTER
@@ -382,6 +382,7 @@ AsyncMqttClient mqttClient;
 #include <user_interface.h>
 #include "SimpleMap.h";
 #include <Syslog.h>
+#include <ESP8266Ping.h>
 
 // A UDP instance to let us send and receive packets over UDP
 WiFiUDP udpClientSyslog;
@@ -582,7 +583,7 @@ void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
 
 void onWifiConnect(const WiFiEventStationModeGotIP& event)
 {
-  LOG("Connected to Wi-Fi.");
+  DEBUG("Connected to Wi-Fi.");
   mainstate.wificonnected = true;
   connectToMqtt();
 }
@@ -635,8 +636,13 @@ void initMqtt()
 
 void connectToMqtt()
 {
-  LOG("Connecting mqtt");
-  mqttClient.connect();
+  DEBUGV("connectToMqtt()\n");
+  if (!mainstate.mqttconnected) 
+  {
+    LOG("Connecting mqtt");
+    mqttReconnectTimer.once(30, connectToMqtt); // retry over 30 seconds if connection can not be established
+    mqttClient.connect();
+  }
 }
 
 void onMqttDisconnect(AsyncMqttClientDisconnectReason reason)
@@ -666,7 +672,7 @@ void mqttdosubscriptions(int32_t packetId = -1)
   static int32_t nextpacketid = -1;
   static uint16_t nextsubscribe = 0;
   bool startpublish = false;
-  static String subscribetopic = ""; // We need this variable because mqttclient.subscribe uses a pointer
+  static String subscribetopic = ""; // We need this static variable because mqttclient.subscribe uses a pointer
 
   if (packetId == -1) nextsubscribe = 0;
   if (packetId > 0) nextsubscribe++;
@@ -677,7 +683,7 @@ void mqttdosubscriptions(int32_t packetId = -1)
     //DEBUG("mqttdosubscriptions while nextsubscribe=%d\n", nextsubscribe);
     switch (nextsubscribe)
     {
-#ifdef OPENTHERM
+#if defined(OPENTHERM) || defined(GENERIC8266)
       case 0: subscribetopic = mqtt_maintopic + "setthermostattemporary"; break;
       case 1: subscribetopic = mqtt_maintopic + "setthermostatcontinue"; break;
       case 2: subscribetopic = mqtt_maintopic + "setchwatertemperature"; break;
@@ -692,16 +698,16 @@ void mqttdosubscriptions(int32_t packetId = -1)
 #ifdef SONOFFBULB
       case 6: subscribetopic = mqtt_maintopic + "setcolor"; break;
 #endif
-#if defined(AMGPELLETSTOVE) || defined(GENERIC8266)
+#if defined(AMGPELLETSTOVE)
       case 7: subscribetopic = mqtt_maintopic + "setonoff"; break;
       case 8: subscribetopic = mqtt_maintopic + "setpower"; break;
       case 9: subscribetopic = mqtt_maintopic + "settemperature"; break;
 #endif
 #ifdef SONOFFCH
-      case 10:  if (0 < SONOFFCH) subscribetopic = mqtt_maintopic + "setrelay/" + String(i); break;
-      case 11:  if (1 < SONOFFCH) subscribetopic = mqtt_maintopic + "setrelay/" + String(i); break;
-      case 12:  if (2 < SONOFFCH) subscribetopic = mqtt_maintopic + "setrelay/" + String(i); break;
-      case 13:  if (3 < SONOFFCH) subscribetopic = mqtt_maintopic + "setrelay/" + String(i); break;
+      case 10:  if (0 < SONOFFCH) subscribetopic = mqtt_maintopic + "setrelay/" + String(0); break;
+      case 11:  if (1 < SONOFFCH) subscribetopic = mqtt_maintopic + "setrelay/" + String(1); break;
+      case 12:  if (2 < SONOFFCH) subscribetopic = mqtt_maintopic + "setrelay/" + String(2); break;
+      case 13:  if (3 < SONOFFCH) subscribetopic = mqtt_maintopic + "setrelay/" + String(3); break;
 #endif
     }
     if (subscribetopic == "") nextsubscribe++;
@@ -2171,7 +2177,41 @@ void processCmdRemoteDebug()
   if (lastCmd == "help")
   {
     DEBUG("Available Debug Commands:\n");
-    DEBUG("showdatamap\n");
+    DEBUG("  showdatamap\n");
+    DEBUG("  ping [hostname]\n");
+    DEBUG("  route\n");
+    DEBUG("  mqttforceconnect\n");
+    DEBUG("  showmainstate\n");
+  }
+
+  if (lastCmd == "ping")
+  {
+    if (Ping.ping(lastArg.c_str())) {
+      DEBUG("Ping Success!!\n");
+      } else {
+      DEBUG("Ping Error!!\n");
+    }
+  }
+
+  if (lastCmd == "route")
+  {
+    String gw = WiFi.gatewayIP().toString();
+    DEBUG("%s\n", gw.c_str());
+  }
+
+  if (lastCmd == "mqttforceconnect")
+  {
+    connectToMqtt();
+  }
+
+  if (lastCmd == "showmainstate")
+  {
+    DEBUG("wificonnected=%d\n",mainstate.wificonnected);
+    DEBUG("mqttconnected=%d\n",mainstate.mqttconnected);
+    DEBUG("mqttready=%d\n",mainstate.mqttready);
+    DEBUG("mqttsenddatamap=%d\n",mainstate.mqttsenddatamap);
+    DEBUG("defaultpassword=%d\n",mainstate.defaultpassword);
+    DEBUG("accesspoint=%d\n",mainstate.accesspoint);
   }
 
   if (lastCmd == "showdatamap") showdatamap();
