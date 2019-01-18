@@ -477,7 +477,7 @@ os_timer_t myTimer;
 String mqtt_server = "";
 String mqtt_username = "";
 String mqtt_password = "";
-String mqtt_maintopic = "";
+String mqtt_topicprefix = "";
 int mqtt_port = 1883;
 bool mqtt_ssl = 0;
 String esp_password = "esplogin";
@@ -609,15 +609,19 @@ void initWifi()
 
 void connectToWifi()
 {
-  LOG("Connecting to Wi-Fi...");
-  WiFi.begin();
+  if (!mainstate.wificonnected)
+  {
+    DEBUG("Connecting to Wi-Fi...");
+    wifiReconnectTimer.once(30, connectToWifi); // Retry wifi connection in 30 seconds if it fails to connect
+    WiFi.begin();
+  }
 }
 
 void initMqtt()
 {
   // Because mqtt lib uses a pointer to const char[], we have to make a static variables
   static String clientid = String("ESP8266_") + chipid;
-  static String willtopic = String(mqtt_maintopic) + "status";
+  static String willtopic = String(mqtt_topicprefix) + "status";
 
   mqttClient.onMessage(onMqttMessage);
   mqttClient.onDisconnect(onMqttDisconnect);
@@ -684,30 +688,30 @@ void mqttdosubscriptions(int32_t packetId = -1)
     switch (nextsubscribe)
     {
 #if defined(OPENTHERM) || defined(GENERIC8266)
-      case 0: subscribetopic = mqtt_maintopic + "setthermostattemporary"; break;
-      case 1: subscribetopic = mqtt_maintopic + "setthermostatcontinue"; break;
-      case 2: subscribetopic = mqtt_maintopic + "setchwatertemperature"; break;
+      case 0: subscribetopic = mqtt_topicprefix + "setthermostattemporary"; break;
+      case 1: subscribetopic = mqtt_topicprefix + "setthermostatcontinue"; break;
+      case 2: subscribetopic = mqtt_topicprefix + "setchwatertemperature"; break;
 #endif
 #ifdef DUCOBOX
-      case 3: subscribetopic = mqtt_maintopic + "setfan"; break;
+      case 3: subscribetopic = mqtt_topicprefix + "setfan"; break;
 #endif
 #ifdef DIMMER
-      case 4: subscribetopic = mqtt_maintopic + "setdimvalue"; break;
-      case 5: subscribetopic = mqtt_maintopic + "setdimstate"; break;
+      case 4: subscribetopic = mqtt_topicprefix + "setdimvalue"; break;
+      case 5: subscribetopic = mqtt_topicprefix + "setdimstate"; break;
 #endif
 #ifdef SONOFFBULB
-      case 6: subscribetopic = mqtt_maintopic + "setcolor"; break;
+      case 6: subscribetopic = mqtt_topicprefix + "setcolor"; break;
 #endif
 #if defined(AMGPELLETSTOVE)
-      case 7: subscribetopic = mqtt_maintopic + "setonoff"; break;
-      case 8: subscribetopic = mqtt_maintopic + "setpower"; break;
-      case 9: subscribetopic = mqtt_maintopic + "settemperature"; break;
+      case 7: subscribetopic = mqtt_topicprefix + "setonoff"; break;
+      case 8: subscribetopic = mqtt_topicprefix + "setpower"; break;
+      case 9: subscribetopic = mqtt_topicprefix + "settemperature"; break;
 #endif
 #ifdef SONOFFCH
-      case 10:  if (0 < SONOFFCH) subscribetopic = mqtt_maintopic + "setrelay/" + String(0); break;
-      case 11:  if (1 < SONOFFCH) subscribetopic = mqtt_maintopic + "setrelay/" + String(1); break;
-      case 12:  if (2 < SONOFFCH) subscribetopic = mqtt_maintopic + "setrelay/" + String(2); break;
-      case 13:  if (3 < SONOFFCH) subscribetopic = mqtt_maintopic + "setrelay/" + String(3); break;
+      case 10:  if (0 < SONOFFCH) subscribetopic = mqtt_topicprefix + "setrelay/" + String(0); break;
+      case 11:  if (1 < SONOFFCH) subscribetopic = mqtt_topicprefix + "setrelay/" + String(1); break;
+      case 12:  if (2 < SONOFFCH) subscribetopic = mqtt_topicprefix + "setrelay/" + String(2); break;
+      case 13:  if (3 < SONOFFCH) subscribetopic = mqtt_topicprefix + "setrelay/" + String(3); break;
 #endif
     }
     if (subscribetopic == "") nextsubscribe++;
@@ -812,7 +816,7 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
 #ifdef SONOFFCH
   for (byte i = 0; i < SONOFFCH; i++)
   {
-    if (String(topic) == String(mqtt_maintopic + "setrelay/" + i))
+    if (String(topic) == String(mqtt_topicprefix + "setrelay/" + i))
     {
       bool inverse = false;
 #ifdef SONOFFCHINVERSE
@@ -830,17 +834,17 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
 #endif
 
 #ifdef OPENTHERM
-  if (String(topic) == String(mqtt_maintopic + "setthermostattemporary"))
+  if (String(topic) == String(mqtt_topicprefix + "setthermostattemporary"))
   {
     LOG(String("RECEIVED SETTHERMOSTATTEMPORARY ") + payloadstring);
     opentherm_setthermosttattemporary(payloadstring.toFloat());
   }
-  if (String(topic) == String(mqtt_maintopic + "setthermostatcontinue"))
+  if (String(topic) == String(mqtt_topicprefix + "setthermostatcontinue"))
   {
     LOG(String("RECEIVED SETTHERMOSTATCONTINUE ") + payloadstring);
     opentherm_setthermosttatcontinue(payloadstring.toFloat());
   }
-  if (String(topic) == String(mqtt_maintopic + "setchwatertemperature"))
+  if (String(topic) == String(mqtt_topicprefix + "setchwatertemperature"))
   {
     LOG(String("RECEIVED SETCHWATERTEMPERATURE ") + payloadstring);
     opentherm_setchwatertemperature(payloadstring.toFloat());
@@ -848,11 +852,11 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
 #endif
 
 #ifdef DUCOBOX
-  if (String(topic) == String(mqtt_maintopic + "setfan")) ducobox_setfan(payloadstring.toInt());
+  if (String(topic) == String(mqtt_topicprefix + "setfan")) ducobox_setfan(payloadstring.toInt());
 #endif
 
 #ifdef DIMMER
-  if (String(topic) == String(mqtt_maintopic + "setdimvalue"))
+  if (String(topic) == String(mqtt_topicprefix + "setdimvalue"))
   {
     dimmer_setdimvalue(payloadstring.toInt());
     putdatamap ("dimvalue", String(dimmer_getdimvalue()));
@@ -860,7 +864,7 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
 #endif
 
 #ifdef SONOFFBULB
-  if (String(topic) == String(mqtt_maintopic + "setcolor"))
+  if (String(topic) == String(mqtt_topicprefix + "setcolor"))
   {
     long number = strtol(payloadstring.substring(0, 6).c_str(), NULL, 16);
     _my92xx->setChannel(MY92XX_RED, (number >> 16) & 0xFF);
@@ -1026,7 +1030,7 @@ void loop()
     rainpulses++; // Pulse has to settle for 50ms before counting
     rainpulseshour++; // Pulse has to settle for 50ms before counting
     rainpulsesminute++; // Pulse has to settle for 50ms before counting
-    String mqtttopic = String(mqtt_maintopic + "rain/pulse");
+    String mqtttopic = String(mqtt_topicprefix + "rain/pulse");
     mqttClient.publish(mqtttopic.c_str(), 0, false, "1");
     count = 0;
   }
@@ -1480,7 +1484,7 @@ void publishdatamap(int32_t packetId, bool publishall)
         //DEBUG ("datamappointer=%d datamapsize=%d send=%d\n", datamappointer, dataMap->size(), data.send);
         if (data.send)
         {
-          topic = String("home/" + esp_hostname + "/" + topic);
+          topic = String(mqtt_topicprefix + topic);
           nextpacketId = mqttClient.publish(topic.c_str(), 1, true, data.payload.c_str());
           if (nextpacketId > 0) waitingforack = true;
           DEBUG("MQTT PUBLISHING DATAMAP %s=%s (nextpacketId=%d)\n", topic.c_str(), data.payload.c_str(), nextpacketId);
@@ -1796,7 +1800,7 @@ void handleWWWSettings()
       if (webserver.argName(i) == "mqttserver") mqtt_server = webserver.arg(i);
       if (webserver.argName(i) == "mqttusername") mqtt_username = webserver.arg(i);
       if (webserver.argName(i) == "mqttpassword") mqtt_password = webserver.arg(i);
-      if (webserver.argName(i) == "mqttmaintopic") mqtt_maintopic = webserver.arg(i);
+      if (webserver.argName(i) == "mqtttopicprefix") mqtt_topicprefix = webserver.arg(i);
       if (webserver.argName(i) == "mqttport") mqtt_port = String(webserver.arg(i)).toInt();
       if (webserver.argName(i) == "mqttssl") mqtt_ssl = 1;
       if (webserver.argName(i) == "webpassword") esp_password = webserver.arg(i);
@@ -1821,7 +1825,7 @@ void handleWWWSettings()
     eeprom_write(esp_hostname, 4);
     eeprom_write(String(mqtt_port), 5);
     eeprom_write(String(mqtt_ssl), 6);
-    eeprom_write(mqtt_maintopic, 7);
+    eeprom_write(mqtt_topicprefix, 7);
     eeprom_commit();
 
 
@@ -1868,7 +1872,7 @@ void handleWWWSettings()
     webpage += String("<TR><TD>MQTT Ssl</TD><TD ALIGN=\"left\"><input type=\"checkbox\" name=\"mqttssl\" ") + (mqtt_ssl ? "checked" : "") + "></TD></TR>";
     webpage += String("<TR><TD>MQTT Username</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttusername\" value=\"") + mqtt_username + "\"></TD></TR>";
     webpage += String("<TR><TD>MQTT Password</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttpassword\" value=\"") + mqtt_password + "\"></TD></TR>";
-    webpage += String("<TR><TD>MQTT Maintopic</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"50\" name=\"mqttmaintopic\" value=\"") + mqtt_maintopic + "\"></TD></TR>";
+    webpage += String("<TR><TD>MQTT Topic Prefix</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"50\" name=\"mqtttopicprefix\" value=\"") + mqtt_topicprefix + "\"></TD></TR>";
     webpage += String("<TR><TD>ESP Password</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"webpassword\" value=\"") + esp_password + "\"></TD></TR>";
 #ifdef WATERMETER
     webpage += String("<TR><TD>Watermeter Liter</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"64\" name=\"watermeterliter\" value=\"") + getdatamap("water/liter") + "\"></TD></TR>";
@@ -1998,10 +2002,10 @@ void setup() {
     if (mqttsslstr != "") mqtt_ssl = mqttsslstr == "1" ? 1 : 0;
   }
 
-  if (!eeprom_read(&mqtt_maintopic, 7))
+  if (!eeprom_read(&mqtt_topicprefix, 7))
   {
     DEBUG("Error reading mqtt main topic from internal eeprom\n");
-    mqtt_maintopic = "home/" + esp_hostname + "/";
+    mqtt_topicprefix = "home/" + esp_hostname + "/";
   }
 
 #ifdef SONOFFCH
