@@ -22,11 +22,11 @@
 */
 //#define GENERIC8266
 //#define BATHROOM
-//#define BEDROOM2
+#define BEDROOM2
 //#define GARDEN //ESP8285
 //#define MAINPOWERMETER
 //#define OPENTHERM
-#define SONOFF4CH //ESP8285
+//#define SONOFF4CH //ESP8285
 //#define DUCOBOX
 //#define SONOFFDUAL
 //#define OLDBATHROOM
@@ -41,9 +41,9 @@
 //#define SONOFFBULB
 //#define SONOFFS20_PRINTER
 //#define SONOFFPOW // not finished yet
-//#define SONOFFPOWR2
+//#define SONOFFPOWR2 // tv done
 //#define WEATHER
-//#define AMGPELLETSTOVE
+//#define AMGPELLETSTOVE // done
 
 #ifdef SONOFFS20_PRINTER
 #define ESPNAME "SONOFFS20_PRINTER"
@@ -333,7 +333,7 @@ static bool sonoff_oldbuttons[1] = {1};
 #define ESPLED D4
 #define DHTPIN D5
 #define DHTTYPE DHT22   // there are multiple kinds of DHT sensors
-#define DHTTEMPOFFSET -1
+#define DHTTEMPOFFSET -2
 #define NEOPIXELPIN D6
 #include <Adafruit_NeoPixel.h>
 Adafruit_NeoPixel neopixelleds = Adafruit_NeoPixel(2, NEOPIXELPIN, NEO_RGB + NEO_KHZ400);
@@ -371,6 +371,7 @@ Adafruit_NeoPixel neopixelleds = Adafruit_NeoPixel(2, NEOPIXELPIN, NEO_RGB + NEO
 
 #include <EEPROM.h>
 #include <ESP8266WiFi.h>
+#include "espMQTT.h"
 //#include <WiFiUdp.h>
 //#include <PubSubClient.h>
 #include <AsyncMqttClient.h>
@@ -378,7 +379,6 @@ AsyncMqttClient mqttClient;
 #include <ESP8266WebServer.h>
 #include <ArduinoOTA.h>
 #include <ESP8266mDNS.h>        // Include the mDNS library
-#include <RemoteDebug.h>
 #include <user_interface.h>
 #include "SimpleMap.h";
 #include <Syslog.h>
@@ -417,7 +417,6 @@ SimpleMap<int, String> *eepromMap = new SimpleMap<int, String>([](int &a, int &b
 });
 
 
-RemoteDebug Debug;
 bool updatemqtt = 0;
 
 static const char webpage_P[] PROGMEM = "<!DOCTYPE html><html><meta charset=\"UTF-8\"><meta name=\"google\" content=\"notranslate\"><meta http-equiv=\"Content-Language\" content=\"en\"><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><style>table{width: 400px; margin: auto;}</style></head><body><CENTER><div align='center' style='width:400px; margin:auto'><CENTER><H1><p id='header'></p></H1></CENTER><p id='table'></p><A HREF='settings'>Settings</A></div></CENTER><script>function refreshsite(){var obj,dbParam,xmlhttp,myObj,x,txt ='';xmlhttp=new XMLHttpRequest();xmlhttp.onreadystatechange=function(){if(this.readyState==4&&this.status==200){myObj=JSON.parse(this.responseText);txt+='<TABLE>';for (x in myObj){if(x=='hostname')document.getElementById('header').innerHTML=myObj[x].toUpperCase();txt+='<tr><td>'+x.split('/').join(' ')+'</td><td>'+myObj[x]+'</td></tr>';}txt+='</table>';document.getElementById('table').innerHTML = txt;}};xmlhttp.open('POST','data.json',true);xmlhttp.setRequestHeader('Content-type','application/x-www-form-urlencoded');xmlhttp.send();}refreshsite();window.setInterval(refreshsite, 5000);</script></body></html>";
@@ -486,6 +485,7 @@ String esp_orig_hostname = "";
 static bool debug;
 static bool mqttReady = false;
 #include "esp8266_peri.h";
+RemoteDebug Debug;
 
 #if defined(MH_Z19) || defined(OPENTHERM) || defined (DUCOBOX) || defined (SMARTMETER) || defined (GROWATT) || defined (SONOFFPOWR2) || defined (AMGPELLETSTOVE)
 #undef SERIALLOG
@@ -501,9 +501,11 @@ Ticker wifiReconnectTimer;
 
 
 #define LOG(message) mylog(__func__, message)
+#define LOGD(message) mylog(__func__, message, LOG_DEBUG)
+#define LOGV(message) mylog(__func__, message, LOG_NOTICE)
 #define LOGL(message, level) mylog(__func__, message,level)
 
-void publishdatamap(int32_t packetId = -1, bool publishall = false);
+void publishdatamap(int32_t packetId = -1, bool publishall = false, bool init = false);
 
 void mylog (char const * caller_name, String message, int level = LOG_INFO)
 {
@@ -535,16 +537,14 @@ void showdatamap()
 
 void putdatamap(String topic, String value, bool sendupdate = true, bool forcesend = false)
 {
-  DEBUGV ("DATAMAP %s=%s\n", topic.c_str(), value.c_str());
-
-  dataMapStruct datamapstruct;
-  datamapstruct.payload = value;
-  datamapstruct.send = dataMap->get(topic).send;
+  dataMapStruct datamapstruct = dataMap->get(topic);
   
-  if (((dataMap->get(topic).payload != value) || forcesend) && sendupdate)
+  if (((datamapstruct.payload != value) || forcesend) && sendupdate)
   {
+    DEBUG_V ("DATAMAP %s=%s (oldval=%s oldsend=%d forcesend=%d)\n", topic.c_str(), value.c_str(),datamapstruct.payload.c_str(), datamapstruct.send, forcesend);
     datamapstruct.send = true;
   }
+  datamapstruct.payload = value;
 
   dataMap->put(topic, datamapstruct);
 }
@@ -568,17 +568,26 @@ void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
     putdatamap("flash/mode", (ideMode == FM_QIO ? "QIO" : ideMode == FM_QOUT ? "QOUT" : ideMode == FM_DIO ? "DIO" : ideMode == FM_DOUT ? "DOUT" : "UNKNOWN"), sendupdate);
     putdatamap("flash/speed", String(ESP.getFlashChipSpeed()), sendupdate);
   }
-  putdatamap("uptime", String(uptimestr), uptime % 60 == 0, sendupdate);
-  putdatamap("freeram", String(system_get_free_heap_size()), uptime % 60 == 0, sendupdate);
+  putdatamap("uptime", String(uptimestr), uptime % 60 == 0);
+  putdatamap("freeram", String(system_get_free_heap_size()), uptime % 60 == 0);
   putdatamap("wifi/state", WiFi.status() == WL_CONNECTED ? "connected" : "disconnected", sendupdate);
   putdatamap("wifi/localip", WiFi.localIP().toString(), sendupdate);
   putdatamap("wifi/ssid", String(WiFi.SSID()), sendupdate);
-  putdatamap("wifi/rssi", String(WiFi.RSSI()), uptime % 10 == 0, sendupdate);
+  putdatamap("wifi/rssi", String(WiFi.RSSI()), uptime % 10 == 0);
   putdatamap("wifi/channel", String(WiFi.channel()), sendupdate);
   putdatamap("mqtt/server", String(mqtt_server), sendupdate);
   putdatamap("mqtt/port", String(mqtt_port), sendupdate);
   putdatamap("mqtt/ssl", String(mqtt_ssl), sendupdate);
   putdatamap("mqtt/state", mqttClient.connected() ? "connected" : "disconnected", sendupdate);
+
+  if (((uptime % 60) == 0) && (WiFi.status() == WL_CONNECTED))
+  {
+    time_t now;
+    time(&now);
+    String strtime = ctime(&now);
+    strtime.replace("\n","");
+    LOGV(String("Uptime=") + String(uptimestr) + String(" DateTime=") + strtime);
+  }
 }
 
 void onWifiConnect(const WiFiEventStationModeGotIP& event)
@@ -591,6 +600,8 @@ void onWifiConnect(const WiFiEventStationModeGotIP& event)
 void onWifiDisconnect(const WiFiEventStationModeDisconnected& event)
 {
   DEBUG("Disconnected from Wi-Fi.\n");
+  mainstate.mqttconnected = false;
+  mainstate.mqttready = false;
   mainstate.wificonnected = false;
   mqttReconnectTimer.detach(); // ensure we don't reconnect to MQTT while reconnecting to Wi-Fi
   if (!mainstate.accesspoint) wifiReconnectTimer.once(2, connectToWifi); // trying to connect to wifi can cause AP to fail
@@ -717,7 +728,7 @@ void mqttdosubscriptions(int32_t packetId = -1)
     if (subscribetopic == "") nextsubscribe++;
   }
 
-  if (subscribetopic == "") publishdatamap(-1, true); // When subscibtion has finished start publishing of datamap
+  if (subscribetopic == "") publishdatamap(-1, true, true); // When subscibtion has finished start publishing of datamap
   else nextpacketid = mqttClient.subscribe(subscribetopic.c_str() ,1);
   DEBUG("mqttdosubscriptions end nextpacketid=%d\n", nextpacketid);
 }
@@ -731,7 +742,7 @@ void onMqttSubscribe(uint16_t packetId, uint8_t qos)
 
 void onMqttPublish(uint16_t packetId)
 {
-  DEBUG ("Publish acknowledged packetid=%d",packetId);
+  DEBUGV ("Publish acknowledged packetid=%d",packetId);
   publishdatamap(packetId);
 }
 
@@ -797,7 +808,7 @@ void update_dht()
 #ifdef NEOPIXELPIN
   if (rh < 1) neopixelleds.setPixelColor(1, neopixelleds.Color(0, 0, 0));
   else if (rh < 60) neopixelleds.setPixelColor(1, neopixelleds.Color(0, 20, 0));
-  else if (22rh < 90) neopixelleds.setPixelColor(1, neopixelleds.Color(30, 15, 0));
+  else if (rh < 90) neopixelleds.setPixelColor(1, neopixelleds.Color(30, 15, 0));
   else neopixelleds.setPixelColor(1, neopixelleds.Color(50, 0, 0));
   neopixelleds.show();
 #endif
@@ -1178,13 +1189,6 @@ void loop()
     putdatamap("uptime", String(uptime));
 #endif
 
-    if (((uptime % 60) == 0) && (WiFi.status() == WL_CONNECTED))
-    {
-      time_t now;
-      time(&now);
-      LOG(String("Uptime=") + String(uptime) + String(" DateTime=") + ctime(&now));
-    }
-
 #ifdef SONOFFPOWR2
     static uint8_t powr2sec = 0;
     if (powr2sec++ > 5) // Every 5 seconds send update about power usage
@@ -1233,7 +1237,7 @@ void loop()
 
 
 #ifdef DHTPIN
-    update_dht();
+    if (uptime%5 == 0) update_dht();
 #endif
 
 #ifdef ONEWIREPIN
@@ -1424,13 +1428,20 @@ void sonoff_handle()
 
 
 // Publish datamap publishes the datamap one by one to mqtt broker to prevent buffer overflow
-void publishdatamap(int32_t packetId, bool publishall)
+void publishdatamap(int32_t packetId, bool publishall, bool init)
 {
   static uint16_t datamappointer = 0;
   static int32_t nextpacketId = -1;
   static bool waitingforack = false;
 
-  if ((packetId != -1) || publishall) LOG(String("Publishdatamap (") + packetId + "," + publishall + ") datamappointer="+datamappointer+" datamapsize="+dataMap->size()+" nexpacketId="+nextpacketId+" waitingforack="+waitingforack);
+  if (init) 
+  {
+    waitingforack = false;
+    datamappointer = 0;
+    nextpacketId = -1;
+  }
+
+  if ((packetId != -1) || publishall) LOGV(String("Publishdatamap (") + packetId + "," + publishall + ") datamappointer="+datamappointer+" datamapsize="+dataMap->size()+" nexpacketId="+nextpacketId+" waitingforack="+waitingforack);
 
   if (publishall) 
   {
@@ -1487,7 +1498,7 @@ void publishdatamap(int32_t packetId, bool publishall)
           topic = String(mqtt_topicprefix + topic);
           nextpacketId = mqttClient.publish(topic.c_str(), 1, true, data.payload.c_str());
           if (nextpacketId > 0) waitingforack = true;
-          DEBUG("MQTT PUBLISHING DATAMAP %s=%s (nextpacketId=%d)\n", topic.c_str(), data.payload.c_str(), nextpacketId);
+          DEBUG_V ("MQTT PUBLISHING DATAMAP %s=%s (nextpacketId=%d)\n", topic.c_str(), data.payload.c_str(), nextpacketId);
         }
         else 
         {
