@@ -7,7 +7,6 @@ void growatt_init(void(*callback)(String,String))
   Serial.setRxBufferSize(2048); 
   Serial.begin(9600);  //Init serial 9600 baud
   Serial.setDebugOutput(false);
-
   _growatt_callback("grid/today/kwh", "0.0");
 }
 
@@ -48,6 +47,7 @@ void growatt_handle()
   if (millis() > nextupdatetime)
   {
     RxBufferPointer = 0;
+    nextupdatetime = millis() + 10000;
 
     if (!RxPowerDataOk)
     {
@@ -75,7 +75,6 @@ void growatt_handle()
     }
     growatt_send_command(0x41);
     _growatt_callback("status", "querying");
-    nextupdatetime = millis() + 10000;
   }
 
   if (Serial.available())
