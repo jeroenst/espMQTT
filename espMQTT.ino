@@ -22,7 +22,7 @@
 */
 //#define GENERIC8266
 //#define BATHROOM
-#define BEDROOM2
+//#define BEDROOM2
 //#define GARDEN //ESP8285
 //#define MAINPOWERMETER
 //#define OPENTHERM
@@ -43,7 +43,7 @@
 //#define SONOFFPOW // not finished yet
 //#define SONOFFPOWR2 // tv done
 //#define WEATHER
-//#define AMGPELLETSTOVE // done
+#define AMGPELLETSTOVE // done
 
 #ifdef SONOFFS20_PRINTER
 #define ESPNAME "SONOFFS20_PRINTER"
@@ -592,7 +592,7 @@ void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
 
 void onWifiConnect(const WiFiEventStationModeGotIP& event)
 {
-  DEBUG("Connected to Wi-Fi.");
+  DEBUG("Connected to Wi-Fi.\n");
   mainstate.wificonnected = true;
   connectToMqtt();
 }
@@ -766,6 +766,12 @@ void initSerial()
   amgpelletstove_init(amgpelletstovecallback, logdebug);
 #else
   Serial.begin(115200); //Init serial 115200 baud
+#endif
+
+#if defined(MH_Z19)
+  Serial.swap();
+  putdatamap ("mhz19/co2", "-");
+  putdatamap ("mhz19/temperature", "-");
 #endif
 }
 #ifdef DHTPIN
@@ -1180,6 +1186,24 @@ void loop()
   }
 #endif
 
+#ifdef MH_Z19
+  static int mhz19ppm = 0;
+  static int mhz19temp = 0;
+  switch (MHZ19_handle(&mhz19ppm, &mhz19temp))
+  {
+    case 1:
+      putdatamap ("mhz19/co2", String(mhz19ppm));
+      putdatamap ("mhz19/temperature", String(mhz19temp));
+    break;
+    case -1:
+      putdatamap ("mhz19/co2", "-");
+      putdatamap ("mhz19/temperature", "-");
+    break;
+    default:
+    break;
+  }
+#endif
+
   if (timertick == 1) // Every 1 second check sensors and update display (it would be insane to do it more often right?)
   {
     timertick = 0;
@@ -1265,11 +1289,6 @@ void loop()
 #endif
     }
     else ds18b20timer--;
-#endif
-
-
-#ifdef MH_Z19
-    read_MHZ19();
 #endif
 
     write_oled_display();
@@ -1720,6 +1739,97 @@ void timerCallback(void *pArg)
 }
 
 #ifdef MH_Z19
+uint8_t MHZ19_handle(int *ppm, int *temp)
+{
+  static unsigned long requesttime = 0;
+  static unsigned long readtime = 0;
+  if (requesttime < millis())
+  {
+    MHZ19_send_request_cmd();
+    requesttime = millis() + 5000;
+    readtime = millis() + 100;
+  }
+  if ((readtime > 0) && (readtime < millis()))
+  {
+    readtime = 0;
+    if (MHZ19_read(ppm, temp)) 
+    {
+      DEBUG("MHZ19 ppm=%d\n", *ppm);
+      DEBUG("MHZ19 temp=%d\n", *temp);
+      return 1;
+    }
+    else
+    {
+      DEBUG("MHZ19 read error!\n");
+      return -1;
+    }
+  }
+  return false;
+}
+
+void MHZ19_send_request_cmd()
+{
+  uint8_t cmd[9] = {0xFF, 0x01, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00, 0x79};
+  // command to ask for data
+
+  DEBUG("Sending MHZ19 request packet...\n");
+
+  Serial.flush();
+  Serial.write(cmd, 9); //request PPM CO2  
+}
+
+bool MHZ19_read(int *ppm, int *temp)
+{
+  static uint8_t errorcounter = 0;
+  bool error = 0;
+  uint8_t response[9]; // for answer
+
+  DEBUG("Receiving MHZ19 data...\n");
+
+  // The serial stream can get out of sync. The response starts with 0xff, try to resync.
+  uint8_t maxcounter = 0;
+  while (Serial.available() > 0 && (uint8_t)Serial.peek() != 0xFF && maxcounter++ < 10) {
+    Serial.read();
+  }
+
+  memset(response, 0, 9);
+  Serial.readBytes(response, 9);
+  /* for (int i = 0; i < 9; i++)
+    {
+     DEBUG(" %d", response[i]);
+    }
+    DEBUG("\n");
+  */
+  if (response[1] == 0x86)
+  {
+    uint8_t crc = 0;
+    for (uint8_t i = 1; i < 8; i++) {
+      crc += response[i];
+    }
+    crc = 255 - crc + 1;
+
+    if (response[8] == crc)
+    {
+      int responseHigh = (int) response[2];
+      int responseLow = (int) response[3];
+      *ppm = (256 * responseHigh) + responseLow;
+      *temp = response[4] - 40;
+      errorcounter = 0;
+    }
+  }
+  else
+  {
+    DEBUG("Invalid response from MHZ_19 CO2 sensor!\n");
+    if (errorcounter < 255) errorcounter++;
+    if (errorcounter == 5)
+    {
+      return false;
+    }
+  }  
+  return true;
+}
+
+
 void read_MHZ19()
 {
   static uint8_t errorcounter = 0;
@@ -1979,19 +2089,26 @@ void setup() {
   {
     DEBUG("Error reading mqtt username from internal eeprom\n");
   }
+  DEBUG("mqtt username=%s\n", mqtt_username.c_str());
+
   if (!eeprom_read(&mqtt_password, 2))
   {
     DEBUG("Error reading mqtt password from internal eeprom\n");
   }
+  DEBUG("mqtt password=%s\n", mqtt_password.c_str());
+
   if (!eeprom_read(&esp_password, 3))
   {
-    DEBUG("Error reading web password from internal eeprom\n");
+    DEBUG("Error reading esp password from internal eeprom\n");
   }
+  DEBUG("esp password=%s\n", esp_password.c_str());
+  
   if (!eeprom_read(&esp_hostname, 4))
   {
     DEBUG("Error reading hostname from internal eeprom\n");
     esp_hostname = ESPNAME;
   }
+  DEBUG("esp hostname=%s\n", esp_hostname.c_str());
 
   String mqttportstr = "";
   if (!eeprom_read(&mqttportstr, 5))
@@ -2002,22 +2119,25 @@ void setup() {
   {
     if ((mqttportstr != "") && (mqttportstr.toInt() > 0 ) && (mqttportstr.toInt() < 65536)) mqtt_port = mqttportstr.toInt();
   }
+  DEBUG("mqtt port=%d\n", mqtt_port);
 
   String mqttsslstr = "";
   if (!eeprom_read(&mqttsslstr, 6))
   {
-    DEBUG("Error reading hostname from internal eeprom\n");
+    DEBUG("Error reading mqtt ssl from internal eeprom\n");
   }
   else
   {
     if (mqttsslstr != "") mqtt_ssl = mqttsslstr == "1" ? 1 : 0;
   }
+  DEBUG("mqtt ssl=%d\n", mqtt_ssl);
 
   if (!eeprom_read(&mqtt_topicprefix, 7))
   {
     DEBUG("Error reading mqtt main topic from internal eeprom\n");
     mqtt_topicprefix = "home/" + esp_hostname + "/";
   }
+  DEBUG("mqtt topicprefix=%s\n", mqtt_topicprefix.c_str());
 
 #ifdef SONOFFCH
   sonoff_init();
