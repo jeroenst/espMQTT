@@ -20,7 +20,7 @@ uint32_t watermeter_getflow()
    return _watermeter_lmin;
 }
 
-void watermeter_init(uint8_t watermeter_pulsepin, uint8_t watermeter_ledpin, uint8_t watermeter_liters)
+void watermeter_init(uint8_t watermeter_pulsepin, uint8_t watermeter_ledpin, uint32_t watermeter_liters)
 {
   _watermeter_pulsepin = watermeter_pulsepin;
   _watermeter_ledpin = watermeter_ledpin;

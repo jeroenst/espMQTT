@@ -1,9 +1,12 @@
 #include <ESP8266WiFi.h>
 #include <RemoteDebug.h>
+#ifndef D0
+#define D0 0
+#endif
 #define NODEMCULEDPIN D0
 
-String amgcmd = "";
-uint8_t amgcmdnr = 0;
+static String amgcmd = "";
+static uint8_t amgcmdnr = 0;
 void(*_amgpelletstove_callback)(String, String);
 void(*_amgpelletstove_debug_callback)(String);
 
@@ -46,80 +49,63 @@ void _amgpelletstove_sendserial()
   amgcmdnr++;
   if (amgcmd != "") amgcmdnr = 255;
   digitalWrite(NODEMCULEDPIN, 0);
+  Serial.write (27);
   switch (amgcmdnr)
   {
     case 1:
-      Serial.write (27);
       Serial.print ("RD100057&"); // Request room temperature
       break;
     case 2:
-      Serial.write (27);
       Serial.print ("RC60005B&"); // Request room temperature setpoint
       break;
     case 3:
-      Serial.write (27);
       Serial.print ("RC50005A&"); // Request power setpoint
       break;
     case 4:
-      Serial.write (27);
       Serial.print ("RD000056&"); // Request exhaust temperature
       break;
     case 5:
-      Serial.write (27);
       Serial.print ("RD200058&"); // Request exhaust fanspeed
       break;
     case 6:
-      Serial.write (27);
       Serial.print ("RD300059&"); // Request room fanspeed
       break;
     case 7:
-      Serial.write (27);
       Serial.print ("RD40005A&"); // Request auger speed
       break;
     case 8:
-      Serial.write (27);
       Serial.print ("RDF0006C&"); // Request board temp
       break;
     case 9:
-      Serial.write (27);
       Serial.print ("RDD0006A&"); // ??? 0000020 Fluegas motor correction (rpm*10)
       break;
     case 10:
-      Serial.write (27);
       Serial.print ("RDE0006B&"); // ??? 0000020 Pellet correction (%)
       break;
     case 11:
-      Serial.write (27);
       Serial.print ("RDA00067&"); // 000020 // error code
       break;
     case 12:
-      Serial.write (27);
       Serial.print ("REF0006D&"); // 00D20036  // FANSPEED EXHAUST
       break;
     case 13:
-      Serial.write (27);
       Serial.print ("RD80005E&"); // TIMER TO NEXT PHASE
       break;
     case 14:
-      Serial.write (27);
       Serial.print ("RC000055&"); // 00000020 // Inputs
       break;
     case 15:
-      Serial.write (27);
       Serial.print ("RDB00068&"); // Extractor sensorlevel
       break;
     case 255:
       _amgpelletstove_debug_callback("Writing to amg pelletstove:" + amgcmd + "\n");
-      Serial.write (27);
       Serial.print (amgcmd);
       amgcmd = "";
       break;
     default:
       amgcmdnr = 0;
-      Serial.write (27);
       Serial.print ("RD90005F&"); // 02010023 // cycle phase
       break;
-
   }
 }
 
@@ -162,10 +148,11 @@ void amgpelletstove_handle()
           break;
         case 6:
           _amgpelletstove_callback("room/fanspeed", String(value));
+          currentpower = value;
           break;
         case 7:
           _amgpelletstove_callback("auger/speed", String(value));
-          if (value <= 5) currentpower = value;
+          if (currentpower > value) currentpower = value;
           break;
         case 8:
           _amgpelletstove_callback("board/temperature", String(value));
@@ -229,13 +216,13 @@ void amgpelletstove_handle()
           break;
       }
       serstr = "";
-      nextupdatetime = millis() + 250; // After successfull transfer wait 250ms before requesting next value
+      nextupdatetime = millis() + 500; // After successfull transfer wait 500ms before requesting next value
     }
   }
 
   if (millis() > nextupdatetime)
   {
-    nextupdatetime = millis() + 2000; // On first or failed transefer wait 2 second before next (re)try
+    nextupdatetime = millis() + 5000; // On first or failed transefer wait 5 second before next (re)try
     _amgpelletstove_sendserial();
   }
 }

@@ -4,7 +4,7 @@
     https://github.com/jeroenst/ESPAsyncTCP
     https://github.com/jeroenst/async-mqtt-client
     https://github.com/jeroenst/Syslog
-    
+
    Optional libraries depending on defines:
     (Sonoff POW) https://github.com/jeroenst/hlw8012
     (RGB LED) https://github.com/jeroenst/my92xx
@@ -17,33 +17,34 @@
 
 
    Known bugs:
-    MQTT SSL not working (https://github.com/marvinroger/async-mqtt-client/issues/107)
-
+    MQTT SSL not working https://github.com/marvinroger/async-mqtt-client/issues/107
+    When using a delay in call back functions this causes esp to crash when another delay is allready in progress.https://github.com/esp8266/Arduino/issues/5722
 */
-//#define GENERIC8266
-//#define BATHROOM
-//#define BEDROOM2
-//#define GARDEN //ESP8285
+#define GENERIC8266
+//#define BATHROOM //updated
+//#define BEDROOM2 //updated
+//#define OPENTHERM //updated
+//#define WATERMETER //updated
+//#define DUCOBOX //updated
+//#define SMARTMETER //updated
+//#define GROWATT //updated
+//#define DIMMER //updated
+//#define SONOFFS20 // coffeelamp & sonoffs20_001 //updated
+//#define SONOFFBULB //updated
+//#define SONOFFPOWR2 // tv&washing machine updated
+//#define WEATHER  // updated
+//#define AMGPELLETSTOVE // updated
+//#define GARDEN //ESP8285 WATERFALL MARIANNE// unreachable
+
 //#define MAINPOWERMETER
-//#define OPENTHERM
 //#define SONOFF4CH //ESP8285
-//#define DUCOBOX
 //#define SONOFFDUAL
 //#define OLDBATHROOM
-//#define SMARTMETER
-//#define WATERMETER
 //#define NOISE
 //#define IRRIGATION
 //#define SOIL
-//#define GROWATT
-//#define DIMMER
-//#define SONOFFS20
-//#define SONOFFBULB
 //#define SONOFFS20_PRINTER
 //#define SONOFFPOW // not finished yet
-//#define SONOFFPOWR2 // tv done
-//#define WEATHER
-#define AMGPELLETSTOVE // done
 
 #ifdef SONOFFS20_PRINTER
 #define ESPNAME "SONOFFS20_PRINTER"
@@ -372,8 +373,6 @@ Adafruit_NeoPixel neopixelleds = Adafruit_NeoPixel(2, NEOPIXELPIN, NEO_RGB + NEO
 #include <EEPROM.h>
 #include <ESP8266WiFi.h>
 #include "espMQTT.h"
-//#include <WiFiUdp.h>
-//#include <PubSubClient.h>
 #include <AsyncMqttClient.h>
 AsyncMqttClient mqttClient;
 #include <ESP8266WebServer.h>
@@ -386,6 +385,7 @@ AsyncMqttClient mqttClient;
 
 // A UDP instance to let us send and receive packets over UDP
 WiFiUDP udpClientSyslog;
+WiFiUDP udpClient;
 
 // Create a new empty syslog instance
 Syslog syslog(udpClientSyslog, SYSLOG_PROTO_IETF);
@@ -429,8 +429,6 @@ extern "C" {
 #include "DHT.h"
 DHT dht(DHTPIN, DHTTYPE);
 #endif
-
-
 
 #ifdef OLED_ADDRESS
 #include <Wire.h>
@@ -498,6 +496,7 @@ WiFiEventHandler wifiDisconnectHandler;
 #include <Ticker.h>
 Ticker mqttReconnectTimer;
 Ticker wifiReconnectTimer;
+unsigned long reboottimeout = 0;
 
 
 #define LOG(message) mylog(__func__, message)
@@ -518,7 +517,7 @@ void mylog (char const * caller_name, String message, int level = LOG_INFO)
     case LOG_NOTICE: debuglevel = Debug.VERBOSE; break;
   }
   if (Debug.isActive(debuglevel)) Debug.printf("(%s) %s\n", caller_name, message.c_str());
-  syslog.log(level, (String("(") + String(caller_name) + ") " + message).c_str());
+  syslog.log(level, (String("(") + String(caller_name) + ") " + message).c_str()); //https://github.com/arcao/Syslog/issues/21
 }
 
 String getdatamap(String topic)
@@ -538,10 +537,10 @@ void showdatamap()
 void putdatamap(String topic, String value, bool sendupdate = true, bool forcesend = false)
 {
   dataMapStruct datamapstruct = dataMap->get(topic);
-  
+
   if (((datamapstruct.payload != value) || forcesend) && sendupdate)
   {
-    DEBUG_V ("DATAMAP %s=%s (oldval=%s oldsend=%d forcesend=%d)\n", topic.c_str(), value.c_str(),datamapstruct.payload.c_str(), datamapstruct.send, forcesend);
+    DEBUG ("DATAMAP %s=%s (sendupdate=%d, oldval=%s oldsend=%d forcesend=%d)\n", topic.c_str(), value.c_str(), sendupdate, datamapstruct.payload.c_str(), datamapstruct.send, forcesend);
     datamapstruct.send = true;
   }
   datamapstruct.payload = value;
@@ -585,14 +584,15 @@ void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
     time_t now;
     time(&now);
     String strtime = ctime(&now);
-    strtime.replace("\n","");
+    strtime.replace("\n", "");
     LOGV(String("Uptime=") + String(uptimestr) + String(" DateTime=") + strtime);
   }
 }
 
 void onWifiConnect(const WiFiEventStationModeGotIP& event)
 {
-  DEBUG("Connected to Wi-Fi.\n");
+  wifiReconnectTimer.detach();
+  Serial.println("Connected to Wi-Fi.\n");
   mainstate.wificonnected = true;
   connectToMqtt();
 }
@@ -600,6 +600,7 @@ void onWifiConnect(const WiFiEventStationModeGotIP& event)
 void onWifiDisconnect(const WiFiEventStationModeDisconnected& event)
 {
   DEBUG("Disconnected from Wi-Fi.\n");
+  mqttClient.disconnect();
   mainstate.mqttconnected = false;
   mainstate.mqttready = false;
   mainstate.wificonnected = false;
@@ -612,7 +613,7 @@ void initWifi()
   wifiConnectHandler = WiFi.onStationModeGotIP(onWifiConnect);
   wifiDisconnectHandler = WiFi.onStationModeDisconnected(onWifiDisconnect);
   WiFi.setAutoReconnect(false); // We handle reconnect our self
-  //WiFi.setSleepMode(WIFI_NONE_SLEEP);
+  WiFi.setSleepMode(WIFI_NONE_SLEEP); // When sleep is on regular disconnects occur https://github.com/esp8266/Arduino/issues/5083
   WiFi.mode(WIFI_STA);
   DEBUG("Wifi hostname=%s\n", esp_hostname.c_str());
   WiFi.hostname(esp_hostname);
@@ -622,7 +623,7 @@ void connectToWifi()
 {
   if (!mainstate.wificonnected)
   {
-    DEBUG("Connecting to Wi-Fi...");
+    DEBUG("Connecting to Wi-Fi...\n");
     wifiReconnectTimer.once(30, connectToWifi); // Retry wifi connection in 30 seconds if it fails to connect
     WiFi.begin();
   }
@@ -652,9 +653,8 @@ void initMqtt()
 void connectToMqtt()
 {
   DEBUGV("connectToMqtt()\n");
-  if (!mainstate.mqttconnected) 
+  if (!mainstate.mqttconnected)
   {
-    LOG("Connecting mqtt");
     mqttReconnectTimer.once(30, connectToMqtt); // retry over 30 seconds if connection can not be established
     mqttClient.connect();
   }
@@ -729,28 +729,29 @@ void mqttdosubscriptions(int32_t packetId = -1)
   }
 
   if (subscribetopic == "") publishdatamap(-1, true, true); // When subscibtion has finished start publishing of datamap
-  else nextpacketid = mqttClient.subscribe(subscribetopic.c_str() ,1);
+  else nextpacketid = mqttClient.subscribe(subscribetopic.c_str() , 1);
   DEBUG("mqttdosubscriptions end nextpacketid=%d\n", nextpacketid);
 }
-  
+
 void onMqttSubscribe(uint16_t packetId, uint8_t qos)
 {
-  DEBUG ("Subscribe acknowledged packetid=%d qos=%d", packetId, qos);
+  DEBUG ("Subscribe acknowledged packetid=%d qos=%d\n", packetId, qos);
   mqttdosubscriptions(packetId);
 }
 
 
 void onMqttPublish(uint16_t packetId)
 {
-  DEBUGV ("Publish acknowledged packetid=%d",packetId);
+  DEBUGV ("Publish acknowledged packetid=%d\n", packetId);
   publishdatamap(packetId);
 }
 
 void onMqttConnect(bool sessionPresent) {
-  LOG ("Connected to MQTT sessionPresent="+String(sessionPresent));
+  LOG ("Connected to MQTT sessionPresent=" + String(sessionPresent));
   mainstate.mqttconnected = true;
   update_systeminfo(true);
   mqttdosubscriptions();
+  mqttReconnectTimer.detach();
 }
 
 void initSerial()
@@ -769,7 +770,7 @@ void initSerial()
 #endif
 
 #if defined(MH_Z19)
-  Serial.swap();
+  //  Serial.swap();
   putdatamap ("mhz19/co2", "-");
   putdatamap ("mhz19/temperature", "-");
 #endif
@@ -1014,11 +1015,15 @@ void loop()
   ArduinoOTA.handle();
   Debug.handle();
 
+  if ((0 != reboottimeout) && (reboottimeout > uptime)) ESP.restart();
+
+
   if (mainstate.mqttready) publishdatamap();
 
   //mqttClient.loop();
   webserver.handleClient();
   yield();
+
 
 #ifdef SONOFFCH
   sonoff_handle();
@@ -1032,6 +1037,9 @@ void loop()
   ducobox_handle();
 #endif
 
+
+#ifdef GENERIC8266
+#endif
 
 #ifdef RAINMETERPIN
 #define PULSEMM 0.3636
@@ -1194,24 +1202,21 @@ void loop()
     case 1:
       putdatamap ("mhz19/co2", String(mhz19ppm));
       putdatamap ("mhz19/temperature", String(mhz19temp));
-    break;
+      break;
     case -1:
       putdatamap ("mhz19/co2", "-");
       putdatamap ("mhz19/temperature", "-");
-    break;
+      break;
     default:
-    break;
+      break;
   }
 #endif
+
 
   if (timertick == 1) // Every 1 second check sensors and update display (it would be insane to do it more often right?)
   {
     timertick = 0;
     updatemqtt = 1;
-
-#ifdef GENERIC8266
-    putdatamap("uptime", String(uptime));
-#endif
 
 #ifdef SONOFFPOWR2
     static uint8_t powr2sec = 0;
@@ -1239,7 +1244,7 @@ void loop()
     }
 #endif
 
-    update_systeminfo();
+  update_systeminfo();
 
 #ifdef MAINPOWERMETER
     static uint8_t circuitnr = 0;
@@ -1261,7 +1266,7 @@ void loop()
 
 
 #ifdef DHTPIN
-    if (uptime%5 == 0) update_dht();
+    if (uptime % 5 == 0) update_dht();
 #endif
 
 #ifdef ONEWIREPIN
@@ -1453,16 +1458,16 @@ void publishdatamap(int32_t packetId, bool publishall, bool init)
   static int32_t nextpacketId = -1;
   static bool waitingforack = false;
 
-  if (init) 
+  if (init)
   {
     waitingforack = false;
     datamappointer = 0;
     nextpacketId = -1;
   }
 
-  if ((packetId != -1) || publishall) LOGV(String("Publishdatamap (") + packetId + "," + publishall + ") datamappointer="+datamappointer+" datamapsize="+dataMap->size()+" nexpacketId="+nextpacketId+" waitingforack="+waitingforack);
+  if ((packetId != -1) || publishall) LOGV(String("Publishdatamap (") + packetId + "," + publishall + ") datamappointer=" + datamappointer + " datamapsize=" + dataMap->size() + " nexpacketId=" + nextpacketId + " waitingforack=" + waitingforack);
 
-  if (publishall) 
+  if (publishall)
   {
     uint32_t publishallpointer = 0;
     while (publishallpointer < dataMap->size())
@@ -1490,7 +1495,7 @@ void publishdatamap(int32_t packetId, bool publishall, bool init)
       nextpacketId = mqttClient.publish(topic.c_str(), 1, true, payload.c_str());
       if (nextpacketId == 0) waitingforack = false;
     }
-    if (packetId == nextpacketId) 
+    if (packetId == nextpacketId)
     {
       // Packet succesfull delivered proceed to next item
       String topic = dataMap->getKey(datamappointer);
@@ -1517,11 +1522,11 @@ void publishdatamap(int32_t packetId, bool publishall, bool init)
           topic = String(mqtt_topicprefix + topic);
           nextpacketId = mqttClient.publish(topic.c_str(), 1, true, data.payload.c_str());
           if (nextpacketId > 0) waitingforack = true;
-          DEBUG_V ("MQTT PUBLISHING DATAMAP %s=%s (nextpacketId=%d)\n", topic.c_str(), data.payload.c_str(), nextpacketId);
+          DEBUG ("MQTT PUBLISHING DATAMAP %s=%s (nextpacketId=%d)\n", topic.c_str(), data.payload.c_str(), nextpacketId);
         }
-        else 
+        else
         {
-          datamappointer++;    
+          datamappointer++;
         }
       }
       if (nextpacketId == -1)
@@ -1530,7 +1535,7 @@ void publishdatamap(int32_t packetId, bool publishall, bool init)
         mainstate.mqttready = true;
       }
     }
-    else 
+    else
     {
       datamappointer = 0;
       mainstate.mqttready = true;
@@ -1752,7 +1757,7 @@ uint8_t MHZ19_handle(int *ppm, int *temp)
   if ((readtime > 0) && (readtime < millis()))
   {
     readtime = 0;
-    if (MHZ19_read(ppm, temp)) 
+    if (MHZ19_read(ppm, temp))
     {
       DEBUG("MHZ19 ppm=%d\n", *ppm);
       DEBUG("MHZ19 temp=%d\n", *temp);
@@ -1775,7 +1780,7 @@ void MHZ19_send_request_cmd()
   DEBUG("Sending MHZ19 request packet...\n");
 
   Serial.flush();
-  Serial.write(cmd, 9); //request PPM CO2  
+  Serial.write(cmd, 9); //request PPM CO2
 }
 
 bool MHZ19_read(int *ppm, int *temp)
@@ -1825,71 +1830,11 @@ bool MHZ19_read(int *ppm, int *temp)
     {
       return false;
     }
-  }  
+  }
   return true;
 }
 
 
-void read_MHZ19()
-{
-  static uint8_t errorcounter = 0;
-  bool error = 0;
-  uint8_t cmd[9] = {0xFF, 0x01, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00, 0x79};
-  // command to ask for data
-  uint8_t response[9]; // for answer
-
-  Serial.flush();
-  Serial.swap();
-
-  Serial.write(cmd, 9); //request PPM CO2
-
-  delay(20); // Wait 20 ms for packets to receive (104us per bit, +/- 1ms per byte + some execution time)
-
-  // The serial stream can get out of sync. The response starts with 0xff, try to resync.
-  uint8_t maxcounter = 0;
-  while (Serial.available() > 0 && (uint8_t)Serial.peek() != 0xFF && maxcounter++ < 10) {
-    Serial.read();
-  }
-
-  memset(response, 0, 9);
-  Serial.readBytes(response, 9);
-  Serial.swap();
-  /* for (int i = 0; i < 9; i++)
-    {
-     DEBUG(" %d", response[i]);
-    }
-    DEBUG("\n");
-  */
-  if (response[1] == 0x86)
-  {
-    uint8_t crc = 0;
-    for (uint8_t i = 1; i < 8; i++) {
-      crc += response[i];
-    }
-    crc = 255 - crc + 1;
-
-    if (response[8] == crc)
-    {
-      int responseHigh = (int) response[2];
-      int responseLow = (int) response[3];
-      int ppm = (256 * responseHigh) + responseLow;
-      int temp = response[4] - 40;
-      putdatamap ("mhz19/co2", String(ppm));
-      putdatamap ("mhz19/temperature", String(temp));
-      errorcounter = 0;
-    }
-  }
-  else
-  {
-    DEBUG("Invalid response from MHZ_19 CO2 sensor!\n");
-    if (errorcounter < 255) errorcounter++;
-    if (errorcounter == 5)
-    {
-      putdatamap ("mhz19/co2", "-");
-      putdatamap ("mhz19/temperature", "-");
-    }
-  }
-}
 #endif
 
 
@@ -1909,7 +1854,7 @@ void handleWWWSettings()
       if (webserver.argName(i) == "rebootdevice")
       {
         webserver.send(200, "text/html", "<HTML><BODY>Device Rebooting...<BR><A HREF=\"/\">Return to main page</A></BODY></HTML>");
-        delay(3000);
+        reboottimeout = uptime + 4;
         ESP.restart();
       }
     }
@@ -2102,7 +2047,7 @@ void setup() {
     DEBUG("Error reading esp password from internal eeprom\n");
   }
   DEBUG("esp password=%s\n", esp_password.c_str());
-  
+
   if (!eeprom_read(&esp_hostname, 4))
   {
     DEBUG("Error reading hostname from internal eeprom\n");
@@ -2323,7 +2268,7 @@ void processCmdRemoteDebug()
   {
     if (Ping.ping(lastArg.c_str())) {
       DEBUG("Ping Success!!\n");
-      } else {
+    } else {
       DEBUG("Ping Error!!\n");
     }
   }
@@ -2341,12 +2286,12 @@ void processCmdRemoteDebug()
 
   if (lastCmd == "showmainstate")
   {
-    DEBUG("wificonnected=%d\n",mainstate.wificonnected);
-    DEBUG("mqttconnected=%d\n",mainstate.mqttconnected);
-    DEBUG("mqttready=%d\n",mainstate.mqttready);
-    DEBUG("mqttsenddatamap=%d\n",mainstate.mqttsenddatamap);
-    DEBUG("defaultpassword=%d\n",mainstate.defaultpassword);
-    DEBUG("accesspoint=%d\n",mainstate.accesspoint);
+    DEBUG("wificonnected=%d\n", mainstate.wificonnected);
+    DEBUG("mqttconnected=%d\n", mainstate.mqttconnected);
+    DEBUG("mqttready=%d\n", mainstate.mqttready);
+    DEBUG("mqttsenddatamap=%d\n", mainstate.mqttsenddatamap);
+    DEBUG("defaultpassword=%d\n", mainstate.defaultpassword);
+    DEBUG("accesspoint=%d\n", mainstate.accesspoint);
   }
 
   if (lastCmd == "showdatamap") showdatamap();
