@@ -20,21 +20,21 @@
     MQTT SSL not working https://github.com/marvinroger/async-mqtt-client/issues/107
     When using a delay in call back functions this causes esp to crash when another delay is allready in progress.https://github.com/esp8266/Arduino/issues/5722
 */
-#define GENERIC8266
-//#define BATHROOM //updated
-//#define BEDROOM2 //updated
-//#define OPENTHERM //updated
-//#define WATERMETER //updated
-//#define DUCOBOX //updated
-//#define SMARTMETER //updated
-//#define GROWATT //updated
-//#define DIMMER //updated
-//#define SONOFFS20 // coffeelamp & sonoffs20_001 //updated
-//#define SONOFFBULB //updated
-//#define SONOFFPOWR2 // tv&washing machine updated
-//#define WEATHER  // updated
-//#define AMGPELLETSTOVE // updated
-//#define GARDEN //ESP8285 WATERFALL MARIANNE// unreachable
+//#define GENERIC8266
+//#define BATHROOM 
+//#define BEDROOM2 
+//#define OPENTHERM 
+//#define WATERMETER 
+#define DUCOBOX //updated
+//#define SMARTMETER 
+//#define GROWATT 
+//#define DIMMER 
+//#define SONOFFS20 // coffeelamp & sonoffs20_001
+//#define SONOFFBULB 
+//#define SONOFFPOWR2 // tv&washing machine
+//#define WEATHER  
+//#define AMGPELLETSTOVE 
+//#define GARDEN //ESP8285 WATERFALL MARIANNE
 
 //#define MAINPOWERMETER
 //#define SONOFF4CH //ESP8285
@@ -506,7 +506,7 @@ unsigned long reboottimeout = 0;
 
 void publishdatamap(int32_t packetId = -1, bool publishall = false, bool init = false);
 
-void mylog (char const * caller_name, String message, int level = LOG_INFO)
+void mylog (char const * caller_name, String message, int level = LOG_INFO) // DO NOT USE IN CALLBACKS, SYSLOG CAN CAUSE CRASH BECAUSE OF DELAY
 {
   int debuglevel = Debug.ANY;
   switch (level) {
@@ -592,7 +592,7 @@ void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
 void onWifiConnect(const WiFiEventStationModeGotIP& event)
 {
   wifiReconnectTimer.detach();
-  Serial.println("Connected to Wi-Fi.\n");
+  DEBUG("Connected to Wi-Fi.\n");
   mainstate.wificonnected = true;
   connectToMqtt();
 }
@@ -735,7 +735,7 @@ void mqttdosubscriptions(int32_t packetId = -1)
 
 void onMqttSubscribe(uint16_t packetId, uint8_t qos)
 {
-  DEBUG ("Subscribe acknowledged packetid=%d qos=%d\n", packetId, qos);
+  DEBUGV ("Subscribe acknowledged packetid=%d qos=%d\n", packetId, qos);
   mqttdosubscriptions(packetId);
 }
 
@@ -747,11 +747,11 @@ void onMqttPublish(uint16_t packetId)
 }
 
 void onMqttConnect(bool sessionPresent) {
-  LOG ("Connected to MQTT sessionPresent=" + String(sessionPresent));
+  DEBUG ("Connected to MQTT sessionPresent=%d\n", sessionPresent);
+  mqttReconnectTimer.detach();
   mainstate.mqttconnected = true;
   update_systeminfo(true);
   mqttdosubscriptions();
-  mqttReconnectTimer.detach();
 }
 
 void initSerial()
