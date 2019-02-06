@@ -149,14 +149,14 @@ void _ducobox_handleserial(String ducomessage)
     switch (fanspeed)
     {
       case 0:
-        if (_ducobox_co2 >= 900) fanspeed = 1;
+        if (_ducobox_co2 >= 1000) fanspeed = 1;
         break;
       case 1:
         if (_ducobox_co2 < 800) fanspeed = 0;
-        if (_ducobox_co2 >= 1000) fanspeed = 2;
+        if (_ducobox_co2 >= 1200) fanspeed = 2;
         break;
       case 2:
-        if (_ducobox_co2 < 900) fanspeed = 1;
+        if (_ducobox_co2 < 1000) fanspeed = 1;
         break;
     }
     if (_ducobox_co2 == 0) fanspeed = 1; // When no co2 reading do some extra ventilation to prevent high co2...
