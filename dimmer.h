@@ -6,3 +6,5 @@ bool dimmer_getstate();
 
 void dimmer_init(uint8_t zerocrosspin, uint8_t triacpin, bool fade = true);
 void dimmer_stop();
+
+void dimmer_handle();

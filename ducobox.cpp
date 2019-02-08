@@ -152,7 +152,7 @@ void _ducobox_handleserial(String ducomessage)
         if (_ducobox_co2 >= 1000) fanspeed = 1;
         break;
       case 1:
-        if (_ducobox_co2 < 800) fanspeed = 0;
+        if (_ducobox_co2 < 900) fanspeed = 0;
         if (_ducobox_co2 >= 1200) fanspeed = 2;
         break;
       case 2:

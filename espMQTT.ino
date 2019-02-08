@@ -21,19 +21,19 @@
     When using a delay in call back functions this causes esp to crash when another delay is allready in progress.https://github.com/esp8266/Arduino/issues/5722
 */
 //#define GENERIC8266
-//#define BATHROOM 
-//#define BEDROOM2 
-//#define OPENTHERM 
-//#define WATERMETER 
-#define DUCOBOX //updated
-//#define SMARTMETER 
-//#define GROWATT 
-//#define DIMMER 
+//#define BATHROOM
+//#define BEDROOM2
+//#define OPENTHERM
+//#define WATERMETER
+//#define DUCOBOX //updated
+//#define SMARTMETER
+//#define GROWATT
+#define DIMMER
 //#define SONOFFS20 // coffeelamp & sonoffs20_001
-//#define SONOFFBULB 
+//#define SONOFFBULB
 //#define SONOFFPOWR2 // tv&washing machine
-//#define WEATHER  
-//#define AMGPELLETSTOVE 
+//#define WEATHER
+//#define AMGPELLETSTOVE
 //#define GARDEN //ESP8285 WATERFALL MARIANNE
 
 //#define MAINPOWERMETER
@@ -91,8 +91,8 @@ uint32_t sonoffch_starttime[1];
 #define ESPLED D4
 #define ONEWIREPIN D5
 #define RAINMETERPIN D1
+#define RAINMETERPULSEMM 0.3636
 #endif
-
 
 #ifdef GROWATT
 #define ESPNAME "GROWATT"
@@ -111,9 +111,6 @@ uint32_t sonoffch_starttime[1];
 
 #ifdef DUCOBOX
 #define ESPNAME "DUCOBOX"
-#ifndef ARDUINO_ESP8266_ESP01
-#error "Wrong board selected! Select Generic ESP8285 module"
-#endif
 #define SONOFFDUAL
 #define FLASHBUTTON 10
 #define ESPLED 13
@@ -137,7 +134,6 @@ uint32_t sonoffch_starttime[4];
 #endif
 #define SONOFF4CH
 #endif
-
 
 #ifdef SONOFF4CH
 #ifndef ESPNAME
@@ -381,6 +377,16 @@ AsyncMqttClient mqttClient;
 #include <user_interface.h>
 #include "SimpleMap.h";
 #include <Syslog.h>
+#define syslogD(fmt, ...) if (WiFi.status() == WL_CONNECTED) syslog.logf(LOG_DEBUG,"(%s) " fmt, __func__, ##__VA_ARGS__)
+#define syslogI(fmt, ...) if (WiFi.status() == WL_CONNECTED) syslog.logf(LOG_INFO,"(%s) " fmt, __func__, ##__VA_ARGS__)
+#define syslogN(fmt, ...) if (WiFi.status() == WL_CONNECTED) syslog.logf(LOG_NOTICE,"(%s) " fmt, __func__, ##__VA_ARGS__)
+#define syslogW(fmt, ...) if (WiFi.status() == WL_CONNECTED) syslog.logf(LOG_WARNING,"(%s) " fmt, __func__, ##__VA_ARGS__)
+#define syslogE(fmt, ...) if (WiFi.status() == WL_CONNECTED) syslog.logf(LOG_ERR,"(%s) " fmt, __func__, ##__VA_ARGS__)
+#define syslogC(fmt, ...) if (WiFi.status() == WL_CONNECTED) syslog.logf(LOG_CRIT,"(%s) " fmt, __func__, ##__VA_ARGS__)
+#define syslogA(fmt, ...) if (WiFi.status() == WL_CONNECTED) syslog.logf(LOG_ALERT,"(%s) " fmt, __func__, ##__VA_ARGS__)
+#define syslogEM(fmt, ...) if (WiFi.status() == WL_CONNECTED) syslog.logf(LOG_EMERG,"(%s) " fmt, __func__, ##__VA_ARGS__)
+
+
 #include <ESP8266Ping.h>
 
 // A UDP instance to let us send and receive packets over UDP
@@ -390,9 +396,17 @@ WiFiUDP udpClient;
 // Create a new empty syslog instance
 Syslog syslog(udpClientSyslog, SYSLOG_PROTO_IETF);
 
+struct Triggers {
+  bool wificonnected = false;
+  bool wifidisconnected = false;
+  bool mqttconnected = false;
+  bool mqttdisconnected = false;
+} triggers;
+
 struct Mainstate {
   bool wificonnected = false;
   bool mqttconnected = false;
+  bool mqttconnectedtrigger = false;
   bool mqttready = false;
   bool mqttsenddatamap = false;
   bool defaultpassword = false;
@@ -470,7 +484,6 @@ ESP8266WebServer webserver(80);
 String chipid;
 uint32_t uptime = 0;
 bool timertick = 1;
-os_timer_t myTimer;
 String mqtt_server = "";
 String mqtt_username = "";
 String mqtt_password = "";
@@ -496,29 +509,10 @@ WiFiEventHandler wifiDisconnectHandler;
 #include <Ticker.h>
 Ticker mqttReconnectTimer;
 Ticker wifiReconnectTimer;
+Ticker systemTimer;
 unsigned long reboottimeout = 0;
 
-
-#define LOG(message) mylog(__func__, message)
-#define LOGD(message) mylog(__func__, message, LOG_DEBUG)
-#define LOGV(message) mylog(__func__, message, LOG_NOTICE)
-#define LOGL(message, level) mylog(__func__, message,level)
-
 void publishdatamap(int32_t packetId = -1, bool publishall = false, bool init = false);
-
-void mylog (char const * caller_name, String message, int level = LOG_INFO) // DO NOT USE IN CALLBACKS, SYSLOG CAN CAUSE CRASH BECAUSE OF DELAY
-{
-  int debuglevel = Debug.ANY;
-  switch (level) {
-    case LOG_INFO: debuglevel = Debug.INFO; break;
-    case LOG_ERR: debuglevel = Debug.ERROR; break;
-    case LOG_WARNING: debuglevel = Debug.WARNING; break;
-    case LOG_DEBUG: debuglevel = Debug.DEBUG; break;
-    case LOG_NOTICE: debuglevel = Debug.VERBOSE; break;
-  }
-  if (Debug.isActive(debuglevel)) Debug.printf("(%s) %s\n", caller_name, message.c_str());
-  syslog.log(level, (String("(") + String(caller_name) + ") " + message).c_str()); //https://github.com/arcao/Syslog/issues/21
-}
 
 String getdatamap(String topic)
 {
@@ -578,34 +572,19 @@ void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
   putdatamap("mqtt/port", String(mqtt_port), sendupdate);
   putdatamap("mqtt/ssl", String(mqtt_ssl), sendupdate);
   putdatamap("mqtt/state", mqttClient.connected() ? "connected" : "disconnected", sendupdate);
-
-  if (((uptime % 60) == 0) && (WiFi.status() == WL_CONNECTED))
-  {
-    time_t now;
-    time(&now);
-    String strtime = ctime(&now);
-    strtime.replace("\n", "");
-    LOGV(String("Uptime=") + String(uptimestr) + String(" DateTime=") + strtime);
-  }
 }
 
 void onWifiConnect(const WiFiEventStationModeGotIP& event)
 {
   wifiReconnectTimer.detach();
-  DEBUG("Connected to Wi-Fi.\n");
+  triggers.wificonnected = true;
   mainstate.wificonnected = true;
-  connectToMqtt();
 }
 
 void onWifiDisconnect(const WiFiEventStationModeDisconnected& event)
 {
-  DEBUG("Disconnected from Wi-Fi.\n");
-  mqttClient.disconnect();
-  mainstate.mqttconnected = false;
-  mainstate.mqttready = false;
+  triggers.wifidisconnected = true;
   mainstate.wificonnected = false;
-  mqttReconnectTimer.detach(); // ensure we don't reconnect to MQTT while reconnecting to Wi-Fi
-  if (!mainstate.accesspoint) wifiReconnectTimer.once(2, connectToWifi); // trying to connect to wifi can cause AP to fail
 }
 
 void initWifi()
@@ -652,7 +631,7 @@ void initMqtt()
 
 void connectToMqtt()
 {
-  DEBUGV("connectToMqtt()\n");
+  DEBUG("Connecting to Mqtt\n");
   if (!mainstate.mqttconnected)
   {
     mqttReconnectTimer.once(30, connectToMqtt); // retry over 30 seconds if connection can not be established
@@ -660,16 +639,31 @@ void connectToMqtt()
   }
 }
 
+void disconnectMqtt()
+{
+  DEBUG("Disconnecting Mqtt\n");
+  mqttReconnectTimer.detach();
+  mqttClient.disconnect();
+}
+
+void onMqttConnect(bool sessionPresent) {
+  DEBUG("Connected to MQTT sessionPresent=%d\n", sessionPresent);
+  mqttReconnectTimer.detach();
+  mainstate.mqttconnected = true;
+  triggers.mqttconnected = true;
+}
+
 void onMqttDisconnect(AsyncMqttClientDisconnectReason reason)
 {
-  LOG("Disconnected from MQTT (" + String(int(reason)) + ")");
+  DEBUG("Disconnected from MQTT reason:%d\n", reason);
 
   if (reason == AsyncMqttClientDisconnectReason::TLS_BAD_FINGERPRINT) {
-    LOG("Bad server fingerprint.\n");
+    DEBUG("Bad server fingerprint.\n");
   }
 
   mainstate.mqttconnected = false;
   mainstate.mqttready = false;
+  triggers.mqttdisconnected = true;
 
   if (WiFi.isConnected()) {
     mqttReconnectTimer.once(2, connectToMqtt);
@@ -677,7 +671,7 @@ void onMqttDisconnect(AsyncMqttClientDisconnectReason reason)
 }
 
 void onMqttUnsubscribe(uint16_t packetId) {
-  LOG ("Unsubscribe acknowledged. packetid=" + String(packetId));
+  DEBUG ("Unsubscribe acknowledged. packetid=%d\n" + packetId);
 }
 
 
@@ -744,14 +738,6 @@ void onMqttPublish(uint16_t packetId)
 {
   DEBUGV ("Publish acknowledged packetid=%d\n", packetId);
   publishdatamap(packetId);
-}
-
-void onMqttConnect(bool sessionPresent) {
-  DEBUG ("Connected to MQTT sessionPresent=%d\n", sessionPresent);
-  mqttReconnectTimer.detach();
-  mainstate.mqttconnected = true;
-  update_systeminfo(true);
-  mqttdosubscriptions();
 }
 
 void initSerial()
@@ -829,7 +815,7 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
     payloadstring += char(payload[i]);
   }
   String topicstring = topic;
-  LOG("MQTT RECEIVED len=" + String(len) + " topic=\"" + topicstring + "\" payload=\"" + payloadstring + "\"");
+  DEBUG("MQTT RECEIVED topic=%s payload=%s\n", topicstring.c_str(), payloadstring.c_str());
 
 #ifdef SONOFFCH
   for (byte i = 0; i < SONOFFCH; i++)
@@ -854,17 +840,17 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
 #ifdef OPENTHERM
   if (String(topic) == String(mqtt_topicprefix + "setthermostattemporary"))
   {
-    LOG(String("RECEIVED SETTHERMOSTATTEMPORARY ") + payloadstring);
+    DEBUG("RECEIVED SETTHERMOSTATTEMPORARY %d\n", payloadstring);
     opentherm_setthermosttattemporary(payloadstring.toFloat());
   }
   if (String(topic) == String(mqtt_topicprefix + "setthermostatcontinue"))
   {
-    LOG(String("RECEIVED SETTHERMOSTATCONTINUE ") + payloadstring);
+    DEBUG("RECEIVED SETTHERMOSTATCONTINUE %d\n", payloadstring);
     opentherm_setthermosttatcontinue(payloadstring.toFloat());
   }
   if (String(topic) == String(mqtt_topicprefix + "setchwatertemperature"))
   {
-    LOG(String("RECEIVED SETCHWATERTEMPERATURE ") + payloadstring);
+    DEBUG("RECEIVED SETCHWATERTEMPERATURE %d\n", payloadstring);
     opentherm_setchwatertemperature(payloadstring.toFloat());
   }
 #endif
@@ -1017,13 +1003,42 @@ void loop()
 
   if ((0 != reboottimeout) && (reboottimeout > uptime)) ESP.restart();
 
+  if (triggers.wificonnected)
+  {
+    triggers.wificonnected = false;
+    DEBUG("Connected to WiFi SSID=%s RSSI=%d\n", WiFi.SSID().c_str(), WiFi.RSSI());
+    syslogN("Connected to WiFi SSID=%s RSSI=%d\n", WiFi.SSID().c_str(), WiFi.RSSI());
+    initMqtt();
+    connectToMqtt();
+  }
+
+  if (triggers.wifidisconnected)
+  {
+    triggers.wifidisconnected = false;
+    DEBUG("Disconnected from Wi-Fi.\n");
+    disconnectMqtt();
+    if (!mainstate.accesspoint) wifiReconnectTimer.once(2, connectToWifi); // trying to connect to wifi can cause AP to fail
+  }
+
+  if (triggers.mqttconnected)
+  {
+    triggers.mqttconnected = false;
+    DEBUG("Connected to MQTT Server=%s\n", mqtt_server.c_str());
+    syslogN("Connected to MQTT Server=%s\n", mqtt_server.c_str());
+    update_systeminfo(true);
+    mqttdosubscriptions();
+  }
+
+  if (triggers.mqttdisconnected)
+  {
+    triggers.mqttdisconnected = false;
+    DEBUG("Disconnected from MQTT Server=%s\n", mqtt_server.c_str());
+    syslogN("Disconnected from MQTT Server=%s\n", mqtt_server.c_str());
+  }
 
   if (mainstate.mqttready) publishdatamap();
 
-  //mqttClient.loop();
   webserver.handleClient();
-  yield();
-
 
 #ifdef SONOFFCH
   sonoff_handle();
@@ -1037,12 +1052,14 @@ void loop()
   ducobox_handle();
 #endif
 
+#ifdef DIMMER
+  dimmer_handle();
+#endif
 
 #ifdef GENERIC8266
 #endif
 
 #ifdef RAINMETERPIN
-#define PULSEMM 0.3636
   static uint32_t rainpinmillis = 0;
   static uint32_t rainpulses = 0;
   static uint32_t rainpulsesminute = 0;
@@ -1065,19 +1082,19 @@ void loop()
     count = 1;
   }
   putdatamap ("rain/pulses", String(rainpulses));
-  putdatamap ("rain/mm", String((double(rainpulses)*PULSEMM), 1));
+  putdatamap ("rain/mm", String((double(rainpulses)*RAINMETERPULSEMM), 1));
 
   static bool hourreg = false;
   static bool firsthourreg = true;
   if ((uptime % 3600) || (firsthourreg))
   {
     putdatamap ("rain/hour/pulses", String(rainpulseshour));
-    putdatamap ("rain/hour/mm", String((double(rainpulseshour)*PULSEMM), 1));
+    putdatamap ("rain/hour/mm", String((double(rainpulseshour)*RAINMETERPULSEMM), 1));
     firsthourreg = false;
     if (!hourreg)
     {
       putdatamap ("rain/lasthour/pulses", String(rainpulseshour));
-      putdatamap ("rain/lasthour/mm", String((double(rainpulseshour)*PULSEMM), 1));
+      putdatamap ("rain/lasthour/mm", String((double(rainpulseshour)*RAINMETERPULSEMM), 1));
       rainpulseshour = 0;
       hourreg = true;
     }
@@ -1089,12 +1106,12 @@ void loop()
   if ((uptime % 60) || (firstminreg))
   {
     putdatamap ("rain/minute/pulses", String(rainpulsesminute));
-    putdatamap ("rain/minute/mm", String((double(rainpulsesminute)*PULSEMM), 1));
+    putdatamap ("rain/minute/mm", String((double(rainpulsesminute)*RAINMETERPULSEMM), 1));
     firstminreg = false;
     if (!minreg)
     {
       putdatamap ("rain/lastminute/pulses", String(rainpulsesminute));
-      putdatamap ("rain/lastminute/mm", String((double(rainpulsesminute)*PULSEMM), 1));
+      putdatamap ("rain/lastminute/mm", String((double(rainpulsesminute)*RAINMETERPULSEMM), 1));
       rainpulsesminute = 0;
       minreg = true;
     }
@@ -1218,11 +1235,27 @@ void loop()
     timertick = 0;
     updatemqtt = 1;
 
+    if ((uptime % 60) == 0)
+    {
+      char uptimestr[20];
+      sprintf(uptimestr, "%ld:%02ld:%02ld:%02ld", uptime / 86400, (uptime / 3600) % 24, (uptime / 60) % 60, uptime % 60);
+      time_t now;
+      time(&now);
+      String strtime = ctime(&now);
+      strtime.replace("\n", "");
+      if (mainstate.wificonnected)
+      {
+        syslogI("Uptime=%s DateTime=%s\n", uptimestr, strtime.c_str());
+      }
+      DEBUG("Uptime=%s DateTime=%s\n", uptimestr, strtime.c_str());
+    }
+
+
 #ifdef SONOFFPOWR2
     static uint8_t powr2sec = 0;
     if (powr2sec++ > 5) // Every 5 seconds send update about power usage
-    {
-      putdatamap("voltage", String(voltval, 1));
+  {
+    putdatamap("voltage", String(voltval, 1));
       putdatamap("power", String(powerval, 1));
       putdatamap("current", String(currentval, 3));
       powr2sec = 0;
@@ -1238,13 +1271,13 @@ void loop()
       esp_password = "esplogin";
     }
     if (uptime == 330)
-    {
-      DEBUG("Stopping accesspoint");
+  {
+    DEBUG("Stopping accesspoint");
       WiFi.mode(WIFI_STA);
     }
 #endif
 
-  update_systeminfo();
+    update_systeminfo();
 
 #ifdef MAINPOWERMETER
     static uint8_t circuitnr = 0;
@@ -1255,85 +1288,85 @@ void loop()
     uint8_t nrofsamples;
     circuitspowermeter_read(circuitnr, mW, mVA, mA, mV, 10);
     if (circuitnr == 0) putdatamap("mainsvoltage", String(mV / 1000));
-    putdatamap("circuit/" + String((circuitnr + 1)) + "/mA", String(mA));
-    putdatamap("circuit/" + String((circuitnr + 1)) + "/W", String(mW / 1000));
-    putdatamap("circuit/" + String((circuitnr + 1)) + "/VA", String(mVA / 1000));
-    if (circuitnr < 14) circuitnr++;
-    else circuitnr = 0;
+      putdatamap("circuit/" + String((circuitnr + 1)) + "/mA", String(mA));
+      putdatamap("circuit/" + String((circuitnr + 1)) + "/W", String(mW / 1000));
+      putdatamap("circuit/" + String((circuitnr + 1)) + "/VA", String(mVA / 1000));
+      if (circuitnr < 14) circuitnr++;
+      else circuitnr = 0;
 #endif
 
-    if (wifiTimer < 20) wifiTimer++;
+        if (wifiTimer < 20) wifiTimer++;
 
 
 #ifdef DHTPIN
-    if (uptime % 5 == 0) update_dht();
+          if (uptime % 5 == 0) update_dht();
 #endif
 
 #ifdef ONEWIREPIN
-    static uint8_t ds18b20timer = 0;
-    if (ds18b20timer == 0)
-    {
-      ds18b20timer = 10;
-      DEBUG("Requesting DS18B20 temperatures...\n");
-      //oneWireSensors.setWaitForConversion(false);
-      oneWireSensors.requestTemperatures();
-      float temperature;
+            static uint8_t ds18b20timer = 0;
+            if (ds18b20timer == 0)
+            {
+              ds18b20timer = 10;
+              DEBUG("Requesting DS18B20 temperatures...\n");
+                //oneWireSensors.setWaitForConversion(false);
+                oneWireSensors.requestTemperatures();
+                float temperature;
 #ifdef OPENTHERM
-      temperature = oneWireSensors.getTempC(onewire_chReturnWaterThermometer);
-      DEBUG("chreturnwatertemp=%f\n", temperature);
-      if ((onewire_chReturnWaterEnabled) && (temperature != -127)) putdatamap("ow/ch/returnwatertemperature", String(temperature, 1));
-      temperature = oneWireSensors.getTempC(onewire_dcwSupplyWaterThermometer);
-      DEBUG("dcwsupplywatertemp=%f\n", temperature);
-      if ((onewire_dcwSupplyWaterEnabled) && (temperature != -127)) putdatamap("ow/dcw/temperature", String(temperature, 1));
+                temperature = oneWireSensors.getTempC(onewire_chReturnWaterThermometer);
+                DEBUG("chreturnwatertemp=%f\n", temperature);
+                if ((onewire_chReturnWaterEnabled) && (temperature != -127)) putdatamap("ow/ch/returnwatertemperature", String(temperature, 1));
+                temperature = oneWireSensors.getTempC(onewire_dcwSupplyWaterThermometer);
+                DEBUG("dcwsupplywatertemp=%f\n", temperature);
+                if ((onewire_dcwSupplyWaterEnabled) && (temperature != -127)) putdatamap("ow/dcw/temperature", String(temperature, 1));
 #endif
 #ifdef WEATHER
-      temperature = oneWireSensors.getTempC(onewire_OutsideAddress);
-      DEBUG("Outside Temperature=%f\n", temperature);
-      if (temperature != -127) putdatamap("temperature", String(temperature, 1));
+                temperature = oneWireSensors.getTempC(onewire_OutsideAddress);
+                DEBUG("Outside Temperature=%f\n", temperature);
+                if (temperature != -127) putdatamap("temperature", String(temperature, 1));
 
 #endif
-    }
-    else ds18b20timer--;
+              }
+              else ds18b20timer--;
 #endif
 
-    write_oled_display();
+                write_oled_display();
 
-    if (WiFi.status() == WL_CONNECTED)
-    {
-      static uint8_t mqttreconnecttimer = 10;
-      wifiTimer = 0;
-      if (WiFi.status() != previouswifistatus)
-      {
-        DEBUG("Wifi connected to %s\n", WiFi.SSID().c_str());
+                if (WiFi.status() == WL_CONNECTED)
+                {
+                  static uint8_t mqttreconnecttimer = 10;
+                  wifiTimer = 0;
+                  if (WiFi.status() != previouswifistatus)
+                  {
+                    DEBUG("Wifi connected to %s\n", WiFi.SSID().c_str());
 #ifdef NEOPIXELPIN
-        neopixelleds.setPixelColor(0, neopixelleds.Color(30, 15, 0));
-        neopixelleds.show();
+                    neopixelleds.setPixelColor(0, neopixelleds.Color(30, 15, 0));
+                    neopixelleds.show();
 #endif
-      }
+                  }
 
 #ifdef NEOPIXELPIN
-      neopixelleds.setPixelColor(0, neopixelleds.Color(0, 20, 0));
-      neopixelleds.show();
+                  neopixelleds.setPixelColor(0, neopixelleds.Color(0, 20, 0));
+                  neopixelleds.show();
 #endif
-    }
-    else
-    {
+                }
+                else
+                {
 #ifdef NEOPIXELPIN
-      neopixelleds.setPixelColor(0, neopixelleds.Color(30, 0, 0));
-      neopixelleds.show();
+                  neopixelleds.setPixelColor(0, neopixelleds.Color(30, 0, 0));
+                  neopixelleds.show();
 #endif
-      if (flashbuttonstatus == 0)
-      {
+                  if (flashbuttonstatus == 0)
+                  {
 
-        /*if (wifiTimer >= 30)
-          {
-          WiFi.disconnect(false);
-          delay(10);
-          WiFi.begin();
-          wifiTimer = 0;
-          }*/
-      }
-    }
+                    /*if (wifiTimer >= 30)
+                      {
+                      WiFi.disconnect(false);
+                      delay(10);
+                      WiFi.begin();
+                      wifiTimer = 0;
+                      }*/
+                  }
+                }
     previouswifistatus = WiFi.status();
   }
 }
@@ -1465,7 +1498,7 @@ void publishdatamap(int32_t packetId, bool publishall, bool init)
     nextpacketId = -1;
   }
 
-  if ((packetId != -1) || publishall) LOGV(String("Publishdatamap (") + packetId + "," + publishall + ") datamappointer=" + datamappointer + " datamapsize=" + dataMap->size() + " nexpacketId=" + nextpacketId + " waitingforack=" + waitingforack);
+  if ((packetId != -1) || publishall) DEBUG("Publishdatamap packetId=%d publishall=%d datamappointer=%d datamapsize=%d nextpacketid=%d waintingforack=%d\n", packetId, publishall, datamappointer, dataMap->size(), nextpacketId, waitingforack);
 
   if (publishall)
   {
@@ -1694,7 +1727,7 @@ uint8_t eeprom_read(String * data, byte eepromindex)
   return 1;
 }
 
-void timerCallback(void *pArg)
+void systemTimerCallback()
 {
   static uint8_t ms = 0;
   ms++;
@@ -2088,7 +2121,6 @@ void setup() {
   sonoff_init();
 #endif
   initWifi();
-  initMqtt();
   connectToWifi();
 
   ArduinoOTA.setHostname(esp_hostname.c_str());
@@ -2103,8 +2135,8 @@ void setup() {
   syslog.appName(ESPNAME);
   syslog.defaultPriority(LOG_KERN);
 
-  LOG("ESP8266 Started...");
-  LOG("Hostname=" + WiFi.hostname());
+  DEBUG("ESP8266 Started...");
+  DEBUG("Hostname=%s\n", WiFi.hostname().c_str());
 
   ArduinoOTA.setPassword(esp_password.c_str());
 
@@ -2184,8 +2216,7 @@ void setup() {
   MDNS.begin(esp_hostname.c_str());
   MDNS.addService("http", "tcp", 80);
 
-  os_timer_setfn(&myTimer, timerCallback, NULL);
-  os_timer_arm(&myTimer, 100, true);
+  systemTimer.attach_ms(100, systemTimerCallback);
 
 #ifdef ESPLED
   pinMode(ESPLED, OUTPUT);
