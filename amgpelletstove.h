@@ -7,5 +7,5 @@
 
 
 void amgpelletstove_receivemqtt(String topicstring, String payloadstring);
-void amgpelletstove_init(void(*callback)(String,String),void(*debugcallback)(String));
+void amgpelletstove_init(void(*callback)(String,String),void(*debugcallback)(String, String));
 void amgpelletstove_handle();

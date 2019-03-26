@@ -5,12 +5,14 @@
 #endif
 #define NODEMCULEDPIN D0
 
-static String amgcmd = "";
+static String amgpowercmd = "";
+static String amgtempcmd = "";
 static uint8_t amgcmdnr = 0;
 void(*_amgpelletstove_callback)(String, String);
-void(*_amgpelletstove_debug_callback)(String);
+void(*_amgpelletstove_debug_callback)(String, String);
+#define DEBUG(message) _amgpelletstove_debug_callback(__func__, message);
 
-void amgpelletstove_init(void(*callback)(String, String), void(*debugcallback)(String))
+void amgpelletstove_init(void(*callback)(String, String), void(*debugcallback)(String, String))
 {
   _amgpelletstove_callback = callback;
   _amgpelletstove_debug_callback = debugcallback;
@@ -23,12 +25,20 @@ void amgpelletstove_receivemqtt(String topicstring, String payloadstring)
 {
   if (topicstring == String("home/" + WiFi.hostname() + "/setpower"))
   {
-    if (payloadstring == "0") amgcmd = "RF000058&";
-    if (payloadstring == "1") amgcmd = "RF001059&";
-    if (payloadstring == "2") amgcmd = "RF00205A&";
-    if (payloadstring == "3") amgcmd = "RF00305B&";
-    if (payloadstring == "4") amgcmd = "RF00405C&";
-    if (payloadstring == "5") amgcmd = "RF00505D&";
+    int powersetpoint = payloadstring.toInt();
+    if ((payloadstring == "0") || ((powersetpoint > 0) && (powersetpoint <= 5)))
+    {
+      switch (powersetpoint)
+      {
+        case 0: amgpowercmd = "RF000058&"; break;
+        case 1: amgpowercmd = "RF001059&"; break;
+        case 2: amgpowercmd = "RF00205A&"; break;
+        case 3: amgpowercmd = "RF00305B&"; break;
+        case 4: amgpowercmd = "RF00405C&"; break;
+        case 5: amgpowercmd = "RF00505D&"; break;
+      }
+      _amgpelletstove_callback("power/setpoint", String(payloadstring));
+    }
   }
   if (topicstring == String("home/" + WiFi.hostname() + "/settemperature"))
   {
@@ -39,7 +49,8 @@ void amgpelletstove_receivemqtt(String topicstring, String payloadstring)
       String temp = str;
       sprintf(str, "%02X", payloadstring.toInt() + 75);
       String checksum = str;
-      amgcmd = "RF2" + temp + "0" + checksum + "&";
+      amgtempcmd = "RF2" + temp + "0" + checksum + "&";
+      _amgpelletstove_callback("room/temperature/setpoint", String(payloadstring.toInt()));
     }
   }
 }
@@ -47,7 +58,8 @@ void amgpelletstove_receivemqtt(String topicstring, String payloadstring)
 void _amgpelletstove_sendserial()
 {
   amgcmdnr++;
-  if (amgcmd != "") amgcmdnr = 255;
+  if (amgpowercmd != "") amgcmdnr = 254;
+  else if (amgtempcmd != "") amgcmdnr = 255;
   digitalWrite(NODEMCULEDPIN, 0);
   Serial.write (27);
   switch (amgcmdnr)
@@ -97,10 +109,15 @@ void _amgpelletstove_sendserial()
     case 15:
       Serial.print ("RDB00068&"); // Extractor sensorlevel
       break;
+    case 254:
+      DEBUG("Writing to amg pelletstove:" + amgpowercmd + "\n");
+      Serial.print (amgpowercmd);
+      amgpowercmd = "";
+      break;
     case 255:
-      _amgpelletstove_debug_callback("Writing to amg pelletstove:" + amgcmd + "\n");
-      Serial.print (amgcmd);
-      amgcmd = "";
+      DEBUG("Writing to amg pelletstove:" + amgtempcmd + "\n");
+      Serial.print (amgtempcmd);
+      amgtempcmd = "";
       break;
     default:
       amgcmdnr = 0;
@@ -122,7 +139,7 @@ void amgpelletstove_handle()
     if (serval == '&')
     {
       digitalWrite(NODEMCULEDPIN, 1);
-      _amgpelletstove_debug_callback("Received from amg pelletstove:" + serstr + "\n");
+      DEBUG("Received from amg pelletstove:" + serstr + "\n");
       long value = strtol(serstr.substring(2, 5).c_str(), 0, 16);
       serstr = "";
       switch (amgcmdnr)
@@ -137,8 +154,7 @@ void amgpelletstove_handle()
           _amgpelletstove_callback("room/temperature/setpoint", String(value));
           break;
         case 3:
-          _amgpelletstove_callback("power/setpoint", String(value));
-          currentpower = value;
+          _amgpelletstove_callback("controlpanel/power/setpoint", String(value));
           break;
         case 4:
           _amgpelletstove_callback("exhaust/temperature", String(value));
@@ -152,7 +168,7 @@ void amgpelletstove_handle()
           break;
         case 7:
           _amgpelletstove_callback("auger/speed", String(value));
-          if (currentpower > value) currentpower = value;
+          if ((value > 0) && (currentpower > value)) currentpower = value;
           break;
         case 8:
           _amgpelletstove_callback("board/temperature", String(value));

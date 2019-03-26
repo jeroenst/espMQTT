@@ -96,7 +96,7 @@ void dimmer_zcDetectISR()
 
 void dimmer_dimTimerISR()
 {
-  digitalWrite(dimmer_triacpin, 1);
+  digitalWrite(dimmer_triacpin, bool(dimmer_curBrightness));
 
   //  Serial.println("dimTimerISR()"); To see bug ISR is fired every 800ms enable this line and check serial output
 

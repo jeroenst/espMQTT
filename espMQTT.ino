@@ -24,17 +24,18 @@
 //#define BATHROOM
 //#define BEDROOM2
 //#define OPENTHERM
-//#define WATERMETER
+#define WATERMETER
 //#define DUCOBOX //updated
 //#define SMARTMETER
 //#define GROWATT
-#define DIMMER
-//#define SONOFFS20 // coffeelamp & sonoffs20_001
+//#define DIMMER
+//#define SONOFFS20 // coffeelamp & sonoffs20_00X
 //#define SONOFFBULB
 //#define SONOFFPOWR2 // tv&washing machine
 //#define WEATHER
 //#define AMGPELLETSTOVE
 //#define GARDEN //ESP8285 WATERFALL MARIANNE
+//#define SONOFF_FLOORHEATING
 
 //#define MAINPOWERMETER
 //#define SONOFF4CH //ESP8285
@@ -46,11 +47,22 @@
 //#define SONOFFS20_PRINTER
 //#define SONOFFPOW // not finished yet
 
+#define SERIALLOG
+
 #ifdef SONOFFS20_PRINTER
 #define ESPNAME "SONOFFS20_PRINTER"
 #define SONOFFS20
 #define SONOFFCH_TIMEOUT 1800
 uint32_t sonoffch_starttime[1];
+#endif
+
+#ifdef SONOFF_FLOORHEATING
+#define ESPNAME "SONOFF_FLOORHEATING"
+#define SONOFFS20
+// Use RX pin for onewire
+#define ONEWIREPIN 3
+#undef SERIALLOG
+#define SONOFF_FLOORHEATING_TEMPMAX 45
 #endif
 
 #ifdef DIMMER
@@ -82,6 +94,7 @@ uint32_t sonoffch_starttime[1];
 #define FLASHBUTTON D3
 #define ESPLED D4
 #include "amgpelletstove.h";
+#undef SERIALLOG
 #endif
 
 #ifdef WEATHER
@@ -100,6 +113,7 @@ uint32_t sonoffch_starttime[1];
 #define FLASHBUTTON D3
 #define ESPLED D4
 #include "growatt.h"
+#undef SERIALLOG
 #endif
 
 #ifdef SOIL
@@ -115,6 +129,7 @@ uint32_t sonoffch_starttime[1];
 #define FLASHBUTTON 10
 #define ESPLED 13
 #include "ducobox.h";
+#undef SERIALLOG
 #endif
 
 #ifdef GARDEN
@@ -166,6 +181,7 @@ static bool sonoff_oldbuttons[2] = {1, 1};
 #endif
 
 #ifdef SONOFFPOW
+#undef SERIALLOG
 #define ESPNAME "SONOFFPOW"
 #ifndef ARDUINO_ESP8266_ESP01
 #error "Wrong board selected! Select Generic ESP8285 module"
@@ -210,6 +226,7 @@ void ICACHE_RAM_ATTR hlw8012_cf_interrupt() {
 #endif
 
 #ifdef SONOFFPOWR2
+#undef SERIALLOG
 #define ESPNAME "SONOFFPOWR2"
 #ifndef ARDUINO_ESP8266_ESP01
 #error "Wrong board selected! Select Generic ESP8285 module"
@@ -348,6 +365,7 @@ Adafruit_NeoPixel neopixelleds = Adafruit_NeoPixel(2, NEOPIXELPIN, NEO_RGB + NEO
 #define DHTTYPE DHT22   // there are multiple kinds of DHT sensors
 #define OLEDX 0
 #define MH_Z19
+#undef SERIALLOG
 #endif
 
 #ifdef SMARTMETER
@@ -355,6 +373,7 @@ Adafruit_NeoPixel neopixelleds = Adafruit_NeoPixel(2, NEOPIXELPIN, NEO_RGB + NEO
 #define FLASHBUTTON D3
 #define ESPLED D4
 #include "smartmeter.h"
+#undef SERIALLOG
 #endif
 
 #define EEPROMSTRINGSIZE 40 // 2 positions are used, one for 0 character and one for checksum
@@ -472,6 +491,12 @@ DeviceAddress onewire_OutsideAddress;
 float onewire_chOutsideTemperature = -127;
 float oldonewire_chOutsideTemperature = -127;
 #endif
+
+#ifdef SONOFF_FLOORHEATING
+DeviceAddress onewire_floorWaterAddress;
+float onewire_floorWaterTemperature = -127;
+bool floorheating_valveon = 0;
+#endif
 #endif
 
 //WiFiClientSecure wifiClientSecure;
@@ -497,12 +522,6 @@ static bool debug;
 static bool mqttReady = false;
 #include "esp8266_peri.h";
 RemoteDebug Debug;
-
-#if defined(MH_Z19) || defined(OPENTHERM) || defined (DUCOBOX) || defined (SMARTMETER) || defined (GROWATT) || defined (SONOFFPOWR2) || defined (AMGPELLETSTOVE)
-#undef SERIALLOG
-#else
-#define SERIALLOG
-#endif
 
 WiFiEventHandler wifiConnectHandler;
 WiFiEventHandler wifiDisconnectHandler;
@@ -687,7 +706,7 @@ void mqttdosubscriptions(int32_t packetId = -1)
   if (packetId > 0) nextsubscribe++;
   nextpacketid = -1;
   subscribetopic = "";
-  while ((subscribetopic == "") && (nextsubscribe < 14))
+  while ((subscribetopic == "") && (nextsubscribe < 15))
   {
     //DEBUG("mqttdosubscriptions while nextsubscribe=%d\n", nextsubscribe);
     switch (nextsubscribe)
@@ -717,6 +736,9 @@ void mqttdosubscriptions(int32_t packetId = -1)
       case 11:  if (1 < SONOFFCH) subscribetopic = mqtt_topicprefix + "setrelay/" + String(1); break;
       case 12:  if (2 < SONOFFCH) subscribetopic = mqtt_topicprefix + "setrelay/" + String(2); break;
       case 13:  if (3 < SONOFFCH) subscribetopic = mqtt_topicprefix + "setrelay/" + String(3); break;
+#endif
+#ifdef SONOFF_FLOORHEATING
+      case 14: subscribetopic = mqtt_topicprefix + "setvalve"; break;
 #endif
     }
     if (subscribetopic == "") nextsubscribe++;
@@ -826,12 +848,20 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
 #ifdef SONOFFCHINVERSE
       inverse = true;
 #endif
-      if (payloadstring == "0") digitalWrite(sonoff_relays[i], inverse ? 1 : 0);
-      if (payloadstring == "1") digitalWrite(sonoff_relays[i], inverse ? 0 : 1);
+      if (payloadstring == "0")
+      {
+        digitalWrite(sonoff_relays[i], inverse ? 1 : 0);
 #ifdef SONOFFCH_TIMEOUT
-      if (payloadstring == "0") sonoffch_starttime[i] = 0;
-      if (payloadstring == "1") sonoffch_starttime[i] = uptime;
+        sonoffch_starttime[i] = 0;
 #endif
+      }
+      if (payloadstring == "1")
+      {
+        digitalWrite(sonoff_relays[i], inverse ? 0 : 1);
+#ifdef SONOFFCH_TIMEOUT
+        sonoffch_starttime[i] = uptime;
+#endif
+      }
       updatemqtt = 1;
     }
   }
@@ -854,6 +884,11 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
     opentherm_setchwatertemperature(payloadstring.toFloat());
   }
 #endif
+
+#ifdef SONOFF_FLOORHEATING
+  if (String(topic) == String(mqtt_topicprefix + "setvalve")) floorheating_valveon = payloadstring == "1" ? true : false;
+#endif
+
 
 #ifdef DUCOBOX
   if (String(topic) == String(mqtt_topicprefix + "setfan")) ducobox_setfan(payloadstring.toInt());
@@ -1254,8 +1289,8 @@ void loop()
 #ifdef SONOFFPOWR2
     static uint8_t powr2sec = 0;
     if (powr2sec++ > 5) // Every 5 seconds send update about power usage
-  {
-    putdatamap("voltage", String(voltval, 1));
+    {
+      putdatamap("voltage", String(voltval, 1));
       putdatamap("power", String(powerval, 1));
       putdatamap("current", String(currentval, 3));
       powr2sec = 0;
@@ -1271,8 +1306,8 @@ void loop()
       esp_password = "esplogin";
     }
     if (uptime == 330)
-  {
-    DEBUG("Stopping accesspoint");
+    {
+      DEBUG("Stopping accesspoint");
       WiFi.mode(WIFI_STA);
     }
 #endif
@@ -1288,85 +1323,110 @@ void loop()
     uint8_t nrofsamples;
     circuitspowermeter_read(circuitnr, mW, mVA, mA, mV, 10);
     if (circuitnr == 0) putdatamap("mainsvoltage", String(mV / 1000));
-      putdatamap("circuit/" + String((circuitnr + 1)) + "/mA", String(mA));
-      putdatamap("circuit/" + String((circuitnr + 1)) + "/W", String(mW / 1000));
-      putdatamap("circuit/" + String((circuitnr + 1)) + "/VA", String(mVA / 1000));
-      if (circuitnr < 14) circuitnr++;
-      else circuitnr = 0;
+    putdatamap("circuit/" + String((circuitnr + 1)) + "/mA", String(mA));
+    putdatamap("circuit/" + String((circuitnr + 1)) + "/W", String(mW / 1000));
+    putdatamap("circuit/" + String((circuitnr + 1)) + "/VA", String(mVA / 1000));
+    if (circuitnr < 14) circuitnr++;
+    else circuitnr = 0;
 #endif
 
-        if (wifiTimer < 20) wifiTimer++;
+    if (wifiTimer < 20) wifiTimer++;
 
 
 #ifdef DHTPIN
-          if (uptime % 5 == 0) update_dht();
+    if (uptime % 5 == 0) update_dht();
 #endif
 
 #ifdef ONEWIREPIN
-            static uint8_t ds18b20timer = 0;
-            if (ds18b20timer == 0)
-            {
-              ds18b20timer = 10;
-              DEBUG("Requesting DS18B20 temperatures...\n");
-                //oneWireSensors.setWaitForConversion(false);
-                oneWireSensors.requestTemperatures();
-                float temperature;
+    if (uptime % 10 == 0)
+    {
+      DEBUG("Requesting DS18B20 temperatures...\n");
+      //oneWireSensors.setWaitForConversion(false);
+      oneWireSensors.requestTemperatures();
+      float temperature;
 #ifdef OPENTHERM
-                temperature = oneWireSensors.getTempC(onewire_chReturnWaterThermometer);
-                DEBUG("chreturnwatertemp=%f\n", temperature);
-                if ((onewire_chReturnWaterEnabled) && (temperature != -127)) putdatamap("ow/ch/returnwatertemperature", String(temperature, 1));
-                temperature = oneWireSensors.getTempC(onewire_dcwSupplyWaterThermometer);
-                DEBUG("dcwsupplywatertemp=%f\n", temperature);
-                if ((onewire_dcwSupplyWaterEnabled) && (temperature != -127)) putdatamap("ow/dcw/temperature", String(temperature, 1));
+      temperature = oneWireSensors.getTempC(onewire_chReturnWaterThermometer);
+      DEBUG("chreturnwatertemp=%f\n", temperature);
+      if ((onewire_chReturnWaterEnabled) && (temperature != -127)) putdatamap("ow/ch/returnwatertemperature", String(temperature, 1));
+      else putdatamap("ow/ch/returnwatertemperature", "-");
+      temperature = oneWireSensors.getTempC(onewire_dcwSupplyWaterThermometer);
+      DEBUG("dcwsupplywatertemp=%f\n", temperature);
+      if ((onewire_dcwSupplyWaterEnabled) && (temperature != -127)) putdatamap("ow/dcw/temperature", String(temperature, 1));
+      else putdatamap("ow/dcw/temperature", "-");
 #endif
 #ifdef WEATHER
-                temperature = oneWireSensors.getTempC(onewire_OutsideAddress);
-                DEBUG("Outside Temperature=%f\n", temperature);
-                if (temperature != -127) putdatamap("temperature", String(temperature, 1));
+      temperature = oneWireSensors.getTempC(onewire_OutsideAddress);
+      DEBUG("Outside Temperature=%f\n", temperature);
+      if (temperature != -127) putdatamap("temperature", String(temperature, 1));
+      else putdatamap("temperature", "-");
 
 #endif
-              }
-              else ds18b20timer--;
+#ifdef SONOFF_FLOORHEATING
+      temperature = oneWireSensors.getTempC(onewire_floorWaterAddress);
+      DEBUG("Floor Water Temperature=%f\n", temperature);
+      bool inverse = false;
+#ifdef SONOFFCHINVERSE
+      inverse = true;
+#endif
+      if (temperature != -127)
+      {
+        putdatamap("temperature", String(temperature, 1));
+        if (temperature > SONOFF_FLOORHEATING_TEMPMAX)
+        {
+          digitalWrite(sonoff_relays[0], inverse ? true : false); // Set floorheating off
+        }
+        else
+        {
+          digitalWrite(sonoff_relays[0], inverse == floorheating_valveon ? false : true); // Set floorheating on
+        }
+      }
+      else
+      {
+        putdatamap("temperature", "-");
+        digitalWrite(sonoff_relays[0], inverse ? true : false); // Set floorheating off
+      }
+#endif
+    }
 #endif
 
-                write_oled_display();
+    write_oled_display();
 
-                if (WiFi.status() == WL_CONNECTED)
-                {
-                  static uint8_t mqttreconnecttimer = 10;
-                  wifiTimer = 0;
-                  if (WiFi.status() != previouswifistatus)
-                  {
-                    DEBUG("Wifi connected to %s\n", WiFi.SSID().c_str());
+    if (WiFi.status() == WL_CONNECTED)
+    {
+      static uint8_t mqttreconnecttimer = 10;
+      wifiTimer = 0;
+      if (WiFi.status() != previouswifistatus)
+      {
+        DEBUG("Wifi connected to %s\n", WiFi.SSID().c_str());
 #ifdef NEOPIXELPIN
-                    neopixelleds.setPixelColor(0, neopixelleds.Color(30, 15, 0));
-                    neopixelleds.show();
+        neopixelleds.setPixelColor(0, neopixelleds.Color(30, 15, 0));
+        neopixelleds.show();
 #endif
-                  }
+      }
 
 #ifdef NEOPIXELPIN
-                  neopixelleds.setPixelColor(0, neopixelleds.Color(0, 20, 0));
-                  neopixelleds.show();
+      neopixelleds.setPixelColor(0, neopixelleds.Color(0, 20, 0));
+      neopixelleds.show();
 #endif
-                }
-                else
-                {
+    }
+    else
+    {
 #ifdef NEOPIXELPIN
-                  neopixelleds.setPixelColor(0, neopixelleds.Color(30, 0, 0));
-                  neopixelleds.show();
+      neopixelleds.setPixelColor(0, neopixelleds.Color(30, 0, 0));
+      neopixelleds.show();
 #endif
-                  if (flashbuttonstatus == 0)
-                  {
+      if (flashbuttonstatus == 0)
+      {
 
-                    /*if (wifiTimer >= 30)
-                      {
-                      WiFi.disconnect(false);
-                      delay(10);
-                      WiFi.begin();
-                      wifiTimer = 0;
-                      }*/
-                  }
-                }
+        /*if (wifiTimer >= 30)
+          {
+          WiFi.disconnect(false);
+          delay(10);
+          WiFi.begin();
+          wifiTimer = 0;
+          }*/
+      }
+    }
     previouswifistatus = WiFi.status();
   }
 }
@@ -2007,9 +2067,9 @@ void amgpelletstovecallback (String topic, String payload)
   putdatamap(topic, payload);
 }
 
-void logdebug (String message)
+void logdebug (String function, String message)
 {
-  DEBUG("%s", message.c_str());
+  Debug.printf("(%s) %s", function.c_str(), message.c_str());
 }
 
 void openthermcallback (String topic, String payload)
@@ -2179,12 +2239,21 @@ void setup() {
 #endif
 
 #ifdef WATERMETER
-  i2cEeprom_init(I2C_SDA, I2C_SCL, I2C_EEPROM_ADDRESS, EE24LC512MAXBYTES);
-  watermeter_init(WATERPULSEPIN, NODEMCULEDPIN, i2cEeprom_read());
+  i2cEeprom_init(I2C_SDA, I2C_SCL, I2C_EEPROM_ADDRESS, EE24LC512MAXBYTES, logdebug);
+  uint32_t watermeter_liters = i2cEeprom_read();
+  watermeter_init(WATERPULSEPIN, NODEMCULEDPIN, watermeter_liters);
+  putdatamap("water/lmin", "0");
+  putdatamap("water/m3h", "0");
+  putdatamap("water/liter", String(watermeter_liters));
+  putdatamap("water/m3", String(double(watermeter_liters) / 1000, 3));
 #endif
 
 #ifdef MAINPOWERMETER
   circuitspowermeter_init(ADS0_CS_PIN, ADS0_RDY_PIN, ADS1_CS_PIN, ADS1_RDY_PIN);
+#endif
+
+#ifdef SONOFF_FLOORHEATING
+pinMode(3, FUNCTION_3); 
 #endif
 
 #ifdef ONEWIREPIN
@@ -2203,6 +2272,12 @@ void setup() {
 #ifdef WEATHER
   if (!oneWireSensors.getAddress(onewire_OutsideAddress, 0)) {
     DEBUG("Unable to find address for onewire_outsidetemp\n");
+  }
+#endif
+
+#ifdef SONOFF_FLOORHEATING
+  if (!oneWireSensors.getAddress(onewire_floorWaterAddress, 0)) {
+    DEBUG("Unable to find address for onewire_floorwater\n");
   }
 #endif
 #endif
@@ -2330,12 +2405,12 @@ void processCmdRemoteDebug()
   if (lastCmd == "help") DEBUG("  watermeterreadeeprom\n  watermeterwriteeeprom\n");
   if (lastCmd == "watermeterreadeeprom")
   {
-    LOG("i2cEeprom read liters=" + String(i2cEeprom_read()));
+    DEBUG("i2cEeprom read liters=%d\n", i2cEeprom_read());
     watermeter_setliters(i2cEeprom_read());
   }
   if (lastCmd == "watermeterwriteeeprom")
   {
-    LOG("i2cEeprom write liters=" + String(watermeter_getliters()));
+    DEBUG("i2cEeprom write liters=%d\n", watermeter_getliters());
     i2cEeprom_write(watermeter_getliters());
   }
 #endif
