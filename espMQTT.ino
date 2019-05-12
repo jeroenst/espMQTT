@@ -20,11 +20,13 @@
     MQTT SSL not working https://github.com/marvinroger/async-mqtt-client/issues/107
     When using a delay in call back functions this causes esp to crash when another delay is allready in progress.https://github.com/esp8266/Arduino/issues/5722
 */
+#define SYSLOGDEBUG
+
 //#define GENERIC8266
 //#define BATHROOM
 //#define BEDROOM2
 //#define OPENTHERM
-#define WATERMETER
+//#define WATERMETER
 //#define DUCOBOX //updated
 //#define SMARTMETER
 //#define GROWATT
@@ -32,6 +34,7 @@
 //#define SONOFFS20 // coffeelamp & sonoffs20_00X
 //#define SONOFFBULB
 //#define SONOFFPOWR2 // tv&washing machine
+//#define BLITZWOLF
 //#define WEATHER
 //#define AMGPELLETSTOVE
 //#define GARDEN //ESP8285 WATERFALL MARIANNE
@@ -45,7 +48,8 @@
 //#define IRRIGATION
 //#define SOIL
 //#define SONOFFS20_PRINTER
-//#define SONOFFPOW // not finished yet
+#define SONOFFPOW
+//#define SDM120
 
 #define SERIALLOG
 
@@ -80,6 +84,16 @@ uint32_t sonoffch_starttime[1];
 #define MICGAIN 1
 #define FLASHBUTTON D3
 #define ESPLED D4
+#endif
+
+#ifdef SDM120
+#define ESPNAME "SDM120"
+#define FLASHBUTTON D3
+#define ESPLED D4
+#undef SERIALLOG
+HardwareSerial serSDM(0);
+#include <SDM.h>;
+SDM sdm(serSDM, 2400, NOT_A_PIN);
 #endif
 
 #ifdef GENERIC8266
@@ -180,50 +194,63 @@ const byte sonoff_buttons[2] = {0, 9};
 static bool sonoff_oldbuttons[2] = {1, 1};
 #endif
 
+#ifdef BLITZWOLF
+#define ESPNAME "BLITZWOLF"
+#ifndef ARDUINO_ESP8266_ESP01
+#error "Wrong board selected! Select Generic ESP8285 module"
+#endif
+#define FLASHBUTTON 13
+#define ESPLED 2
+#define SONOFFCH 1
+
+const byte sonoff_relays[1] = {15};
+#define SONOFF_LEDS
+#define SONOFF_LEDS_INVERSE
+const byte sonoff_leds[1] = {0};
+const byte sonoff_buttons[1] = {13};
+static bool sonoff_oldbuttons[1] = {1};
+const bool sonoff_ledinverse = 1;
+
+// HLW8012
+#define HLW8012_SEL_PIN 12
+#define HLW8012_CF1_PIN 14
+#define HLW8012_CF_PIN 5
+#define HLW8012_CURRENT_MODE LOW
+#define HLW8012_CF_INTERRUPT_EDGE FALLING
+#define HLW8012_CF1_INTERRUPT_EDGE CHANGE
+#define HLW8012_CURRENT_MULTIPLIER 25740
+#define HLW8012_VOLTAGE_MULTIPLIER 313400
+#define HLW8012_POWER_MULTIPLIER 3414290
+#endif
+
 #ifdef SONOFFPOW
-#undef SERIALLOG
 #define ESPNAME "SONOFFPOW"
 #ifndef ARDUINO_ESP8266_ESP01
 #error "Wrong board selected! Select Generic ESP8285 module"
 #endif
 #define FLASHBUTTON 0
-#define ESPLED 13
+#define ESPLED 15
 #define SONOFFCH 1
 
 const byte sonoff_relays[1] = {12};
 const byte sonoff_buttons[1] = {0};
 static bool sonoff_oldbuttons[1] = {1};
 
-#include <HLW8012.h>
-
-// GPIOs
-#define SONOFFPOW_SEL_PIN 5
-#define SONOFFPOW_CF1_PIN 13
-#define SONOFFPOW_CF_PIN 14
-
-// Set SEL_PIN to HIGH to sample current
-// This is the case for Itead's Sonoff POW, where a
-// the SEL_PIN drives a transistor that pulls down
-// the SEL pin in the HLW8012 when closed
-#define SONOFFPOW_CURRENT_MODE HIGH
-
-// These are the nominal values for the resistors in the circuit
-#define SONOFFPOW_CURRENT_RESISTOR 0.001
-#define SONOFFPOW_VOLTAGE_RESISTOR_UPSTREAM ( 5 * 470000 ) // Real: 2280k
-#define SONOFFPOW_VOLTAGE_RESISTOR_DOWNSTREAM ( 1000 ) // Real 1.009k
-
-HLW8012 hlw8012;
-
-// When using interrupts we have to call the library entry point
-// whenever an interrupt is triggered
-void ICACHE_RAM_ATTR hlw8012_cf1_interrupt() {
-  hlw8012.cf1_interrupt();
-}
-void ICACHE_RAM_ATTR hlw8012_cf_interrupt() {
-  hlw8012.cf_interrupt();
-}
-
+// HLW8012
+#define HLW8012_SEL_PIN 5
+#define HLW8012_CF1_PIN 13
+#define HLW8012_CF_PIN 14
+#define HLW8012_CURRENT_MODE HIGH
+#define HLW8012_CF_INTERRUPT_EDGE FALLING
+#define HLW8012_CF1_INTERRUPT_EDGE CHANGE
+#define HLW8012_CURRENT_RESISTOR 0.001
+#define HLW8012_VOLTAGE_RESISTOR_UPSTREAM ( 5 * 470000 ) // Real: 2280k
+#define HLW8012_VOLTAGE_RESISTOR_DOWNSTREAM ( 1000 ) // Real 1.009k
+#define HLW8012_CURRENT_MULTIPLIER 16400
+#define HLW8012_VOLTAGE_MULTIPLIER 467566.54
+#define HLW8012_POWER_MULTIPLIER 24783293
 #endif
+
 
 #ifdef SONOFFPOWR2
 #undef SERIALLOG
@@ -376,6 +403,7 @@ Adafruit_NeoPixel neopixelleds = Adafruit_NeoPixel(2, NEOPIXELPIN, NEO_RGB + NEO
 #undef SERIALLOG
 #endif
 
+
 #define EEPROMSTRINGSIZE 40 // 2 positions are used, one for 0 character and one for checksum
 
 // ################################################################################################################# END OF DEFINES ####################################################################################################################
@@ -414,6 +442,11 @@ WiFiUDP udpClient;
 
 // Create a new empty syslog instance
 Syslog syslog(udpClientSyslog, SYSLOG_PROTO_IETF);
+
+
+#ifdef HLW8012_CF_PIN
+#include <HLW8012.h>
+#endif
 
 struct Triggers {
   bool wificonnected = false;
@@ -509,6 +542,7 @@ ESP8266WebServer webserver(80);
 String chipid;
 uint32_t uptime = 0;
 bool timertick = 1;
+bool timersectick = 1;
 String mqtt_server = "";
 String mqtt_username = "";
 String mqtt_password = "";
@@ -530,6 +564,22 @@ Ticker mqttReconnectTimer;
 Ticker wifiReconnectTimer;
 Ticker systemTimer;
 unsigned long reboottimeout = 0;
+
+
+#ifdef HLW8012_CF_PIN
+HLW8012 hlw8012;
+
+// When using interrupts we have to call the library entry point
+// whenever an interrupt is triggered
+void ICACHE_RAM_ATTR hlw8012_cf1_interrupt() {
+  hlw8012.cf1_interrupt();
+}
+
+void ICACHE_RAM_ATTR hlw8012_cf_interrupt() {
+  hlw8012.cf_interrupt();
+}
+#endif
+
 
 void publishdatamap(int32_t packetId = -1, bool publishall = false, bool init = false);
 
@@ -772,7 +822,11 @@ void initSerial()
   Serial.setDebugOutput(false);
   Serial.begin(4800, SERIAL_8E1);
 #elif defined (AMGPELLETSTOVE)
+  Serial.setDebugOutput(false);
   amgpelletstove_init(amgpelletstovecallback, logdebug);
+#elif defined (SDM120)
+  Serial.setDebugOutput(false);
+  sdm.begin();
 #else
   Serial.begin(115200); //Init serial 115200 baud
 #endif
@@ -851,6 +905,9 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
       if (payloadstring == "0")
       {
         digitalWrite(sonoff_relays[i], inverse ? 1 : 0);
+#ifdef SONOFF_LEDS
+        digitalWrite(sonoff_leds[i], sonoff_ledinverse ? 1 : 0);
+#endif
 #ifdef SONOFFCH_TIMEOUT
         sonoffch_starttime[i] = 0;
 #endif
@@ -858,6 +915,9 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
       if (payloadstring == "1")
       {
         digitalWrite(sonoff_relays[i], inverse ? 0 : 1);
+#ifdef SONOFF_LEDS
+        digitalWrite(sonoff_leds[i], sonoff_ledinverse ? 0 : 1);
+#endif
 #ifdef SONOFFCH_TIMEOUT
         sonoffch_starttime[i] = uptime;
 #endif
@@ -1045,6 +1105,13 @@ void loop()
     syslogN("Connected to WiFi SSID=%s RSSI=%d\n", WiFi.SSID().c_str(), WiFi.RSSI());
     initMqtt();
     connectToMqtt();
+    #ifdef SYSLOGDEBUG
+    for (int i = 0; i < dataMap->size(); i++)
+    {
+      syslogD("%s=%s (%d)\n", dataMap->getKey(i).c_str(), dataMap->getData(i).payload.c_str(), dataMap->getData(i).send);
+      yield();
+    }
+    #endif
   }
 
   if (triggers.wifidisconnected)
@@ -1158,7 +1225,7 @@ void loop()
 
 
 #ifdef WATERMETER
-  static uint32_t watermeter_liters = i2cEeprom_read();
+  static uint32_t watermeter_liters = watermeter_getliters();
   if (watermeter_handle())
   {
     putdatamap("water/lmin", String(watermeter_getflow()));
@@ -1167,9 +1234,10 @@ void loop()
     if (watermeter_liters != watermeter_getliters())
     {
       watermeter_liters = watermeter_getliters();
-      putdatamap("water/liter", String(watermeter_liters));
-      putdatamap("water/m3", String(double(watermeter_liters) / 1000, 3));
       i2cEeprom_write(watermeter_liters);
+      syslogN("Watermeter Liters Changed=%d\n", watermeter_liters);
+      putdatamap("water/liter", String(watermeter_liters));
+      putdatamap("water/m3", String((double(watermeter_liters) / 1000), 3));
     }
   }
 #endif
@@ -1264,11 +1332,67 @@ void loop()
   }
 #endif
 
-
-  if (timertick == 1) // Every 1 second check sensors and update display (it would be insane to do it more often right?)
+  if (timertick == 1) // Every 0,1 second check sensors and update display (it would be insane to do it more often right?)
   {
     timertick = 0;
+#ifdef SDM120
+  static uint8_t sdmreadcounter=1;
+
+  switch (sdmreadcounter)
+  {
+    case 1:
+      putdatamap("voltage", String(sdm.readVal(SDM120CT_VOLTAGE), 2));
+    break;
+    case 6:
+      putdatamap("current", String(sdm.readVal(SDM120CT_CURRENT), 2));
+    break;
+    case 11:
+      putdatamap("power", String(sdm.readVal(SDM120CT_POWER), 2));
+    break;
+    case 16:
+      putdatamap("power/apparant", String(sdm.readVal(SDM120CT_APPARENT_POWER), 2));
+    break;
+    case 21:
+      putdatamap("power/reactive", String(sdm.readVal(SDM120CT_REACTIVE_POWER), 2));
+    break;
+    case 26:
+      putdatamap("frequency", String(sdm.readVal(SDM120CT_FREQUENCY), 2));
+    break;
+    case 31:
+      putdatamap("powerfactor", String(sdm.readVal(SDM120CT_POWER_FACTOR), 2));
+    break;
+    case 36:
+      putdatamap("energy/active/import", String(sdm.readVal(SDM120CT_IMPORT_ACTIVE_ENERGY), 3));
+    break;
+    case 41:
+      putdatamap("energy/active/export", String(sdm.readVal(SDM120CT_EXPORT_ACTIVE_ENERGY), 3));
+    break;
+    case 46:
+      putdatamap("energy/active", String(sdm.readVal(SDM120CT_TOTAL_ACTIVE_ENERGY), 3));
+    break;
+    case 51:
+      putdatamap("energy/reactive/import", String(sdm.readVal(SDM120CT_IMPORT_REACTIVE_ENERGY), 3));
+    break;
+    case 56:
+      putdatamap("energy/reactive/export", String(sdm.readVal(SDM120CT_EXPORT_REACTIVE_ENERGY), 3));
+    break;
+    case 61:
+      putdatamap("energy/reactive", String(sdm.readVal(SDM120CT_TOTAL_REACTIVE_ENERGY), 3));
+    break;
+    case 66:
+    sdmreadcounter = 0;
+    break;      
+  }
+  sdmreadcounter++;
+#endif;
+  }
+
+  if (timersectick == 1) // Every 1 second check sensors and update display (it would be insane to do it more often right?)
+  {
+    timersectick = 0;
     updatemqtt = 1;
+
+    
 
     if ((uptime % 60) == 0)
     {
@@ -1374,16 +1498,25 @@ void loop()
         if (temperature > SONOFF_FLOORHEATING_TEMPMAX)
         {
           digitalWrite(sonoff_relays[0], inverse ? true : false); // Set floorheating off
+#ifdef SONOFF_LEDS
+        digitalWrite(sonoff_leds[i], sonoff_ledinverse ? 1 : 0);
+#endif
         }
         else
         {
           digitalWrite(sonoff_relays[0], inverse == floorheating_valveon ? false : true); // Set floorheating on
+#ifdef SONOFF_LEDS
+        digitalWrite(sonoff_leds[i], sonoff_ledinverse ? 0 : 1);
+#endif
         }
       }
       else
       {
         putdatamap("temperature", "-");
         digitalWrite(sonoff_relays[0], inverse ? true : false); // Set floorheating off
+#ifdef SONOFF_LEDS
+        digitalWrite(sonoff_leds[i], sonoff_ledinverse ? 1 : 0);
+#endif
       }
 #endif
     }
@@ -1442,6 +1575,10 @@ void sonoff_init()
   {
     digitalWrite(sonoff_relays[i], inverse ? true : false);
     pinMode(sonoff_relays[i], OUTPUT);
+#ifdef SONOFF_LEDS
+    digitalWrite(sonoff_leds[i], sonoff_ledinverse ? 1 : 0);
+    pinMode(sonoff_leds[i], OUTPUT);
+#endif
     pinMode(sonoff_buttons[i], INPUT_PULLUP);
   }
 
@@ -1449,24 +1586,36 @@ void sonoff_init()
   for (uint8_t i = 0; i < SONOFFCH; i++) sonoffch_starttime[i] = 0;
 #endif
 
-#ifdef SONOFFPOW
+#ifdef HLW8012_CF_PIN
   // Initialize HLW8012
   // void begin(unsigned char cf_pin, unsigned char cf1_pin, unsigned char sel_pin, unsigned char currentWhen = HIGH, bool use_interrupts = false, unsigned long pulse_timeout = PULSE_TIMEOUT);
   // * cf_pin, cf1_pin and sel_pin are GPIOs to the HLW8012 IC
   // * currentWhen is the value in sel_pin to select current sampling
   // * set use_interrupts to true to use interrupts to monitor pulse widths
   // * leave pulse_timeout to the default value, recommended when using interrupts
-  hlw8012.begin(SONOFFPOW_CF_PIN, SONOFFPOW_CF1_PIN, SONOFFPOW_SEL_PIN, SONOFFPOW_CURRENT_MODE, true);
+  hlw8012.begin(HLW8012_CF_PIN, HLW8012_CF1_PIN, HLW8012_SEL_PIN, HLW8012_CURRENT_MODE, true);
 
   // These values are used to calculate current, voltage and power factors as per datasheet formula
   // These are the nominal values for the Sonoff POW resistors:
   // * The CURRENT_RESISTOR is the 1milliOhm copper-manganese resistor in series with the main line
   // * The VOLTAGE_RESISTOR_UPSTREAM are the 5 470kOhm resistors in the voltage divider that feeds the V2P pin in the HLW8012
   // * The VOLTAGE_RESISTOR_DOWNSTREAM is the 1kOhm resistor in the voltage divider that feeds the V2P pin in the HLW8012
-  hlw8012.setResistors(SONOFFPOW_CURRENT_RESISTOR, SONOFFPOW_VOLTAGE_RESISTOR_UPSTREAM, SONOFFPOW_VOLTAGE_RESISTOR_DOWNSTREAM);
+#ifdef HLW8012_CURRENT_RESISTOR
+  hlw8012.setResistors(HLW8012_CURRENT_RESISTOR, HLW8012_VOLTAGE_RESISTOR_UPSTREAM, HLW8012_VOLTAGE_RESISTOR_DOWNSTREAM);
+#endif
 
-  attachInterrupt(SONOFFPOW_CF1_PIN, hlw8012_cf1_interrupt, FALLING);
-  attachInterrupt(SONOFFPOW_CF_PIN, hlw8012_cf_interrupt, FALLING);
+#ifdef HLW8012_CURRENT_MULTIPLIER
+  hlw8012.setCurrentMultiplier(HLW8012_CURRENT_MULTIPLIER);
+#endif
+#ifdef HLW8012_VOLTAGE_MULTIPLIER
+  hlw8012.setVoltageMultiplier(HLW8012_VOLTAGE_MULTIPLIER);
+#endif
+#ifdef HLW8012_POWER_MULTIPLIER
+  hlw8012.setPowerMultiplier(HLW8012_POWER_MULTIPLIER);
+#endif
+
+  attachInterrupt(HLW8012_CF1_PIN, hlw8012_cf1_interrupt, HLW8012_CF1_INTERRUPT_EDGE);
+  attachInterrupt(HLW8012_CF_PIN, hlw8012_cf_interrupt, HLW8012_CF_INTERRUPT_EDGE);
 #endif
 
 }
@@ -1484,6 +1633,9 @@ void sonoff_handle()
       inverse = true;
 #endif
       digitalWrite(sonoff_relays[i], inverse ? 1 : 0);
+#ifdef SONOFF_LEDS
+      digitalWrite(sonoff_leds[i], sonoff_ledinverse ? 1 : 0);
+#endif
     }
   }
 #endif
@@ -1499,6 +1651,9 @@ void sonoff_handle()
         {
           DEBUG ("SONOFF BUTTON %d PRESSED\n", i);
           digitalWrite(sonoff_relays[i], digitalRead(sonoff_relays[i]) ? 0 : 1);
+#ifdef SONOFF_LEDS
+        digitalWrite(sonoff_leds[i], (digitalRead(sonoff_relays[i]) ? 1 : 0) == sonoff_ledinverse ? 0 : 1);
+#endif
           bool inverse = false;
 #ifdef SONOFFCHINVERSE
           inverse = true;
@@ -1523,13 +1678,13 @@ void sonoff_handle()
     putdatamap ("relay/" + String(i), relaystate);
   }
 
-#ifdef SONOFFPOW
+#ifdef HLW8012_CF_PIN
   static unsigned long nextupdatetime = 0;
   if (millis() > nextupdatetime)
   {
     putdatamap("voltage", String(hlw8012.getVoltage()));
     putdatamap("voltage/multiplier", String(hlw8012.getVoltageMultiplier(), 2));
-    putdatamap("current", String(hlw8012.getCurrent(), 2));
+    putdatamap("current", String(hlw8012.getCurrent(), 3));
     putdatamap("current/multiplier", String(hlw8012.getCurrentMultiplier(), 2));
     putdatamap("power/active", String(hlw8012.getActivePower()));
     putdatamap("power/apparent", String(hlw8012.getApparentPower()));
@@ -1537,7 +1692,7 @@ void sonoff_handle()
     putdatamap("power/ws", String(hlw8012.getEnergy()));
     putdatamap("power/factor", String(hlw8012.getPowerFactor(), 2));
     putdatamap("power/multiplier", String(hlw8012.getPowerMultiplier(), 2));
-    nextupdatetime = millis() + 2000;
+    nextupdatetime = millis() + 1000;
   }
 #endif
 }
@@ -1790,11 +1945,12 @@ uint8_t eeprom_read(String * data, byte eepromindex)
 void systemTimerCallback()
 {
   static uint8_t ms = 0;
+  timertick = 1;
   ms++;
   if (ms >= 10)
   {
     uptime++;
-    timertick = 1;
+    timersectick = 1;
     ms = 0;
   }
 #ifdef ESPLED
