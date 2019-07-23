@@ -1,3 +1,4 @@
+
 /*
    Needed libraries:
     https://github.com/jeroenst/RemoteDebug
@@ -20,8 +21,9 @@
     MQTT SSL not working https://github.com/marvinroger/async-mqtt-client/issues/107
     When using a delay in call back functions this causes esp to crash when another delay is allready in progress.https://github.com/esp8266/Arduino/issues/5722
 */
-#define SYSLOGDEBUG
+//#define SYSLOGDEBUG
 
+//#define DDNS
 //#define GENERIC8266
 //#define BATHROOM
 //#define BEDROOM2
@@ -35,7 +37,7 @@
 //#define SONOFFBULB
 //#define SONOFFPOWR2 // tv&washing machine
 //#define BLITZWOLF
-//#define WEATHER
+#define WEATHER
 //#define AMGPELLETSTOVE
 //#define GARDEN //ESP8285 WATERFALL MARIANNE
 //#define SONOFF_FLOORHEATING
@@ -48,7 +50,7 @@
 //#define IRRIGATION
 //#define SOIL
 //#define SONOFFS20_PRINTER
-#define SONOFFPOW
+//#define SONOFFPOW
 //#define SDM120
 
 #define SERIALLOG
@@ -403,6 +405,14 @@ Adafruit_NeoPixel neopixelleds = Adafruit_NeoPixel(2, NEOPIXELPIN, NEO_RGB + NEO
 #undef SERIALLOG
 #endif
 
+#ifdef DDNS
+#include<EasyDDNS.h>
+#define ESPNAME "DDNS"
+#define NODEMCULEDPIN D0
+#define FLASHBUTTON D3
+#define ESPLED D4
+#endif
+
 
 #define EEPROMSTRINGSIZE 40 // 2 positions are used, one for 0 character and one for checksum
 
@@ -413,15 +423,17 @@ Adafruit_NeoPixel neopixelleds = Adafruit_NeoPixel(2, NEOPIXELPIN, NEO_RGB + NEO
 #include <coredecls.h>                  // settimeofday_cb()
 #include "sntp.h"
 
-#include <EEPROM.h>
 #include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
+#include <ESP8266mDNS.h>        // Include the mDNS library
+
+
+#include <EEPROM.h>
 #include "espMQTT.h"
 #include <AsyncMqttClient.h>
 AsyncMqttClient mqttClient;
-#include <ESP8266WebServer.h>
 #include <ArduinoOTA.h>
-#include <ESP8266mDNS.h>        // Include the mDNS library
-#include <user_interface.h>
+//#include <user_interface.h>
 #include "SimpleMap.h";
 #include <Syslog.h>
 #define syslogD(fmt, ...) if (WiFi.status() == WL_CONNECTED) syslog.logf(LOG_DEBUG,"(%s) " fmt, __func__, ##__VA_ARGS__)
@@ -488,7 +500,7 @@ bool updatemqtt = 0;
 static const char webpage_P[] PROGMEM = "<!DOCTYPE html><html><meta charset=\"UTF-8\"><meta name=\"google\" content=\"notranslate\"><meta http-equiv=\"Content-Language\" content=\"en\"><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><style>table{width: 400px; margin: auto;}</style></head><body><CENTER><div align='center' style='width:400px; margin:auto'><CENTER><H1><p id='header'></p></H1></CENTER><p id='table'></p><A HREF='settings'>Settings</A></div></CENTER><script>function refreshsite(){var obj,dbParam,xmlhttp,myObj,x,txt ='';xmlhttp=new XMLHttpRequest();xmlhttp.onreadystatechange=function(){if(this.readyState==4&&this.status==200){myObj=JSON.parse(this.responseText);txt+='<TABLE>';for (x in myObj){if(x=='hostname')document.getElementById('header').innerHTML=myObj[x].toUpperCase();txt+='<tr><td>'+x.split('/').join(' ')+'</td><td>'+myObj[x]+'</td></tr>';}txt+='</table>';document.getElementById('table').innerHTML = txt;}};xmlhttp.open('POST','data.json',true);xmlhttp.setRequestHeader('Content-type','application/x-www-form-urlencoded');xmlhttp.send();}refreshsite();window.setInterval(refreshsite, 5000);</script></body></html>";
 
 extern "C" {
-#include "user_interface.h"
+  //#include "user_interface.h"
 }
 
 #ifdef DHTPIN
@@ -554,7 +566,7 @@ String esp_hostname = "";
 String esp_orig_hostname = "";
 static bool debug;
 static bool mqttReady = false;
-#include "esp8266_peri.h";
+//#include "esp8266_peri.h";
 RemoteDebug Debug;
 
 WiFiEventHandler wifiConnectHandler;
@@ -645,7 +657,7 @@ void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
 
 void onWifiConnect(const WiFiEventStationModeGotIP& event)
 {
-  wifiReconnectTimer.detach();
+  //wifiReconnectTimer.detach();
   triggers.wificonnected = true;
   mainstate.wificonnected = true;
 }
@@ -1084,6 +1096,67 @@ void handle_noise()
 #endif
 
 
+void prinScanResult(int networksFound)
+{
+  DEBUG("WiFiScan finished, %d network(s) found\n", networksFound);
+  int strongestwifiid = -1;
+  int strongestwifirssi = -1000;
+  int currentwifirssi = -1000;
+  int currentwifiid = -1;
+
+  for (int i = 0; i < networksFound; i++)
+  {
+    if (WiFi.SSID(i) == WiFi.SSID())
+    {
+      if (currentwifirssi < WiFi.RSSI(i))
+      {
+        strongestwifiid = i;
+        strongestwifirssi = WiFi.RSSI(i);
+      }
+      if (WiFi.BSSIDstr(i) == WiFi.BSSIDstr())
+      {
+        currentwifirssi = WiFi.RSSI(i);
+        currentwifiid = i;
+      }
+    }
+
+    String enctype = "None";
+    switch (WiFi.encryptionType(i)) {
+      case ENC_TYPE_WEP:
+        enctype = "WEP";
+        break;
+      case ENC_TYPE_TKIP:
+        enctype = "WPA";
+        break;
+      case ENC_TYPE_CCMP:
+        enctype = "WPA2";
+        break;
+      case ENC_TYPE_NONE:
+        enctype = "None";
+        break;
+      case ENC_TYPE_AUTO:
+        enctype = "Auto";
+        break;
+    }
+
+    
+    DEBUG(" %d: %s, %s, Ch:%d (%ddBm) %s\n", i, WiFi.SSID(i).c_str(), WiFi.BSSIDstr().c_str(), WiFi.channel(i), currentwifirssi, enctype.c_str());
+
+  }
+
+  DEBUG("CurrentAp ID=%d SSID=%s KEY=%s BSSID=%s RSSI=%d(%d), Strongest AP ID=%d SSID=%s, BSSID=%s RSSI=%d\n", currentwifiid, WiFi.SSID().c_str(), WiFi.psk().c_str(), WiFi.BSSIDstr().c_str(), currentwifirssi, WiFi.RSSI(), strongestwifiid, WiFi.SSID(strongestwifiid).c_str(), WiFi.BSSIDstr(strongestwifiid).c_str(), strongestwifirssi);
+
+
+  if ((strongestwifiid >= 0) && (((currentwifiid != strongestwifiid) && ((currentwifiid < 0)) || (WiFi.RSSI() >= 0)) || (currentwifirssi + 10 < WiFi.RSSI(strongestwifiid)) || (WiFi.RSSI(currentwifiid) >= 0)))
+  {
+    DEBUG ("Connecting to AP %d (%s, %s, %s)\n", strongestwifiid, WiFi.SSID().c_str(), WiFi.psk().c_str(), WiFi.BSSIDstr(strongestwifiid).c_str());
+    String wifissid = WiFi.SSID();
+    String wifipsk =  WiFi.psk();
+    WiFi.disconnect(false);
+    WiFi.begin(wifissid.c_str(), wifipsk.c_str(), WiFi.channel(strongestwifiid), WiFi.BSSID(strongestwifiid));
+  }
+}
+
 static byte flashbuttonstatus = 0;
 static int8_t previouswifistatus = -1;
 
@@ -1096,6 +1169,10 @@ void loop()
   ArduinoOTA.handle();
   Debug.handle();
 
+#ifdef DDNS
+  EasyDDNS.update(10000);
+#endif
+
   if ((0 != reboottimeout) && (reboottimeout > uptime)) ESP.restart();
 
   if (triggers.wificonnected)
@@ -1105,13 +1182,13 @@ void loop()
     syslogN("Connected to WiFi SSID=%s RSSI=%d\n", WiFi.SSID().c_str(), WiFi.RSSI());
     initMqtt();
     connectToMqtt();
-    #ifdef SYSLOGDEBUG
+#ifdef SYSLOGDEBUG
     for (int i = 0; i < dataMap->size(); i++)
     {
       syslogD("%s=%s (%d)\n", dataMap->getKey(i).c_str(), dataMap->getData(i).payload.c_str(), dataMap->getData(i).send);
       yield();
     }
-    #endif
+#endif
   }
 
   if (triggers.wifidisconnected)
@@ -1119,7 +1196,7 @@ void loop()
     triggers.wifidisconnected = false;
     DEBUG("Disconnected from Wi-Fi.\n");
     disconnectMqtt();
-    if (!mainstate.accesspoint) wifiReconnectTimer.once(2, connectToWifi); // trying to connect to wifi can cause AP to fail
+    //if (!mainstate.accesspoint) wifiReconnectTimer.once(2, connectToWifi); // trying to connect to wifi can cause AP to fail
   }
 
   if (triggers.mqttconnected)
@@ -1336,54 +1413,54 @@ void loop()
   {
     timertick = 0;
 #ifdef SDM120
-  static uint8_t sdmreadcounter=1;
+    static uint8_t sdmreadcounter = 1;
 
-  switch (sdmreadcounter)
-  {
-    case 1:
-      putdatamap("voltage", String(sdm.readVal(SDM120CT_VOLTAGE), 2));
-    break;
-    case 6:
-      putdatamap("current", String(sdm.readVal(SDM120CT_CURRENT), 2));
-    break;
-    case 11:
-      putdatamap("power", String(sdm.readVal(SDM120CT_POWER), 2));
-    break;
-    case 16:
-      putdatamap("power/apparant", String(sdm.readVal(SDM120CT_APPARENT_POWER), 2));
-    break;
-    case 21:
-      putdatamap("power/reactive", String(sdm.readVal(SDM120CT_REACTIVE_POWER), 2));
-    break;
-    case 26:
-      putdatamap("frequency", String(sdm.readVal(SDM120CT_FREQUENCY), 2));
-    break;
-    case 31:
-      putdatamap("powerfactor", String(sdm.readVal(SDM120CT_POWER_FACTOR), 2));
-    break;
-    case 36:
-      putdatamap("energy/active/import", String(sdm.readVal(SDM120CT_IMPORT_ACTIVE_ENERGY), 3));
-    break;
-    case 41:
-      putdatamap("energy/active/export", String(sdm.readVal(SDM120CT_EXPORT_ACTIVE_ENERGY), 3));
-    break;
-    case 46:
-      putdatamap("energy/active", String(sdm.readVal(SDM120CT_TOTAL_ACTIVE_ENERGY), 3));
-    break;
-    case 51:
-      putdatamap("energy/reactive/import", String(sdm.readVal(SDM120CT_IMPORT_REACTIVE_ENERGY), 3));
-    break;
-    case 56:
-      putdatamap("energy/reactive/export", String(sdm.readVal(SDM120CT_EXPORT_REACTIVE_ENERGY), 3));
-    break;
-    case 61:
-      putdatamap("energy/reactive", String(sdm.readVal(SDM120CT_TOTAL_REACTIVE_ENERGY), 3));
-    break;
-    case 66:
-    sdmreadcounter = 0;
-    break;      
-  }
-  sdmreadcounter++;
+    switch (sdmreadcounter)
+    {
+      case 1:
+        putdatamap("voltage", String(sdm.readVal(SDM120CT_VOLTAGE), 2));
+        break;
+      case 6:
+        putdatamap("current", String(sdm.readVal(SDM120CT_CURRENT), 2));
+        break;
+      case 11:
+        putdatamap("power", String(sdm.readVal(SDM120CT_POWER), 2));
+        break;
+      case 16:
+        putdatamap("power/apparant", String(sdm.readVal(SDM120CT_APPARENT_POWER), 2));
+        break;
+      case 21:
+        putdatamap("power/reactive", String(sdm.readVal(SDM120CT_REACTIVE_POWER), 2));
+        break;
+      case 26:
+        putdatamap("frequency", String(sdm.readVal(SDM120CT_FREQUENCY), 2));
+        break;
+      case 31:
+        putdatamap("powerfactor", String(sdm.readVal(SDM120CT_POWER_FACTOR), 2));
+        break;
+      case 36:
+        putdatamap("energy/active/import", String(sdm.readVal(SDM120CT_IMPORT_ACTIVE_ENERGY), 3));
+        break;
+      case 41:
+        putdatamap("energy/active/export", String(sdm.readVal(SDM120CT_EXPORT_ACTIVE_ENERGY), 3));
+        break;
+      case 46:
+        putdatamap("energy/active", String(sdm.readVal(SDM120CT_TOTAL_ACTIVE_ENERGY), 3));
+        break;
+      case 51:
+        putdatamap("energy/reactive/import", String(sdm.readVal(SDM120CT_IMPORT_REACTIVE_ENERGY), 3));
+        break;
+      case 56:
+        putdatamap("energy/reactive/export", String(sdm.readVal(SDM120CT_EXPORT_REACTIVE_ENERGY), 3));
+        break;
+      case 61:
+        putdatamap("energy/reactive", String(sdm.readVal(SDM120CT_TOTAL_REACTIVE_ENERGY), 3));
+        break;
+      case 66:
+        sdmreadcounter = 0;
+        break;
+    }
+    sdmreadcounter++;
 #endif;
   }
 
@@ -1392,7 +1469,10 @@ void loop()
     timersectick = 0;
     updatemqtt = 1;
 
-    
+    if ((uptime % 10) == 0)
+    {
+      WiFi.scanNetworksAsync(prinScanResult);
+    }
 
     if ((uptime % 60) == 0)
     {
@@ -1499,14 +1579,14 @@ void loop()
         {
           digitalWrite(sonoff_relays[0], inverse ? true : false); // Set floorheating off
 #ifdef SONOFF_LEDS
-        digitalWrite(sonoff_leds[i], sonoff_ledinverse ? 1 : 0);
+          digitalWrite(sonoff_leds[i], sonoff_ledinverse ? 1 : 0);
 #endif
         }
         else
         {
           digitalWrite(sonoff_relays[0], inverse == floorheating_valveon ? false : true); // Set floorheating on
 #ifdef SONOFF_LEDS
-        digitalWrite(sonoff_leds[i], sonoff_ledinverse ? 0 : 1);
+          digitalWrite(sonoff_leds[i], sonoff_ledinverse ? 0 : 1);
 #endif
         }
       }
@@ -1652,7 +1732,7 @@ void sonoff_handle()
           DEBUG ("SONOFF BUTTON %d PRESSED\n", i);
           digitalWrite(sonoff_relays[i], digitalRead(sonoff_relays[i]) ? 0 : 1);
 #ifdef SONOFF_LEDS
-        digitalWrite(sonoff_leds[i], (digitalRead(sonoff_relays[i]) ? 1 : 0) == sonoff_ledinverse ? 0 : 1);
+          digitalWrite(sonoff_leds[i], (digitalRead(sonoff_relays[i]) ? 1 : 0) == sonoff_ledinverse ? 0 : 1);
 #endif
           bool inverse = false;
 #ifdef SONOFFCHINVERSE
@@ -2333,6 +2413,12 @@ void setup() {
   }
   DEBUG("mqtt topicprefix=%s\n", mqtt_topicprefix.c_str());
 
+#ifdef DDNS
+  EasyDDNS.service("duckdns");
+  EasyDDNS.client("renegusta.duckdns.org", "c4f55de5-0d15-477d-a938-f39c19c67b33");
+#endif
+
+
 #ifdef SONOFFCH
   sonoff_init();
 #endif
@@ -2409,7 +2495,7 @@ void setup() {
 #endif
 
 #ifdef SONOFF_FLOORHEATING
-pinMode(3, FUNCTION_3); 
+  pinMode(3, FUNCTION_3);
 #endif
 
 #ifdef ONEWIREPIN
