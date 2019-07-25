@@ -1,4 +1,5 @@
 #include <ESP8266WiFi.h>
+
 #include "ducobox.h"
 WiFiServer ducoserver(2233);
 static uint16_t _ducobox_minfanspeed = 0;
@@ -180,10 +181,10 @@ void _ducobox_handleserial(String ducomessage)
         ducobox_writeserial("fanparaget");             // Get fan parameters
         break;
       case 2:
-        ducobox_writeserial("nodeparaget 2 73");       // Request TEMPERATURE of node 2
+        ducobox_writeserial("nodeparaget 3 73");       // Request TEMPERATURE of node 3
         break;
       case 3:
-        ducobox_writeserial("nodeparaget 2 74");       // Request CO2 of sensor 2
+        ducobox_writeserial("nodeparaget 3 74");       // Request CO2 of sensor 3
         break;
     }
   }
@@ -216,6 +217,7 @@ void ducobox_handle()
     {
       char ducochar = char(Serial.read());
       ducoclient.print(ducochar);
+      if (ducochar == 13) ducoclient.print(char(10));
     }
   }
   else
