@@ -27,9 +27,9 @@
 //#define GENERIC8266
 //#define BATHROOM
 //#define BEDROOM2
-//#define OPENTHERM
+//UPDATED #define OPENTHERM
 //#define WATERMETER
-//#define DUCOBOX //updated
+//#define DUCOBOX
 //#define SMARTMETER
 //#define GROWATT
 //#define DIMMER
@@ -39,7 +39,7 @@
 //#define BLITZWOLF
 #define WEATHER
 //#define AMGPELLETSTOVE
-//#define GARDEN //ESP8285 WATERFALL MARIANNE
+//UPDATED #define GARDEN //ESP8285 WATERFALL & MARIANNE
 //#define SONOFF_FLOORHEATING
 
 //#define MAINPOWERMETER
@@ -942,17 +942,17 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
 #ifdef OPENTHERM
   if (String(topic) == String(mqtt_topicprefix + "setthermostattemporary"))
   {
-    DEBUG("RECEIVED SETTHERMOSTATTEMPORARY %d\n", payloadstring);
+    DEBUG("RECEIVED SETTHERMOSTATTEMPORARY %s\n", payloadstring.c_str());
     opentherm_setthermosttattemporary(payloadstring.toFloat());
   }
   if (String(topic) == String(mqtt_topicprefix + "setthermostatcontinue"))
   {
-    DEBUG("RECEIVED SETTHERMOSTATCONTINUE %d\n", payloadstring);
+    DEBUG("RECEIVED SETTHERMOSTATCONTINUE %s\n", payloadstring.c_str());
     opentherm_setthermosttatcontinue(payloadstring.toFloat());
   }
   if (String(topic) == String(mqtt_topicprefix + "setchwatertemperature"))
   {
-    DEBUG("RECEIVED SETCHWATERTEMPERATURE %d\n", payloadstring);
+    DEBUG("RECEIVED SETCHWATERTEMPERATURE %s\n", payloadstring.c_str());
     opentherm_setchwatertemperature(payloadstring.toFloat());
   }
 #endif
@@ -1146,8 +1146,7 @@ void prinScanResult(int networksFound)
 
   DEBUG("CurrentAp ID=%d SSID=%s KEY=%s BSSID=%s RSSI=%d(%d), Strongest AP ID=%d SSID=%s, BSSID=%s RSSI=%d\n", currentwifiid, WiFi.SSID().c_str(), WiFi.psk().c_str(), WiFi.BSSIDstr().c_str(), currentwifirssi, WiFi.RSSI(), strongestwifiid, WiFi.SSID(strongestwifiid).c_str(), WiFi.BSSIDstr(strongestwifiid).c_str(), strongestwifirssi);
 
-
-  if ((strongestwifiid >= 0) && (((currentwifiid != strongestwifiid) && ((currentwifiid < 0)) || (WiFi.RSSI() >= 0)) || (currentwifirssi + 10 < WiFi.RSSI(strongestwifiid)) || (WiFi.RSSI(currentwifiid) >= 0)))
+  if ((strongestwifiid >= 0) && ((WiFi.RSSI() >= 0) || (currentwifiid == -1) || ((currentwifirssi < -60) && (currentwifiid != strongestwifiid)) || (currentwifirssi + 10 < WiFi.RSSI(strongestwifiid))))
   {
     DEBUG ("Connecting to AP %d (%s, %s, %s)\n", strongestwifiid, WiFi.SSID().c_str(), WiFi.psk().c_str(), WiFi.BSSIDstr(strongestwifiid).c_str());
     String wifissid = WiFi.SSID();
@@ -1561,7 +1560,7 @@ void loop()
 #ifdef WEATHER
       temperature = oneWireSensors.getTempC(onewire_OutsideAddress);
       DEBUG("Outside Temperature=%f\n", temperature);
-      if (temperature != -127) putdatamap("temperature", String(temperature, 1));
+      if (temperature != -127) putdatamap("temperature", String(temperature, 2));
       else putdatamap("temperature", "-");
 
 #endif
@@ -2422,6 +2421,7 @@ void setup() {
 #ifdef SONOFFCH
   sonoff_init();
 #endif
+
   initWifi();
   connectToWifi();
 
@@ -2437,7 +2437,7 @@ void setup() {
   syslog.appName(ESPNAME);
   syslog.defaultPriority(LOG_KERN);
 
-  DEBUG("ESP8266 Started...");
+  DEBUG("ESP8266 Started...\n");
   DEBUG("Hostname=%s\n", WiFi.hostname().c_str());
 
   ArduinoOTA.setPassword(esp_password.c_str());
