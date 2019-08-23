@@ -1,4 +1,5 @@
 
+
 /*
    Needed libraries:
     https://github.com/jeroenst/RemoteDebug
@@ -31,13 +32,13 @@
 //#define WATERMETER
 //#define DUCOBOX
 //#define SMARTMETER
-//#define GROWATT
+#define GROWATT
 //#define DIMMER
 //#define SONOFFS20 // coffeelamp & sonoffs20_00X
 //#define SONOFFBULB
 //#define SONOFFPOWR2 // tv&washing machine
 //#define BLITZWOLF
-#define WEATHER
+//#define WEATHER
 //#define AMGPELLETSTOVE
 //UPDATED #define GARDEN //ESP8285 WATERFALL & MARIANNE
 //#define SONOFF_FLOORHEATING
@@ -128,6 +129,7 @@ SDM sdm(serSDM, 2400, NOT_A_PIN);
 #define NODEMCULEDPIN D0
 #define FLASHBUTTON D3
 #define ESPLED D4
+#define FANPIN D1
 #include "growatt.h"
 #undef SERIALLOG
 #endif
@@ -159,6 +161,7 @@ SDM sdm(serSDM, 2400, NOT_A_PIN);
 #ifdef IRRIGATION
 #define ESPNAME "IRRIGATION"
 uint32_t sonoffch_starttime[4];
+static bool sonoffch_timeout_enabled[4] = {1, 1, 1, 0};
 #define SONOFFCH_TIMEOUT 1800
 #ifndef ARDUINO_ESP8266_ESP01
 #error "Wrong board selected! Select Generic ESP8285 module"
@@ -1245,11 +1248,11 @@ void loop()
   bool rainpinstate = 0;
   static bool count = 0;
   rainpinstate = digitalRead(RAINMETERPIN);
-  if ((rainpinstate == 1) && (millis() - 50 > rainpinmillis) && count)
+  if ((rainpinstate == 1) && (millis() - 50 > rainpinmillis) && count) // Pulse has to settle for 50ms before counting
   {
-    rainpulses++; // Pulse has to settle for 50ms before counting
-    rainpulseshour++; // Pulse has to settle for 50ms before counting
-    rainpulsesminute++; // Pulse has to settle for 50ms before counting
+    rainpulses++;
+    rainpulseshour++;
+    rainpulsesminute++;
     String mqtttopic = String(mqtt_topicprefix + "rain/pulse");
     mqttClient.publish(mqtttopic.c_str(), 0, false, "1");
     count = 0;
@@ -1408,8 +1411,9 @@ void loop()
   }
 #endif
 
-  if (timertick == 1) // Every 0,1 second check sensors and update display (it would be insane to do it more often right?)
+  if (timertick == 1) // Every 0,1 second read next SDM120 register
   {
+//    Serial.print(".");
     timertick = 0;
 #ifdef SDM120
     static uint8_t sdmreadcounter = 1;
@@ -1544,7 +1548,6 @@ void loop()
     if (uptime % 10 == 0)
     {
       DEBUG("Requesting DS18B20 temperatures...\n");
-      //oneWireSensors.setWaitForConversion(false);
       oneWireSensors.requestTemperatures();
       float temperature;
 #ifdef OPENTHERM
@@ -1560,7 +1563,7 @@ void loop()
 #ifdef WEATHER
       temperature = oneWireSensors.getTempC(onewire_OutsideAddress);
       DEBUG("Outside Temperature=%f\n", temperature);
-      if (temperature != -127) putdatamap("temperature", String(temperature, 2));
+      if (temperature != -127) putdatamap("temperature", String(temperature, 1));
       else putdatamap("temperature", "-");
 
 #endif
@@ -1704,7 +1707,7 @@ void sonoff_handle()
 #ifdef SONOFFCH_TIMEOUT
   for (uint8_t i = 0; i < SONOFFCH; i++)
   {
-    if ((sonoffch_starttime[i] > 0) && (sonoffch_starttime[i] + SONOFFCH_TIMEOUT < uptime))
+    if ((sonoffch_starttime[i] > 0) && (sonoffch_starttime[i] + SONOFFCH_TIMEOUT < uptime) && (sonoffch_timeout_enabled[i]))
     {
       sonoffch_starttime[i] = 0;
       bool inverse = false;
@@ -2499,6 +2502,9 @@ void setup() {
 #endif
 
 #ifdef ONEWIREPIN
+    oneWireSensors.setWaitForConversion(false);
+    oneWireSensors.setResolution(12);
+
 #ifdef OPENTHERM
   if (!oneWireSensors.getAddress(onewire_dcwSupplyWaterThermometer, 0)) {
     DEBUG("Unable to find address for onewire_dcwSupplyWaterThermometer\n");
@@ -2558,7 +2564,7 @@ void setup() {
 #endif
 
 #ifdef GROWATT
-  growatt_init(growattcallback);
+  growatt_init(growattcallback, FANPIN);
 #endif
 
 #ifdef NEOPIXELPIN
