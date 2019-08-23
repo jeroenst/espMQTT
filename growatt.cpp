@@ -1,18 +1,50 @@
 #include <ESP8266WiFi.h>
-void(*_growatt_callback)(String,String);
+#include "espMQTT.h"
+#include "growatt.h"
 
-void growatt_init(void(*callback)(String,String))
+#define _GROWATT_FAN_PID_P_GAIN 200
+#define _GROWATT_FAN_PID_I_GAIN 10
+#define _GROWATT_FAN_PID_D_GAIN 0
+//#define _GROWATT_FAN_PWM_FREQ 25
+#define _GROWATT_FAN_STOP_TEMP_DELTA -1
+#define _GROWATT_FAN_FULLSPEED_TEMP_DELTA 5
+
+void(*_growatt_callback)(String,String);
+static int _growatt_fanpin = 0;
+static int _growatt_fanspeed = 0;
+static float _growatt_fan_pid_p = 0;
+static float _growatt_fan_pid_i = 0;
+static float _growatt_fan_pid_d = 0;
+static float _growatt_fan_pid_error = 0;
+static float _growatt_fan_pid_preverror = 0;
+
+
+void growatt_init(void(*callback)(String,String), int fanpin)
 {
   _growatt_callback = callback;
   Serial.setRxBufferSize(2048); 
   Serial.begin(9600);  //Init serial 9600 baud
   Serial.setDebugOutput(false);
   _growatt_callback("grid/today/kwh", "0.0");
+  if (fanpin >= 0)
+  {
+    _growatt_fanpin = fanpin;
+    pinMode(fanpin, OUTPUT);
+    analogWrite(fanpin, 0);
+    //analogWriteFreq(_GROWATT_FAN_PWM_FREQ);
+    _growatt_fan_pid_p = 0;
+    _growatt_fan_pid_i = 0;
+    _growatt_fan_pid_d = 0;
+  }
+
+  _growatt_callback("grid/today/kwh", "-");
+  _growatt_callback("grid/total/kwh", "-");
+  _growatt_callback("grid/total/hour", "-");
 }
 
 void growatt_send_command(uint8_t c1)
 {
-//  DEBUG("Requesting Growatt Data %#02x...\n");
+  DEBUG("Requesting Growatt Data %#02x...\n");
   uint8_t TxBuffer[10];
   TxBuffer[0] = 0x3F;
   TxBuffer[1] = 0x23;
@@ -30,7 +62,7 @@ void growatt_send_command(uint8_t c1)
   TxBuffer[7] = wStringSum & 0xFF;
   for (int i = 0; i < 8; i++)
   {
-//    DEBUG ("Sending to Growatt inverter: %#02x\n", TxBuffer[i]);
+    DEBUG ("Sending to Growatt inverter: %#02x\n", TxBuffer[i]);
     Serial.write(TxBuffer[i]);
   }
 }
@@ -41,13 +73,12 @@ void growatt_handle()
   static uint8_t RxBuffer[50];
   static uint8_t RxBufferPointer = 0;
   static bool RxPowerDataOk = 0;
-  static bool firstRun = 1;
   static double pv1volt = 0;
 
   if (millis() > nextupdatetime)
   {
     RxBufferPointer = 0;
-    nextupdatetime = millis() + 10000;
+    nextupdatetime = millis() + (GROWATT_POLL_TIMER * 1000);
 
     if (!RxPowerDataOk)
     {
@@ -63,16 +94,14 @@ void growatt_handle()
       _growatt_callback("fault/type", "-");
       _growatt_callback("temperature", "-");
       _growatt_callback("status", "commerror");
+      if (_growatt_fanpin >= 0)
+      {
+         _growatt_callback("fan/speed", "-");
+         analogWrite(_growatt_fanpin, 0);
+      }
     }
     RxPowerDataOk = 0;
 
-    if (firstRun)
-    {
-      _growatt_callback("grid/today/kwh", "-");
-      _growatt_callback("grid/total/kwh", "-");
-      _growatt_callback("grid/total/hour", "-");
-      firstRun = 0;
-    }
     growatt_send_command(0x41);
     _growatt_callback("status", "querying");
   }
@@ -101,10 +130,10 @@ void growatt_handle()
       {
         double value = 0;
         uint32_t intvalue = 0;
-//        DEBUG("Received complete message from Growatt Inverter...\n");
+        DEBUG("Received complete message from Growatt Inverter...\n");
         if ((RxBuffer[3] == 0x32) && (RxBuffer[4] == 0x41) && (RxBufferPointer >= 34))
         {
-//          DEBUG("Received power data from Growatt Inverter...\n");
+          DEBUG("Received power data from Growatt Inverter...\n");
           intvalue = RxBuffer[6];
           _growatt_callback("inverterstatus/value", String(intvalue));
           _growatt_callback("inverterstatus", intvalue == 0 ? "waiting" : intvalue == 1 ? "ready" : intvalue == 3 ? "fault" : "unknown");
@@ -129,12 +158,50 @@ void growatt_handle()
           _growatt_callback("fault/type", String(intvalue));
           value = double((uint16_t(RxBuffer[37]) << 8) + RxBuffer[38]) / 10;
           _growatt_callback("temperature", String(value, 1));
+          if (_growatt_fanpin >= 0)
+          {
+            //if (value >= GROWATT_FANSPEED_MINTEMP) digitalWrite(_growatt_fanpin,1);
+            //else digitalWrite(_growatt_fanpin, 0);
+
+            // PID control of fans on top of growatt inverter
+            _growatt_fan_pid_error = value - GROWATT_FANSPEED_TEMP;
+            _growatt_fan_pid_preverror = _growatt_fan_pid_error;
+            float new_fan_pid_p = _growatt_fan_pid_error * _GROWATT_FAN_PID_P_GAIN;
+            float new_fan_pid_i = _growatt_fan_pid_i + (_growatt_fan_pid_error * _GROWATT_FAN_PID_I_GAIN);
+            float new_fan_pid_d = (_growatt_fan_pid_preverror - _growatt_fan_pid_error) * _GROWATT_FAN_PID_D_GAIN;
+            int new_fanspeed = new_fan_pid_p + new_fan_pid_i + new_fan_pid_d;
+            if ((new_fanspeed < PWMRANGE-GROWATT_FANSPEED_OFFSET) && (new_fanspeed >= 0)) // Only do PID calculation if maximums are not reached
+            {
+              _growatt_fan_pid_p = new_fan_pid_p;
+              _growatt_fan_pid_i = new_fan_pid_i;
+              _growatt_fan_pid_d = new_fan_pid_d;
+            }
+            _growatt_fanspeed = min(max (GROWATT_FANSPEED_OFFSET, new_fanspeed+GROWATT_FANSPEED_OFFSET), PWMRANGE);
+            static bool fanstop = 0;
+            if (_growatt_fan_pid_error <= _GROWATT_FAN_STOP_TEMP_DELTA) fanstop = 1;
+            if (_growatt_fan_pid_error == 0) fanstop = 0;
+            if (fanstop == 1) _growatt_fanspeed = 0;
+            if (_growatt_fan_pid_error >= _GROWATT_FAN_FULLSPEED_TEMP_DELTA) _growatt_fanspeed = PWMRANGE;
+            analogWrite(_growatt_fanpin, _growatt_fanspeed);
+            _growatt_callback("fan/speed", String(_growatt_fanspeed));
+            DEBUG("Temperature=%.01f, Fanspeed=%d\n", value, _growatt_fanspeed);
+
+            
+            //int fanspeed = 0;
+           
+            //fanspeed = max(min((int)((value - GROWATT_FANSPEED_MINTEMP) * GROWATT_FANSPEED_MULTIPLIER) + GROWATT_FANSPEED_OFFSET, PWMRANGE), GROWATT_FANSPEED_OFFSET);
+            //analogWrite(_growatt_fanpin, fanspeed);
+            //DEBUG("Temperature=%.01f, Fanspeed=%d\n", value, fanspeed);
+            //_growatt_callback("fan/speed", String((fanspeed*100)/PWMRANGE));
+            //_growatt_callback("fan/on", String(digitalRead(_growatt_fanpin)));
+          }
+          
           RxPowerDataOk = 1;
           growatt_send_command(0x42);
         }
         if ((RxBuffer[3] == 0x32) && (RxBuffer[4] == 0x42) && (RxBufferPointer >= 22))
         {
-//          DEBUG("Received energy data from Growatt Inverter...\n");
+          DEBUG("Received energy data from Growatt Inverter...\n");
           value = double((uint16_t(RxBuffer[13]) << 8) + RxBuffer[14]) / 10;
           if (pv1volt > 100) _growatt_callback("grid/today/kwh", String(value, 1)); // Only reset today value when pv 1 volt is above 100 volt (steady voltage) otherwise this gets resets during shutdown
           value = double((uint32_t(RxBuffer[15]) << 24) + (uint32_t(RxBuffer[16]) << 16) + (uint16_t(RxBuffer[17]) << 8) + RxBuffer[18]) / 10;
