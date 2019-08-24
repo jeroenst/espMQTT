@@ -3,11 +3,11 @@
 #include "growatt.h"
 
 #define _GROWATT_FAN_PID_P_GAIN 200
-#define _GROWATT_FAN_PID_I_GAIN 10
+#define _GROWATT_FAN_PID_I_GAIN 40
 #define _GROWATT_FAN_PID_D_GAIN 0
-//#define _GROWATT_FAN_PWM_FREQ 25
-#define _GROWATT_FAN_STOP_TEMP_DELTA -1
-#define _GROWATT_FAN_FULLSPEED_TEMP_DELTA 5
+#define _GROWATT_FAN_STOP_TEMP_DELTA -5
+#define _GROWAT_PWM_RANGE (PWMRANGE-GROWATT_FANSPEED_OFFSET)
+#define _GROWATT_FAN_PWM_FREQ 32
 
 void(*_growatt_callback)(String,String);
 static int _growatt_fanpin = 0;
@@ -31,7 +31,7 @@ void growatt_init(void(*callback)(String,String), int fanpin)
     _growatt_fanpin = fanpin;
     pinMode(fanpin, OUTPUT);
     analogWrite(fanpin, 0);
-    //analogWriteFreq(_GROWATT_FAN_PWM_FREQ);
+    analogWriteFreq(_GROWATT_FAN_PWM_FREQ);
     _growatt_fan_pid_p = 0;
     _growatt_fan_pid_i = 0;
     _growatt_fan_pid_d = 0;
@@ -83,6 +83,7 @@ void growatt_handle()
     if (!RxPowerDataOk)
     {
       _growatt_callback("inverterstatus", "offline");
+      _growatt_callback("inverterstatus/value", "-");
       _growatt_callback("pv/1/volt", "-");
       _growatt_callback("pv/2/volt", "-");
       _growatt_callback("pv/watt", "-");
@@ -96,7 +97,7 @@ void growatt_handle()
       _growatt_callback("status", "commerror");
       if (_growatt_fanpin >= 0)
       {
-         _growatt_callback("fan/speed", "-");
+         _growatt_callback("fanspeed", "0");
          analogWrite(_growatt_fanpin, 0);
       }
     }
@@ -166,24 +167,16 @@ void growatt_handle()
             // PID control of fans on top of growatt inverter
             _growatt_fan_pid_error = value - GROWATT_FANSPEED_TEMP;
             _growatt_fan_pid_preverror = _growatt_fan_pid_error;
-            float new_fan_pid_p = _growatt_fan_pid_error * _GROWATT_FAN_PID_P_GAIN;
-            float new_fan_pid_i = _growatt_fan_pid_i + (_growatt_fan_pid_error * _GROWATT_FAN_PID_I_GAIN);
-            float new_fan_pid_d = (_growatt_fan_pid_preverror - _growatt_fan_pid_error) * _GROWATT_FAN_PID_D_GAIN;
-            int new_fanspeed = new_fan_pid_p + new_fan_pid_i + new_fan_pid_d;
-            if ((new_fanspeed < PWMRANGE-GROWATT_FANSPEED_OFFSET) && (new_fanspeed >= 0)) // Only do PID calculation if maximums are not reached
-            {
-              _growatt_fan_pid_p = new_fan_pid_p;
-              _growatt_fan_pid_i = new_fan_pid_i;
-              _growatt_fan_pid_d = new_fan_pid_d;
-            }
-            _growatt_fanspeed = min(max (GROWATT_FANSPEED_OFFSET, new_fanspeed+GROWATT_FANSPEED_OFFSET), PWMRANGE);
-            static bool fanstop = 0;
+            _growatt_fan_pid_p = _growatt_fan_pid_error * _GROWATT_FAN_PID_P_GAIN;
+            _growatt_fan_pid_i = max(min(float(_GROWAT_PWM_RANGE), float(_growatt_fan_pid_i + (_growatt_fan_pid_error * _GROWATT_FAN_PID_I_GAIN))), float(-_GROWAT_PWM_RANGE));
+            _growatt_fan_pid_d = (_growatt_fan_pid_preverror - _growatt_fan_pid_error) * _GROWATT_FAN_PID_D_GAIN;
+            _growatt_fanspeed = max(min(PWMRANGE,int(_growatt_fan_pid_p+_growatt_fan_pid_i+_growatt_fan_pid_d+GROWATT_FANSPEED_OFFSET)),GROWATT_FANSPEED_OFFSET);
+            static bool fanstop = 1;
             if (_growatt_fan_pid_error <= _GROWATT_FAN_STOP_TEMP_DELTA) fanstop = 1;
-            if (_growatt_fan_pid_error == 0) fanstop = 0;
+            if (_growatt_fan_pid_error >= 0) fanstop = 0;
             if (fanstop == 1) _growatt_fanspeed = 0;
-            if (_growatt_fan_pid_error >= _GROWATT_FAN_FULLSPEED_TEMP_DELTA) _growatt_fanspeed = PWMRANGE;
             analogWrite(_growatt_fanpin, _growatt_fanspeed);
-            _growatt_callback("fan/speed", String(_growatt_fanspeed));
+            _growatt_callback("fanspeed", String((100 * _growatt_fanspeed)/PWMRANGE));
             DEBUG("Temperature=%.01f, Fanspeed=%d\n", value, _growatt_fanspeed);
 
             
