@@ -1,5 +1,4 @@
 #include <ESP8266WiFi.h>
-#include <RemoteDebug.h>
 #ifndef D0
 #define D0 0
 #endif
@@ -10,7 +9,10 @@ static String amgtempcmd = "";
 static uint8_t amgcmdnr = 0;
 void(*_amgpelletstove_callback)(String, String);
 void(*_amgpelletstove_debug_callback)(String, String);
-#define DEBUG(message) _amgpelletstove_debug_callback(__func__, message);
+
+
+#define DEBUG(message) _amgpelletstove_debug_callback(__FUNCTION__, message);
+
 
 void amgpelletstove_init(void(*callback)(String, String), void(*debugcallback)(String, String))
 {
@@ -62,73 +64,79 @@ void _amgpelletstove_sendserial()
   else if (amgtempcmd != "") amgcmdnr = 255;
   digitalWrite(NODEMCULEDPIN, 0);
   Serial.write (27);
+  static String sendcmd; // needs to be static otherwise debug call fails..
+  sendcmd = "";
   switch (amgcmdnr)
   {
     case 1:
-      Serial.print ("RD100057&"); // Request room temperature
+      sendcmd = "RD100057&"; // Request room temperature
       break;
     case 2:
-      Serial.print ("RC60005B&"); // Request room temperature setpoint
+      sendcmd = "RC60005B&"; // Request room temperature setpoint
       break;
     case 3:
-      Serial.print ("RC50005A&"); // Request power setpoint
+      sendcmd = "RC50005A&"; // Request power setpoint
       break;
     case 4:
-      Serial.print ("RD000056&"); // Request exhaust temperature
+      sendcmd = "RD000056&"; // Request exhaust temperature
       break;
     case 5:
-      Serial.print ("RD200058&"); // Request exhaust fanspeed
+      sendcmd = "RD200058&"; // Request exhaust fanspeed
       break;
     case 6:
-      Serial.print ("RD300059&"); // Request room fanspeed
+      sendcmd = "RD300059&"; // Request room fanspeed
       break;
     case 7:
-      Serial.print ("RD40005A&"); // Request auger speed
+      sendcmd = "RD40005A&"; // Request auger speed
       break;
     case 8:
-      Serial.print ("RDF0006C&"); // Request board temp
+      sendcmd = "RDF0006C&"; // Request board temp
       break;
     case 9:
-      Serial.print ("RDD0006A&"); // ??? 0000020 Fluegas motor correction (rpm*10)
+      sendcmd = "RDD0006A&"; // ??? 0000020 Fluegas motor correction (rpm*10)
       break;
     case 10:
-      Serial.print ("RDE0006B&"); // ??? 0000020 Pellet correction (%)
+      sendcmd = "RDE0006B&"; // ??? 0000020 Pellet correction (%)
       break;
     case 11:
-      Serial.print ("RDA00067&"); // 000020 // error code
+      sendcmd = "RDA00067&"; // 000020 // error code
       break;
     case 12:
-      Serial.print ("REF0006D&"); // 00D20036  // FANSPEED EXHAUST
+      sendcmd = "REF0006D&"; // 00D20036  // FANSPEED EXHAUST
       break;
     case 13:
-      Serial.print ("RD80005E&"); // TIMER TO NEXT PHASE
+      sendcmd = "RD80005E&"; // TIMER TO NEXT PHASE
       break;
     case 14:
-      Serial.print ("RC000055&"); // 00000020 // Inputs
+      sendcmd = "RC000055&"; // 00000020 // Inputs
       break;
     case 15:
-      Serial.print ("RDB00068&"); // Extractor sensorlevel
+      sendcmd = "RDB00068&"; // Extractor sensorlevel
       break;
     case 254:
       DEBUG("Writing to amg pelletstove:" + amgpowercmd + "\n");
-      Serial.print (amgpowercmd);
+      sendcmd = amgpowercmd;
       amgpowercmd = "";
+      amgcmdnr = 0;
       break;
     case 255:
       DEBUG("Writing to amg pelletstove:" + amgtempcmd + "\n");
-      Serial.print (amgtempcmd);
+      sendcmd = amgtempcmd;
       amgtempcmd = "";
+      amgcmdnr = 0;
       break;
     default:
       amgcmdnr = 0;
-      Serial.print ("RD90005F&"); // 02010023 // cycle phase
+      sendcmd = "RD90005F&"; // 02010023 // cycle phase
       break;
   }
+  Serial.print(sendcmd);
+  DEBUG("Writing to amg pelletstove: "+ sendcmd +"\n");
 }
 
 void amgpelletstove_handle()
 {
-  static unsigned long nextupdatetime = millis();
+  static unsigned long nextupdatetime = millis() + 1000; // Wait 1 second after startup before sending first cmd...
   static String serstr = "";
   static uint8_t currentpower = 0;
   if (Serial.available() > 0)
@@ -140,7 +148,7 @@ void amgpelletstove_handle()
     {
       digitalWrite(NODEMCULEDPIN, 1);
       DEBUG("Received from amg pelletstove:" + serstr + "\n");
-      long value = strtol(serstr.substring(2, 5).c_str(), 0, 16);
+      long value = strtol(serstr.substring(2, 5).c_str(), NULL, 16);
       serstr = "";
       switch (amgcmdnr)
       {

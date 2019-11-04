@@ -1,5 +1,3 @@
-
-
 /*
    Needed libraries:
     https://github.com/jeroenst/RemoteDebug
@@ -28,19 +26,19 @@
 //#define GENERIC8266
 //#define BATHROOM
 //#define BEDROOM2
-//UPDATED #define OPENTHERM
+//#define OPENTHERM
 //#define WATERMETER
 //#define DUCOBOX
 //#define SMARTMETER
-#define GROWATT
+//#define GROWATT
 //#define DIMMER
 //#define SONOFFS20 // coffeelamp & sonoffs20_00X
 //#define SONOFFBULB
 //#define SONOFFPOWR2 // tv&washing machine
 //#define BLITZWOLF
-//#define WEATHER
+#define WEATHER
 //#define AMGPELLETSTOVE
-//UPDATED #define GARDEN //ESP8285 WATERFALL & MARIANNE
+//#define GARDEN //ESP8285 WATERFALL & MARIANNE
 //#define SONOFF_FLOORHEATING
 
 //#define MAINPOWERMETER
@@ -54,7 +52,6 @@
 //#define SONOFFPOW
 //#define SDM120
 
-#define SERIALLOG
 
 #ifdef SONOFFS20_PRINTER
 #define ESPNAME "SONOFFS20_PRINTER"
@@ -103,6 +100,7 @@ SDM sdm(serSDM, 2400, NOT_A_PIN);
 #define ESPNAME "GENERIC8266"
 #define FLASHBUTTON D3
 #define ESPLED D4
+#define SERIALLOG
 #endif
 
 #ifdef AMGPELLETSTOVE
@@ -122,6 +120,7 @@ SDM sdm(serSDM, 2400, NOT_A_PIN);
 #define ONEWIREPIN D5
 #define RAINMETERPIN D1
 #define RAINMETERPULSEMM 0.3636
+#undef SERIALLOG
 #endif
 
 #ifdef GROWATT
@@ -138,7 +137,6 @@ SDM sdm(serSDM, 2400, NOT_A_PIN);
 #define ESPNAME "SOIL"
 #define FLASHBUTTON D3
 #define ESPLED D4
-#define SERIALLLOG
 #endif
 
 #ifdef DUCOBOX
@@ -332,6 +330,7 @@ static bool sonoff_oldbuttons[1] = {1};
 #define ESPLED D4
 #define ONEWIREPIN D6
 #include "opentherm.h"
+#undef SERIALLOG
 #endif
 
 #ifdef WATERMETER
@@ -484,6 +483,8 @@ struct dataMapStruct {
   String payload = "";
   bool send = true;
 };
+
+int wifichannel = 0;
 
 SimpleMap<String, dataMapStruct> *dataMap = new SimpleMap<String, dataMapStruct>([](String &a, String &b) -> int {
   if (a == b) return 0;      // a and b are equal
@@ -651,7 +652,7 @@ void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
   putdatamap("wifi/localip", WiFi.localIP().toString(), sendupdate);
   putdatamap("wifi/ssid", String(WiFi.SSID()), sendupdate);
   putdatamap("wifi/rssi", String(WiFi.RSSI()), uptime % 10 == 0);
-  putdatamap("wifi/channel", String(WiFi.channel()), sendupdate);
+  putdatamap("wifi/channel", String(wifichannel), sendupdate);
   putdatamap("mqtt/server", String(mqtt_server), sendupdate);
   putdatamap("mqtt/port", String(mqtt_port), sendupdate);
   putdatamap("mqtt/ssl", String(mqtt_ssl), sendupdate);
@@ -660,6 +661,7 @@ void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
 
 void onWifiConnect(const WiFiEventStationModeGotIP& event)
 {
+  wifichannel = WiFi.channel(); // We can't rely on wifi.channel because while scanning the channel is changed.
   //wifiReconnectTimer.detach();
   triggers.wificonnected = true;
   mainstate.wificonnected = true;
@@ -667,6 +669,7 @@ void onWifiConnect(const WiFiEventStationModeGotIP& event)
 
 void onWifiDisconnect(const WiFiEventStationModeDisconnected& event)
 {
+  wifichannel = 0;
   triggers.wifidisconnected = true;
   mainstate.wificonnected = false;
 }
@@ -728,6 +731,9 @@ void disconnectMqtt()
   DEBUG("Disconnecting Mqtt\n");
   mqttReconnectTimer.detach();
   mqttClient.disconnect();
+  mainstate.mqttconnected = false;
+  mainstate.mqttready = false;
+  triggers.mqttdisconnected = true;
 }
 
 void onMqttConnect(bool sessionPresent) {
@@ -838,7 +844,6 @@ void initSerial()
   Serial.begin(4800, SERIAL_8E1);
 #elif defined (AMGPELLETSTOVE)
   Serial.setDebugOutput(false);
-  amgpelletstove_init(amgpelletstovecallback, logdebug);
 #elif defined (SDM120)
   Serial.setDebugOutput(false);
   sdm.begin();
@@ -1099,7 +1104,7 @@ void handle_noise()
 #endif
 
 
-void prinScanResult(int networksFound)
+void printScanResult(int networksFound)
 {
   DEBUG("WiFiScan finished, %d network(s) found\n", networksFound);
   int strongestwifiid = -1;
@@ -1143,11 +1148,11 @@ void prinScanResult(int networksFound)
     }
 
     
-    DEBUG(" %d: %s, %s, Ch:%d (%ddBm) %s\n", i, WiFi.SSID(i).c_str(), WiFi.BSSIDstr().c_str(), WiFi.channel(i), currentwifirssi, enctype.c_str());
+    DEBUG(" %d: %s, %s, Ch:%d (%ddBm) %s\n", i, WiFi.SSID(i).c_str(), WiFi.BSSIDstr(i).c_str(), WiFi.channel(i), WiFi.RSSI(i), enctype.c_str());
 
   }
 
-  DEBUG("CurrentAp ID=%d SSID=%s KEY=%s BSSID=%s RSSI=%d(%d), Strongest AP ID=%d SSID=%s, BSSID=%s RSSI=%d\n", currentwifiid, WiFi.SSID().c_str(), WiFi.psk().c_str(), WiFi.BSSIDstr().c_str(), currentwifirssi, WiFi.RSSI(), strongestwifiid, WiFi.SSID(strongestwifiid).c_str(), WiFi.BSSIDstr(strongestwifiid).c_str(), strongestwifirssi);
+  DEBUG("CurrentAp ID=%d SSID=%s BSSID=%s RSSI=%d(%d), Strongest AP ID=%d SSID=%s, BSSID=%s RSSI=%d(%d)\n", currentwifiid, WiFi.SSID().c_str(), WiFi.BSSIDstr().c_str(), currentwifirssi, WiFi.RSSI(), strongestwifiid, WiFi.SSID(strongestwifiid).c_str(), WiFi.BSSIDstr(strongestwifiid).c_str(), WiFi.RSSI(strongestwifiid), strongestwifirssi);
 
   if ((strongestwifiid >= 0) && ((WiFi.RSSI() >= 0) || (currentwifiid == -1) || ((currentwifirssi < -60) && (currentwifiid != strongestwifiid)) || (currentwifirssi + 10 < WiFi.RSSI(strongestwifiid))))
   {
@@ -1474,7 +1479,7 @@ void loop()
 
     if ((uptime % 10) == 0)
     {
-      WiFi.scanNetworksAsync(prinScanResult);
+      WiFi.scanNetworksAsync(printScanResult);
     }
 
     if ((uptime % 60) == 0)
@@ -1812,6 +1817,9 @@ void publishdatamap(int32_t packetId, bool publishall, bool init)
     datamappointer = 0;
   }
 
+  if (mqttClient.connected())
+  {
+
   if (waitingforack)
   {
     if (packetId == 0)
@@ -1870,6 +1878,7 @@ void publishdatamap(int32_t packetId, bool publishall, bool init)
       datamappointer = 0;
       mainstate.mqttready = true;
     }
+  }
   }
 }
 
@@ -2231,8 +2240,7 @@ void handleWWWSettings()
     Debug.setPassword(esp_password);
     mainstate.defaultpassword = false;
 
-    mqttClient.disconnect(); // Disconnect mqtt server, it will auto reconnect...
-    initMqtt();
+    disconnectMqtt(); // Disconnect mqtt server
     WiFi.mode(WIFI_STA); // After saving settings return to wifi client mode and disable AP
     mainstate.accesspoint = false;
 
@@ -2247,6 +2255,8 @@ void handleWWWSettings()
       previouswifistatus = -1;
     }
     else webserver.send(200, "text/html", "<HTML><BODY>Settings Saved.<BR><A HREF=\"/\">Return to main page</A></BODY></HTML>");
+    initMqtt();
+    connectToMqtt();
     update_systeminfo(true);
   }
   else
@@ -2565,6 +2575,10 @@ void setup() {
 
 #ifdef GROWATT
   growatt_init(growattcallback, FANPIN);
+#endif
+
+#ifdef AMGPELLETSTOVE
+  amgpelletstove_init(amgpelletstovecallback, logdebug);
 #endif
 
 #ifdef NEOPIXELPIN

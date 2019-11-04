@@ -3,7 +3,7 @@
 #include "growatt.h"
 
 #define _GROWATT_FAN_PID_P_GAIN 200
-#define _GROWATT_FAN_PID_I_GAIN 40
+#define _GROWATT_FAN_PID_I_GAIN 20
 #define _GROWATT_FAN_PID_D_GAIN 0
 #define _GROWATT_FAN_STOP_TEMP_DELTA -5
 #define _GROWAT_PWM_RANGE (PWMRANGE-GROWATT_FANSPEED_OFFSET)
@@ -168,7 +168,7 @@ void growatt_handle()
             _growatt_fan_pid_error = value - GROWATT_FANSPEED_TEMP;
             _growatt_fan_pid_preverror = _growatt_fan_pid_error;
             _growatt_fan_pid_p = _growatt_fan_pid_error * _GROWATT_FAN_PID_P_GAIN;
-            _growatt_fan_pid_i = max(min(float(_GROWAT_PWM_RANGE), float(_growatt_fan_pid_i + (_growatt_fan_pid_error * _GROWATT_FAN_PID_I_GAIN))), float(-_GROWAT_PWM_RANGE));
+            _growatt_fan_pid_i = max(min(float(_GROWAT_PWM_RANGE), float(_growatt_fan_pid_i + (_growatt_fan_pid_error * _GROWATT_FAN_PID_I_GAIN))), float(0));
             _growatt_fan_pid_d = (_growatt_fan_pid_preverror - _growatt_fan_pid_error) * _GROWATT_FAN_PID_D_GAIN;
             _growatt_fanspeed = max(min(PWMRANGE,int(_growatt_fan_pid_p+_growatt_fan_pid_i+_growatt_fan_pid_d+GROWATT_FANSPEED_OFFSET)),GROWATT_FANSPEED_OFFSET);
             static bool fanstop = 1;
