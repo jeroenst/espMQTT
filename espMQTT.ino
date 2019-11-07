@@ -22,9 +22,12 @@
 */
 //#define SYSLOGDEBUG
 
+//#define WEATHER
+//#define AMGPELLETSTOVE
+#define BATHROOM
+
 //#define DDNS
 //#define GENERIC8266
-//#define BATHROOM
 //#define BEDROOM2
 //#define OPENTHERM
 //#define WATERMETER
@@ -36,11 +39,8 @@
 //#define SONOFFBULB
 //#define SONOFFPOWR2 // tv&washing machine
 //#define BLITZWOLF
-#define WEATHER
-//#define AMGPELLETSTOVE
 //#define GARDEN //ESP8285 WATERFALL & MARIANNE
 //#define SONOFF_FLOORHEATING
-
 //#define MAINPOWERMETER
 //#define SONOFF4CH //ESP8285
 //#define SONOFFDUAL
@@ -860,7 +860,7 @@ void initSerial()
 #ifdef DHTPIN
 void update_dht()
 {
-  static uint8 errors = 0;
+  static uint8 errors = 4;
   float rh = dht.readHumidity();
   // Read temperature as Celsius (the default)
   float temp = dht.readTemperature();
@@ -2610,6 +2610,10 @@ void setup() {
   pinMode(NODEMCULEDPIN, OUTPUT);
   digitalWrite(NODEMCULEDPIN, 1);
 #endif
+
+#ifdef DHTPIN
+  dht.begin();
+#endif;
 }
 
 void processCmdRemoteDebug()
