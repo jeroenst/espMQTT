@@ -30,7 +30,7 @@
 //#define WIFIDIMMERDUO
 //#define DDNS
 //#define GENERIC8266
-//#define BEDROOM2
+#define BEDROOM2
 //#define OPENTHERM
 //#define WATERMETER
 //#define DUCOBOX
@@ -52,7 +52,7 @@
 //#define SOIL
 //#define SONOFFS20_PRINTER
 //#define SONOFFPOW
-#define SDM120
+//#define SDM120
 
 
 #ifdef SONOFFS20_PRINTER
@@ -476,6 +476,7 @@ struct Triggers {
   bool wifidisconnected = false;
   bool mqttconnected = false;
   bool mqttdisconnected = false;
+  bool wifiscanready = false;
 } triggers;
 
 struct Mainstate {
@@ -494,6 +495,7 @@ struct dataMapStruct {
 };
 
 int wifichannel = 0;
+int wifinetworksfound = 0;
 
 SimpleMap<String, dataMapStruct> *dataMap = new SimpleMap<String, dataMapStruct>([](String &a, String &b) -> int {
   if (a == b) return 0;      // a and b are equal
@@ -1110,66 +1112,11 @@ void handle_noise()
 #endif
 
 
-void printScanResult(int networksFound)
+void wifiScanReady(int networksFound)
 {
-  DEBUG_D("WiFiScan finished, %d network(s) found\n", networksFound);
-  int strongestwifiid = -1;
-  int strongestwifirssi = -1000;
-  int currentwifirssi = -1000;
-  int currentwifiid = -1;
-
-  for (int i = 0; i < networksFound; i++)
-  {
-    if (WiFi.SSID(i) == WiFi.SSID())
-    {
-      if (currentwifirssi < WiFi.RSSI(i))
-      {
-        strongestwifiid = i;
-        strongestwifirssi = WiFi.RSSI(i);
-      }
-      if (WiFi.BSSIDstr(i) == WiFi.BSSIDstr())
-      {
-        currentwifirssi = WiFi.RSSI(i);
-        currentwifiid = i;
-      }
-    }
-
-    String enctype = "None";
-    switch (WiFi.encryptionType(i)) {
-      case ENC_TYPE_WEP:
-        enctype = "WEP";
-        break;
-      case ENC_TYPE_TKIP:
-        enctype = "WPA";
-        break;
-      case ENC_TYPE_CCMP:
-        enctype = "WPA2";
-        break;
-      case ENC_TYPE_NONE:
-        enctype = "None";
-        break;
-      case ENC_TYPE_AUTO:
-        enctype = "Auto";
-        break;
-    }
-
-    
-// THIS CAUSES CRASH     DEBUG_D(" %d: %s, %s, Ch:%d (%ddBm) %s\n", i, WiFi.SSID(i).c_str(), WiFi.BSSIDstr(i).c_str(), WiFi.channel(i), WiFi.RSSI(i), enctype.c_str());
-  }
-
-  DEBUG_I("CurrentAp ID=%d SSID=%s BSSID=%s RSSI=%d(%d), Strongest AP ID=%d SSID=%s, BSSID=%s RSSI=%d(%d)\n", currentwifiid, WiFi.SSID().c_str(), WiFi.BSSIDstr().c_str(), currentwifirssi, WiFi.RSSI(), strongestwifiid, WiFi.SSID(strongestwifiid).c_str(), WiFi.BSSIDstr(strongestwifiid).c_str(), WiFi.RSSI(strongestwifiid), strongestwifirssi);
-
-  if (!mainstate.accesspoint)
-  {
-    if ((strongestwifiid >= 0) && ((WiFi.RSSI() >= 0) || (currentwifiid == -1) || ((currentwifirssi < -60) && (currentwifiid != strongestwifiid)) || (currentwifirssi + 10 < WiFi.RSSI(strongestwifiid))))
-    {
-      DEBUG_I ("Switching to stronger AP %d (%s, %s, %s)\n", strongestwifiid, WiFi.SSID().c_str(), WiFi.psk().c_str(), WiFi.BSSIDstr(strongestwifiid).c_str());
-      String wifissid = WiFi.SSID();
-      String wifipsk =  WiFi.psk();
-      WiFi.disconnect(false);
-      WiFi.begin(wifissid.c_str(), wifipsk.c_str(), WiFi.channel(strongestwifiid), WiFi.BSSID(strongestwifiid));
-    }
-  }
+  DEBUG_V("WiFiScan finished, %d network(s) found\n", networksFound);
+  triggers.wifiscanready = true;
+  wifinetworksfound = networksFound;
 }
 
 static byte flashbuttonstatus = 0;
@@ -1230,11 +1177,74 @@ void loop()
     DEBUG_W("Disconnected from MQTT Server=%s\n", mqtt_server.c_str());
     syslogN("Disconnected from MQTT Server=%s\n", mqtt_server.c_str());
     if (WiFi.isConnected()) {
-     mqttReconnectTimer.once(2, connectToMqtt);
+      mqttReconnectTimer.once(2, connectToMqtt);
     }
   }
 
   if (mainstate.mqttready) publishdatamap();
+
+  if (triggers.wifiscanready)
+  {
+    triggers.wifiscanready = false;
+    int strongestwifiid = -1;
+    int strongestwifirssi = -1000;
+    int currentwifirssi = -1000;
+    int currentwifiid = -1;
+
+    for (int i = 0; i < wifinetworksfound; i++)
+    {
+      if (WiFi.SSID(i) == WiFi.SSID())
+      {
+        if (currentwifirssi < WiFi.RSSI(i))
+        {
+          strongestwifiid = i;
+          strongestwifirssi = WiFi.RSSI(i);
+        }
+        if (WiFi.BSSIDstr(i) == WiFi.BSSIDstr())
+        {
+          currentwifirssi = WiFi.RSSI(i);
+          currentwifiid = i;
+        }
+      }
+
+      String enctype = "None";
+      switch (WiFi.encryptionType(i)) {
+        case ENC_TYPE_WEP:
+          enctype = "WEP";
+          break;
+        case ENC_TYPE_TKIP:
+          enctype = "WPA";
+          break;
+        case ENC_TYPE_CCMP:
+          enctype = "WPA2";
+          break;
+        case ENC_TYPE_NONE:
+          enctype = "None";
+          break;
+        case ENC_TYPE_AUTO:
+          enctype = "Auto";
+          break;
+      }
+
+
+      DEBUG_V(" %d: %s, %s, Ch:%d (%ddBm) %s\n", i, WiFi.SSID(i).c_str(), WiFi.BSSIDstr(i).c_str(), WiFi.channel(i), WiFi.RSSI(i), enctype.c_str());
+    }
+
+    DEBUG_D("CurrentAp ID=%d SSID=%s BSSID=%s RSSI=%d(%d), Strongest AP ID=%d SSID=%s, BSSID=%s RSSI=%d(%d)\n", currentwifiid, WiFi.SSID().c_str(), WiFi.BSSIDstr().c_str(), currentwifirssi, WiFi.RSSI(), strongestwifiid, WiFi.SSID(strongestwifiid).c_str(), WiFi.BSSIDstr(strongestwifiid).c_str(), WiFi.RSSI(strongestwifiid), strongestwifirssi);
+
+    if (!mainstate.accesspoint)
+    {
+      if ((strongestwifiid >= 0) && ((WiFi.RSSI() >= 0) || (currentwifiid == -1) || ((currentwifirssi < -60) && (currentwifiid != strongestwifiid)) || (currentwifirssi + 10 < WiFi.RSSI(strongestwifiid))))
+      {
+        DEBUG_I ("Switching to stronger AP %d (%s, %s, %s)\n", strongestwifiid, WiFi.SSID().c_str(), WiFi.psk().c_str(), WiFi.BSSIDstr(strongestwifiid).c_str());
+        String wifissid = WiFi.SSID();
+        String wifipsk =  WiFi.psk();
+        WiFi.disconnect(false);
+        WiFi.begin(wifissid.c_str(), wifipsk.c_str(), WiFi.channel(strongestwifiid), WiFi.BSSID(strongestwifiid));
+      }
+    }
+
+  }
 
   webserver.handleClient();
 
@@ -1360,10 +1370,10 @@ void loop()
 
 #ifdef WIFIDIMMERDUO
   /*if (Serial.available() > 0)
-  {
+    {
     int serval = Serial.read();
     DEBUG ("Serial Received: %02x\n",serval);
-  }*/
+    }*/
 #endif
 
 #ifdef SONOFFPOWR2
@@ -1438,7 +1448,7 @@ void loop()
 
   if (timertick == 1) // Every 0,1 second read next SDM120 register
   {
-//    Serial.print(".");
+    //    Serial.print(".");
     timertick = 0;
 #ifdef SDM120
     static uint8_t sdmreadcounter = 1;
@@ -1499,7 +1509,7 @@ void loop()
 
     if ((uptime % 10) == 0)
     {
-      if (!mainstate.accesspoint) WiFi.scanNetworksAsync(printScanResult);
+      if (!mainstate.accesspoint) WiFi.scanNetworksAsync(wifiScanReady);
     }
 
     if ((uptime % 60) == 0)
@@ -1772,7 +1782,7 @@ void sonoff_handle()
           else sonoffch_starttime[i] = 0;
 #endif
 #ifdef SONOFF_FLOORHEATING
-          if(i == 0) floorheating_valveon = digitalRead(sonoff_relays[i]) != inverse ? 1 : 0;
+          if (i == 0) floorheating_valveon = digitalRead(sonoff_relays[i]) != inverse ? 1 : 0;
 #endif
           DEBUG_I ("SONOFF RELAY IS %s\n", digitalRead(sonoff_relays[i]) != inverse ? "ON" : "OFF");
           updatemqtt = 1;
@@ -1846,65 +1856,65 @@ void publishdatamap(int32_t packetId, bool publishall, bool init)
   if (mqttClient.connected())
   {
 
-  if (waitingforack)
-  {
-    if (packetId == 0)
+    if (waitingforack)
     {
-      waitingforack = true;
-      // If packetId == 0 resend because packet was not acked
-      String topic = dataMap->getKey(datamappointer);
-      topic = String("home/" + esp_hostname + "/" + topic);
-      dataMapStruct data = dataMap->getData(datamappointer);
-      String payload = data.payload;
-      nextpacketId = mqttClient.publish(topic.c_str(), 1, true, payload.c_str());
-      if (nextpacketId == 0) waitingforack = false;
-    }
-    if (packetId == nextpacketId)
-    {
-      // Packet succesfull delivered proceed to next item
-      String topic = dataMap->getKey(datamappointer);
-      dataMapStruct data = dataMap->getData(datamappointer);
-      data.send = false;
-      dataMap->put(topic, data);
-      datamappointer++;
-      waitingforack = false;
-    }
-  }
-
-  if (!waitingforack)
-  {
-    if (datamappointer < dataMap->size())
-    {
-      nextpacketId = -1;
-      while ((datamappointer < dataMap->size()) && (nextpacketId == -1))
+      if (packetId == 0)
       {
+        waitingforack = true;
+        // If packetId == 0 resend because packet was not acked
+        String topic = dataMap->getKey(datamappointer);
+        topic = String("home/" + esp_hostname + "/" + topic);
+        dataMapStruct data = dataMap->getData(datamappointer);
+        String payload = data.payload;
+        nextpacketId = mqttClient.publish(topic.c_str(), 1, true, payload.c_str());
+        if (nextpacketId == 0) waitingforack = false;
+      }
+      if (packetId == nextpacketId)
+      {
+        // Packet succesfull delivered proceed to next item
         String topic = dataMap->getKey(datamappointer);
         dataMapStruct data = dataMap->getData(datamappointer);
-        //DEBUG ("datamappointer=%d datamapsize=%d send=%d\n", datamappointer, dataMap->size(), data.send);
-        if (data.send)
+        data.send = false;
+        dataMap->put(topic, data);
+        datamappointer++;
+        waitingforack = false;
+      }
+    }
+
+    if (!waitingforack)
+    {
+      if (datamappointer < dataMap->size())
+      {
+        nextpacketId = -1;
+        while ((datamappointer < dataMap->size()) && (nextpacketId == -1))
         {
-          topic = String(mqtt_topicprefix + topic);
-          nextpacketId = mqttClient.publish(topic.c_str(), 1, true, data.payload.c_str());
-          if (nextpacketId > 0) waitingforack = true;
-          DEBUG_D ("MQTT PUBLISHING DATAMAP %s=%s (nextpacketId=%d)\n", topic.c_str(), data.payload.c_str(), nextpacketId);
+          String topic = dataMap->getKey(datamappointer);
+          dataMapStruct data = dataMap->getData(datamappointer);
+          //DEBUG ("datamappointer=%d datamapsize=%d send=%d\n", datamappointer, dataMap->size(), data.send);
+          if (data.send)
+          {
+            topic = String(mqtt_topicprefix + topic);
+            nextpacketId = mqttClient.publish(topic.c_str(), 1, true, data.payload.c_str());
+            if (nextpacketId > 0) waitingforack = true;
+            DEBUG_D ("MQTT PUBLISHING DATAMAP %s=%s (nextpacketId=%d)\n", topic.c_str(), data.payload.c_str(), nextpacketId);
+          }
+          else
+          {
+            datamappointer++;
+          }
         }
-        else
+        if (nextpacketId == -1)
         {
-          datamappointer++;
+          datamappointer = 0;
+          mainstate.mqttready = true;
         }
       }
-      if (nextpacketId == -1)
+      else
       {
         datamappointer = 0;
         mainstate.mqttready = true;
       }
     }
-    else
-    {
-      datamappointer = 0;
-      mainstate.mqttready = true;
-    } 
-  }
   }
 }
 
@@ -2044,7 +2054,7 @@ uint8_t eeprom_read()
     }
     byte eepromchecksum = EEPROM.read(eeprompointer++);
     DEBUG_D("Read from eeprom %d=%s (%d=%d)\n", eeprompointer, data.c_str(), checksum, eepromchecksum);
-    if (eepromchecksum != checksum) 
+    if (eepromchecksum != checksum)
     {
       return 0;
       DEBUG_E("Error reading eeprom!");
@@ -2541,8 +2551,8 @@ void setup() {
 #endif
 
 #ifdef ONEWIREPIN
-    oneWireSensors.setWaitForConversion(false);
-    oneWireSensors.setResolution(12);
+  oneWireSensors.setWaitForConversion(false);
+  oneWireSensors.setResolution(12);
 
 #ifdef OPENTHERM
   if (!oneWireSensors.getAddress(onewire_dcwSupplyWaterThermometer, 0)) {
@@ -2719,8 +2729,8 @@ void processCmdRemoteDebug()
     Serial.write(0x55); //Header
     Serial.write(0x01); //Channel
     Serial.write(0xFF); //Dimvalue
-    Serial.write(0x05); 
-    Serial.write(0xDC); 
+    Serial.write(0x05);
+    Serial.write(0xDC);
     Serial.write(0x0A);
   }
   if (lastCmd == "wdu")
@@ -2731,8 +2741,8 @@ void processCmdRemoteDebug()
     Serial.write(0x55); //Header
     Serial.write(0x01); //Channel
     Serial.write(0x00); //Dimvalue
-    Serial.write(0x05); 
-    Serial.write(0xDC); 
+    Serial.write(0x05);
+    Serial.write(0xDC);
     Serial.write(0x0A);
   }
 #endif
