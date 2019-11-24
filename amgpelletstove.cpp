@@ -1,4 +1,5 @@
 #include <ESP8266WiFi.h>
+#include "espMQTT.h"
 #ifndef D0
 #define D0 0
 #endif
@@ -8,16 +9,10 @@ static String amgpowercmd = "";
 static String amgtempcmd = "";
 static uint8_t amgcmdnr = 0;
 void(*_amgpelletstove_callback)(String, String);
-void(*_amgpelletstove_debug_callback)(String, String);
 
-
-#define DEBUG(message) _amgpelletstove_debug_callback(__FUNCTION__, message);
-
-
-void amgpelletstove_init(void(*callback)(String, String), void(*debugcallback)(String, String))
+void amgpelletstove_init(void(*callback)(String, String))
 {
   _amgpelletstove_callback = callback;
-  _amgpelletstove_debug_callback = debugcallback;
   Serial.setDebugOutput(false);
   Serial.begin(115200, SERIAL_8N1);
   U0C0 = BIT(UCRXI) | BIT(UCBN) | BIT(UCBN + 1) | BIT(UCSBN) | BIT(UCTXI); // Inverse RX + TX
@@ -114,13 +109,13 @@ void _amgpelletstove_sendserial()
       sendcmd = "RDB00068&"; // Extractor sensorlevel
       break;
     case 254:
-      DEBUG("Writing to amg pelletstove:" + amgpowercmd + "\n");
+      DEBUG_V("Writing to amg pelletstove:%s\n",amgpowercmd.c_str());
       sendcmd = amgpowercmd;
       amgpowercmd = "";
       amgcmdnr = 0;
       break;
     case 255:
-      DEBUG("Writing to amg pelletstove:" + amgtempcmd + "\n");
+      DEBUG_V("Writing to amg pelletstove:%s\n", amgtempcmd.c_str());
       sendcmd = amgtempcmd;
       amgtempcmd = "";
       amgcmdnr = 0;
@@ -131,7 +126,7 @@ void _amgpelletstove_sendserial()
       break;
   }
   Serial.print(sendcmd);
-  DEBUG("Writing to amg pelletstove: "+ sendcmd +"\n");
+  DEBUG_V("Writing to amg pelletstove:%s\n",sendcmd.c_str());
 }
 
 void amgpelletstove_handle()
@@ -147,7 +142,7 @@ void amgpelletstove_handle()
     if (serval == '&')
     {
       digitalWrite(NODEMCULEDPIN, 1);
-      DEBUG("Received from amg pelletstove:" + serstr + "\n");
+      DEBUG_V("Received from amg pelletstove:%s\n",serstr.c_str());
       long value = strtol(serstr.substring(2, 5).c_str(), NULL, 16);
       serstr = "";
       switch (amgcmdnr)

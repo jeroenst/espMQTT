@@ -23,14 +23,14 @@
 //#define SYSLOGDEBUG
 
 //#define WEATHER
-//#define AMGPELLETSTOVE
+#define AMGPELLETSTOVE
 //#define BATHROOM
 //#define SERIALLOG
 
 //#define WIFIDIMMERDUO
 //#define DDNS
 //#define GENERIC8266
-#define BEDROOM2
+//#define BEDROOM2
 //#define OPENTHERM
 //#define WATERMETER
 //#define DUCOBOX
@@ -1228,6 +1228,7 @@ void loop()
 
 
       DEBUG_V(" %d: %s, %s, Ch:%d (%ddBm) %s\n", i, WiFi.SSID(i).c_str(), WiFi.BSSIDstr(i).c_str(), WiFi.channel(i), WiFi.RSSI(i), enctype.c_str());
+      yield();
     }
 
     DEBUG_D("CurrentAp ID=%d SSID=%s BSSID=%s RSSI=%d(%d), Strongest AP ID=%d SSID=%s, BSSID=%s RSSI=%d(%d)\n", currentwifiid, WiFi.SSID().c_str(), WiFi.BSSIDstr().c_str(), currentwifirssi, WiFi.RSSI(), strongestwifiid, WiFi.SSID(strongestwifiid).c_str(), WiFi.BSSIDstr(strongestwifiid).c_str(), WiFi.RSSI(strongestwifiid), strongestwifirssi);
@@ -2354,10 +2355,12 @@ void amgpelletstovecallback (String topic, String payload)
   putdatamap(topic, payload);
 }
 
-void logdebug (String function, String message)
-{
-  Debug.printf("(%s) %s", function.c_str(), message.c_str());
-}
+
+
+//void logdebug (String function, String message, loglevel level = DEBUG)
+//{
+ // Debug.printf("(%s) %s", function.c_str(), message.c_str());
+//}
 
 void openthermcallback (String topic, String payload)
 {
@@ -2617,7 +2620,7 @@ void setup() {
 #endif
 
 #ifdef AMGPELLETSTOVE
-  amgpelletstove_init(amgpelletstovecallback, logdebug);
+  amgpelletstove_init(amgpelletstovecallback);
 #endif
 
 #ifdef NEOPIXELPIN
