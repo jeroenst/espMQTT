@@ -24,8 +24,10 @@
 
 //#define WEATHER
 //#define AMGPELLETSTOVE
-#define BATHROOM
+//#define BATHROOM
+//#define SERIALLOG
 
+//#define WIFIDIMMERDUO
 //#define DDNS
 //#define GENERIC8266
 //#define BEDROOM2
@@ -50,7 +52,7 @@
 //#define SOIL
 //#define SONOFFS20_PRINTER
 //#define SONOFFPOW
-//#define SDM120
+#define SDM120
 
 
 #ifdef SONOFFS20_PRINTER
@@ -95,6 +97,13 @@ HardwareSerial serSDM(0);
 #include <SDM.h>;
 SDM sdm(serSDM, 2400, NOT_A_PIN);
 #endif
+
+#ifdef WIFIDIMMERDUO
+#define ESPNAME "WIFIDIMMERDUO"
+#define APONBOOT
+#define ESPLED 4
+#endif
+
 
 #ifdef GENERIC8266
 #define ESPNAME "GENERIC8266"
@@ -619,7 +628,7 @@ void putdatamap(String topic, String value, bool sendupdate = true, bool forcese
 
   if (((datamapstruct.payload != value) || forcesend) && sendupdate)
   {
-    DEBUG ("DATAMAP %s=%s (sendupdate=%d, oldval=%s oldsend=%d forcesend=%d)\n", topic.c_str(), value.c_str(), sendupdate, datamapstruct.payload.c_str(), datamapstruct.send, forcesend);
+    DEBUG_D ("DATAMAP %s=%s (sendupdate=%d, oldval=%s oldsend=%d forcesend=%d)\n", topic.c_str(), value.c_str(), sendupdate, datamapstruct.payload.c_str(), datamapstruct.send, forcesend);
     datamapstruct.send = true;
   }
   datamapstruct.payload = value;
@@ -681,15 +690,15 @@ void initWifi()
   WiFi.setAutoReconnect(false); // We handle reconnect our self
   WiFi.setSleepMode(WIFI_NONE_SLEEP); // When sleep is on regular disconnects occur https://github.com/esp8266/Arduino/issues/5083
   WiFi.mode(WIFI_STA);
-  DEBUG("Wifi hostname=%s\n", esp_hostname.c_str());
+  DEBUG_I("Wifi hostname=%s\n", esp_hostname.c_str());
   WiFi.hostname(esp_hostname);
 }
 
 void connectToWifi()
 {
-  if (!mainstate.wificonnected)
+  if (!mainstate.wificonnected && !mainstate.accesspoint)
   {
-    DEBUG("Connecting to Wi-Fi...\n");
+    DEBUG_I("Connecting to Wi-Fi...\n");
     wifiReconnectTimer.once(30, connectToWifi); // Retry wifi connection in 30 seconds if it fails to connect
     WiFi.begin();
   }
@@ -718,17 +727,18 @@ void initMqtt()
 
 void connectToMqtt()
 {
-  DEBUG("Connecting to Mqtt\n");
+  DEBUG_I("Connecting to Mqtt\n");
   if (!mainstate.mqttconnected)
   {
-    mqttReconnectTimer.once(30, connectToMqtt); // retry over 30 seconds if connection can not be established
+    mqttClient.disconnect();
     mqttClient.connect();
+    mqttReconnectTimer.once(30, connectToMqtt); // retry over 30 seconds if connection can not be established
   }
 }
 
 void disconnectMqtt()
 {
-  DEBUG("Disconnecting Mqtt\n");
+  DEBUG_W("Disconnecting Mqtt\n");
   mqttReconnectTimer.detach();
   mqttClient.disconnect();
   mainstate.mqttconnected = false;
@@ -737,7 +747,7 @@ void disconnectMqtt()
 }
 
 void onMqttConnect(bool sessionPresent) {
-  DEBUG("Connected to MQTT sessionPresent=%d\n", sessionPresent);
+  DEBUG_I("Connected to MQTT sessionPresent=%d\n", sessionPresent);
   mqttReconnectTimer.detach();
   mainstate.mqttconnected = true;
   triggers.mqttconnected = true;
@@ -745,29 +755,25 @@ void onMqttConnect(bool sessionPresent) {
 
 void onMqttDisconnect(AsyncMqttClientDisconnectReason reason)
 {
-  DEBUG("Disconnected from MQTT reason:%d\n", reason);
+  DEBUG_W("Disconnected from MQTT reason:%d\n", reason);
 
   if (reason == AsyncMqttClientDisconnectReason::TLS_BAD_FINGERPRINT) {
-    DEBUG("Bad server fingerprint.\n");
+    DEBUG_W("Bad server fingerprint.\n");
   }
 
   mainstate.mqttconnected = false;
   mainstate.mqttready = false;
   triggers.mqttdisconnected = true;
-
-  if (WiFi.isConnected()) {
-    mqttReconnectTimer.once(2, connectToMqtt);
-  }
 }
 
 void onMqttUnsubscribe(uint16_t packetId) {
-  DEBUG ("Unsubscribe acknowledged. packetid=%d\n" + packetId);
+  DEBUG_I ("Unsubscribe acknowledged. packetid=%d\n" + packetId);
 }
 
 
 void mqttdosubscriptions(int32_t packetId = -1)
 {
-  DEBUG("mqttdosubscriptions (%d)\n", packetId);
+  DEBUG_D("mqttdosubscriptions (%d)\n", packetId);
   static int32_t nextpacketid = -1;
   static uint16_t nextsubscribe = 0;
   bool startpublish = false;
@@ -817,26 +823,26 @@ void mqttdosubscriptions(int32_t packetId = -1)
 
   if (subscribetopic == "") publishdatamap(-1, true, true); // When subscibtion has finished start publishing of datamap
   else nextpacketid = mqttClient.subscribe(subscribetopic.c_str() , 1);
-  DEBUG("mqttdosubscriptions end nextpacketid=%d\n", nextpacketid);
+  DEBUG_V("mqttdosubscriptions end nextpacketid=%d\n", nextpacketid);
 }
 
 void onMqttSubscribe(uint16_t packetId, uint8_t qos)
 {
-  DEBUGV ("Subscribe acknowledged packetid=%d qos=%d\n", packetId, qos);
+  DEBUG_V ("Subscribe acknowledged packetid=%d qos=%d\n", packetId, qos);
   mqttdosubscriptions(packetId);
 }
 
 
 void onMqttPublish(uint16_t packetId)
 {
-  DEBUGV ("Publish acknowledged packetid=%d\n", packetId);
+  DEBUG_V ("Publish acknowledged packetid=%d\n", packetId);
   publishdatamap(packetId);
 }
 
 void initSerial()
 {
   Serial.setRxBufferSize(2048);
-#if defined(MH_Z19) || defined(OPENTHERM) || defined(GROWATT)
+#if defined(MH_Z19) || defined(OPENTHERM) || defined(GROWATT) || defined (WIFIDIMMERDUO)
   Serial.setDebugOutput(false);
   Serial.begin(9600);  //Init serial 9600 baud
 #elif defined (SONOFFPOWR2)
@@ -873,12 +879,12 @@ void update_dht()
   // Check if any reads failed and exit early (to try again).
   if (isnan(temp) || isnan(rh))
   {
-    DEBUG("Reading DHT22 failed!\n");
+    DEBUG_E("Reading DHT22 failed!\n");
     if (errors < 255) errors++;
   }
   else errors = 0;
 
-  DEBUG("%s", ("dht22temp=" + String(temp, 1) + " dht22rh=" + String(rh, 1) + " dht22hi=" + String(hi, 1) + "\n").c_str());
+  DEBUG_I("%s", ("DHT22 temp=" + String(temp, 1) + " rh=" + String(rh, 1) + " hi=" + String(hi, 1) + "\n").c_str());
 
   if (errors == 0)
   {
@@ -911,7 +917,7 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
     payloadstring += char(payload[i]);
   }
   String topicstring = topic;
-  DEBUG("MQTT RECEIVED topic=%s payload=%s\n", topicstring.c_str(), payloadstring.c_str());
+  DEBUG_D("MQTT RECEIVED topic=%s payload=%s\n", topicstring.c_str(), payloadstring.c_str());
 
 #ifdef SONOFFCH
   for (byte i = 0; i < SONOFFCH; i++)
@@ -950,17 +956,17 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
 #ifdef OPENTHERM
   if (String(topic) == String(mqtt_topicprefix + "setthermostattemporary"))
   {
-    DEBUG("RECEIVED SETTHERMOSTATTEMPORARY %s\n", payloadstring.c_str());
+    DEBUG_I("RECEIVED SETTHERMOSTATTEMPORARY %s\n", payloadstring.c_str());
     opentherm_setthermosttattemporary(payloadstring.toFloat());
   }
   if (String(topic) == String(mqtt_topicprefix + "setthermostatcontinue"))
   {
-    DEBUG("RECEIVED SETTHERMOSTATCONTINUE %s\n", payloadstring.c_str());
+    DEBUG_I("RECEIVED SETTHERMOSTATCONTINUE %s\n", payloadstring.c_str());
     opentherm_setthermosttatcontinue(payloadstring.toFloat());
   }
   if (String(topic) == String(mqtt_topicprefix + "setchwatertemperature"))
   {
-    DEBUG("RECEIVED SETCHWATERTEMPERATURE %s\n", payloadstring.c_str());
+    DEBUG_I("RECEIVED SETCHWATERTEMPERATURE %s\n", payloadstring.c_str());
     opentherm_setchwatertemperature(payloadstring.toFloat());
   }
 #endif
@@ -1025,7 +1031,7 @@ void write_oled_display()
   int lcdline = -9;
 #ifdef OLED_ADDRESS
 
-  DEBUG ("Writing OLED display\n");
+  DEBUG_V ("Writing OLED display\n");
   display.clear();
   int rssi = WiFi.RSSI();
 
@@ -1095,7 +1101,7 @@ void handle_noise()
     analogmean = (analogread + (analogmean * 99)) / 100;
     if (analogmeanready++ >= 200)
     {
-      DEBUG("Analog read=%d, Analog mean=%.0f\n", analogread, analogmean);
+      DEBUG_D("Analog read=%d, Analog mean=%.0f\n", analogread, analogmean);
       putdatamap ("noise", String(analogmean, 0));
       analogmeanready = 0;
     }
@@ -1106,7 +1112,7 @@ void handle_noise()
 
 void printScanResult(int networksFound)
 {
-  DEBUG("WiFiScan finished, %d network(s) found\n", networksFound);
+  DEBUG_D("WiFiScan finished, %d network(s) found\n", networksFound);
   int strongestwifiid = -1;
   int strongestwifirssi = -1000;
   int currentwifirssi = -1000;
@@ -1148,19 +1154,21 @@ void printScanResult(int networksFound)
     }
 
     
-    DEBUG(" %d: %s, %s, Ch:%d (%ddBm) %s\n", i, WiFi.SSID(i).c_str(), WiFi.BSSIDstr(i).c_str(), WiFi.channel(i), WiFi.RSSI(i), enctype.c_str());
-
+// THIS CAUSES CRASH     DEBUG_D(" %d: %s, %s, Ch:%d (%ddBm) %s\n", i, WiFi.SSID(i).c_str(), WiFi.BSSIDstr(i).c_str(), WiFi.channel(i), WiFi.RSSI(i), enctype.c_str());
   }
 
-  DEBUG("CurrentAp ID=%d SSID=%s BSSID=%s RSSI=%d(%d), Strongest AP ID=%d SSID=%s, BSSID=%s RSSI=%d(%d)\n", currentwifiid, WiFi.SSID().c_str(), WiFi.BSSIDstr().c_str(), currentwifirssi, WiFi.RSSI(), strongestwifiid, WiFi.SSID(strongestwifiid).c_str(), WiFi.BSSIDstr(strongestwifiid).c_str(), WiFi.RSSI(strongestwifiid), strongestwifirssi);
+  DEBUG_I("CurrentAp ID=%d SSID=%s BSSID=%s RSSI=%d(%d), Strongest AP ID=%d SSID=%s, BSSID=%s RSSI=%d(%d)\n", currentwifiid, WiFi.SSID().c_str(), WiFi.BSSIDstr().c_str(), currentwifirssi, WiFi.RSSI(), strongestwifiid, WiFi.SSID(strongestwifiid).c_str(), WiFi.BSSIDstr(strongestwifiid).c_str(), WiFi.RSSI(strongestwifiid), strongestwifirssi);
 
-  if ((strongestwifiid >= 0) && ((WiFi.RSSI() >= 0) || (currentwifiid == -1) || ((currentwifirssi < -60) && (currentwifiid != strongestwifiid)) || (currentwifirssi + 10 < WiFi.RSSI(strongestwifiid))))
+  if (!mainstate.accesspoint)
   {
-    DEBUG ("Connecting to AP %d (%s, %s, %s)\n", strongestwifiid, WiFi.SSID().c_str(), WiFi.psk().c_str(), WiFi.BSSIDstr(strongestwifiid).c_str());
-    String wifissid = WiFi.SSID();
-    String wifipsk =  WiFi.psk();
-    WiFi.disconnect(false);
-    WiFi.begin(wifissid.c_str(), wifipsk.c_str(), WiFi.channel(strongestwifiid), WiFi.BSSID(strongestwifiid));
+    if ((strongestwifiid >= 0) && ((WiFi.RSSI() >= 0) || (currentwifiid == -1) || ((currentwifirssi < -60) && (currentwifiid != strongestwifiid)) || (currentwifirssi + 10 < WiFi.RSSI(strongestwifiid))))
+    {
+      DEBUG_I ("Switching to stronger AP %d (%s, %s, %s)\n", strongestwifiid, WiFi.SSID().c_str(), WiFi.psk().c_str(), WiFi.BSSIDstr(strongestwifiid).c_str());
+      String wifissid = WiFi.SSID();
+      String wifipsk =  WiFi.psk();
+      WiFi.disconnect(false);
+      WiFi.begin(wifissid.c_str(), wifipsk.c_str(), WiFi.channel(strongestwifiid), WiFi.BSSID(strongestwifiid));
+    }
   }
 }
 
@@ -1175,6 +1183,7 @@ void loop()
   ESP.wdtFeed(); // Prevent HW WD to kick in...
   ArduinoOTA.handle();
   Debug.handle();
+  yield();
 
 #ifdef DDNS
   EasyDDNS.update(10000);
@@ -1185,7 +1194,7 @@ void loop()
   if (triggers.wificonnected)
   {
     triggers.wificonnected = false;
-    DEBUG("Connected to WiFi SSID=%s RSSI=%d\n", WiFi.SSID().c_str(), WiFi.RSSI());
+    DEBUG_I("Connected to WiFi SSID=%s RSSI=%d\n", WiFi.SSID().c_str(), WiFi.RSSI());
     syslogN("Connected to WiFi SSID=%s RSSI=%d\n", WiFi.SSID().c_str(), WiFi.RSSI());
     initMqtt();
     connectToMqtt();
@@ -1201,7 +1210,7 @@ void loop()
   if (triggers.wifidisconnected)
   {
     triggers.wifidisconnected = false;
-    DEBUG("Disconnected from Wi-Fi.\n");
+    DEBUG_W("Disconnected from Wi-Fi.\n");
     disconnectMqtt();
     //if (!mainstate.accesspoint) wifiReconnectTimer.once(2, connectToWifi); // trying to connect to wifi can cause AP to fail
   }
@@ -1209,7 +1218,7 @@ void loop()
   if (triggers.mqttconnected)
   {
     triggers.mqttconnected = false;
-    DEBUG("Connected to MQTT Server=%s\n", mqtt_server.c_str());
+    DEBUG_I("Connected to MQTT Server=%s\n", mqtt_server.c_str());
     syslogN("Connected to MQTT Server=%s\n", mqtt_server.c_str());
     update_systeminfo(true);
     mqttdosubscriptions();
@@ -1218,8 +1227,11 @@ void loop()
   if (triggers.mqttdisconnected)
   {
     triggers.mqttdisconnected = false;
-    DEBUG("Disconnected from MQTT Server=%s\n", mqtt_server.c_str());
+    DEBUG_W("Disconnected from MQTT Server=%s\n", mqtt_server.c_str());
     syslogN("Disconnected from MQTT Server=%s\n", mqtt_server.c_str());
+    if (WiFi.isConnected()) {
+     mqttReconnectTimer.once(2, connectToMqtt);
+    }
   }
 
   if (mainstate.mqttready) publishdatamap();
@@ -1344,6 +1356,14 @@ void loop()
 
 #ifdef AMGPELLETSTOVE
   amgpelletstove_handle();
+#endif
+
+#ifdef WIFIDIMMERDUO
+  /*if (Serial.available() > 0)
+  {
+    int serval = Serial.read();
+    DEBUG ("Serial Received: %02x\n",serval);
+  }*/
 #endif
 
 #ifdef SONOFFPOWR2
@@ -1479,7 +1499,7 @@ void loop()
 
     if ((uptime % 10) == 0)
     {
-      WiFi.scanNetworksAsync(printScanResult);
+      if (!mainstate.accesspoint) WiFi.scanNetworksAsync(printScanResult);
     }
 
     if ((uptime % 60) == 0)
@@ -1494,7 +1514,7 @@ void loop()
       {
         syslogI("Uptime=%s DateTime=%s\n", uptimestr, strtime.c_str());
       }
-      DEBUG("Uptime=%s DateTime=%s\n", uptimestr, strtime.c_str());
+      DEBUG_I("Uptime=%s DateTime=%s\n", uptimestr, strtime.c_str());
     }
 
 
@@ -1512,15 +1532,17 @@ void loop()
 #ifdef APONBOOT
     if ((uptime == 30) && (WiFi.status() != WL_CONNECTED))
     {
-      DEBUG("Connection to wifi failed, starting accesspoint");
-      if (!WiFi.softAP(WiFi.hostname().c_str(), "esplogin", 6, 0)) DEBUG("Failed setting WiFi.softAP()");
-      WiFi.mode(WIFI_AP_STA);
+      DEBUG_W("Connection to wifi failed, starting accesspoint\n");
+      mainstate.accesspoint = true;
+      if (!WiFi.softAP(WiFi.hostname().c_str(), "esplogin", 6, 0)) DEBUG_E("Failed setting WiFi.softAP()");
+      WiFi.mode(WIFI_AP);
       esp_password = "esplogin";
     }
     if (uptime == 330)
     {
-      DEBUG("Stopping accesspoint");
+      DEBUG_I("Stopping accesspoint");
       WiFi.mode(WIFI_STA);
+      mainstate.accesspoint = false;
     }
 #endif
 
@@ -1552,29 +1574,29 @@ void loop()
 #ifdef ONEWIREPIN
     if (uptime % 10 == 0)
     {
-      DEBUG("Requesting DS18B20 temperatures...\n");
+      DEBUG_V("Requesting DS18B20 temperatures...\n");
       oneWireSensors.requestTemperatures();
       float temperature;
 #ifdef OPENTHERM
       temperature = oneWireSensors.getTempC(onewire_chReturnWaterThermometer);
-      DEBUG("chreturnwatertemp=%f\n", temperature);
+      DEBUG_I("chreturnwatertemp=%f\n", temperature);
       if ((onewire_chReturnWaterEnabled) && (temperature != -127)) putdatamap("ow/ch/returnwatertemperature", String(temperature, 1));
       else putdatamap("ow/ch/returnwatertemperature", "-");
       temperature = oneWireSensors.getTempC(onewire_dcwSupplyWaterThermometer);
-      DEBUG("dcwsupplywatertemp=%f\n", temperature);
+      DEBUG_I("dcwsupplywatertemp=%f\n", temperature);
       if ((onewire_dcwSupplyWaterEnabled) && (temperature != -127)) putdatamap("ow/dcw/temperature", String(temperature, 1));
       else putdatamap("ow/dcw/temperature", "-");
 #endif
 #ifdef WEATHER
       temperature = oneWireSensors.getTempC(onewire_OutsideAddress);
-      DEBUG("Outside Temperature=%f\n", temperature);
+      DEBUG_I("Outside Temperature=%f\n", temperature);
       if (temperature != -127) putdatamap("temperature", String(temperature, 1));
       else putdatamap("temperature", "-");
 
 #endif
 #ifdef SONOFF_FLOORHEATING
       temperature = oneWireSensors.getTempC(onewire_floorWaterAddress);
-      DEBUG("Floor Water Temperature=%f\n", temperature);
+      DEBUG_I("Floor Water Temperature=%f\n", temperature);
       bool inverse = false;
 #ifdef SONOFFCHINVERSE
       inverse = true;
@@ -1617,7 +1639,7 @@ void loop()
       wifiTimer = 0;
       if (WiFi.status() != previouswifistatus)
       {
-        DEBUG("Wifi connected to %s\n", WiFi.SSID().c_str());
+        DEBUG_I("Wifi connected to %s\n", WiFi.SSID().c_str());
 #ifdef NEOPIXELPIN
         neopixelleds.setPixelColor(0, neopixelleds.Color(30, 15, 0));
         neopixelleds.show();
@@ -1736,7 +1758,7 @@ void sonoff_handle()
       {
         if (sonoff_oldbuttons[i] != buttonstate)
         {
-          DEBUG ("SONOFF BUTTON %d PRESSED\n", i);
+          DEBUG_I ("SONOFF BUTTON %d PRESSED\n", i);
           digitalWrite(sonoff_relays[i], digitalRead(sonoff_relays[i]) ? 0 : 1);
 #ifdef SONOFF_LEDS
           digitalWrite(sonoff_leds[i], (digitalRead(sonoff_relays[i]) ? 1 : 0) == sonoff_ledinverse ? 0 : 1);
@@ -1749,6 +1771,10 @@ void sonoff_handle()
           if (digitalRead(sonoff_relays[i]) != inverse) sonoffch_starttime[i] = uptime;
           else sonoffch_starttime[i] = 0;
 #endif
+#ifdef SONOFF_FLOORHEATING
+          if(i == 0) floorheating_valveon = digitalRead(sonoff_relays[i]) != inverse ? 1 : 0;
+#endif
+          DEBUG_I ("SONOFF RELAY IS %s\n", digitalRead(sonoff_relays[i]) != inverse ? "ON" : "OFF");
           updatemqtt = 1;
         }
       }
@@ -1800,7 +1826,7 @@ void publishdatamap(int32_t packetId, bool publishall, bool init)
     nextpacketId = -1;
   }
 
-  if ((packetId != -1) || publishall) DEBUG("Publishdatamap packetId=%d publishall=%d datamappointer=%d datamapsize=%d nextpacketid=%d waintingforack=%d\n", packetId, publishall, datamappointer, dataMap->size(), nextpacketId, waitingforack);
+  if ((packetId != -1) || publishall) DEBUG_V("Publishdatamap packetId=%d publishall=%d datamappointer=%d datamapsize=%d nextpacketid=%d waintingforack=%d\n", packetId, publishall, datamappointer, dataMap->size(), nextpacketId, waitingforack);
 
   if (publishall)
   {
@@ -1860,7 +1886,7 @@ void publishdatamap(int32_t packetId, bool publishall, bool init)
           topic = String(mqtt_topicprefix + topic);
           nextpacketId = mqttClient.publish(topic.c_str(), 1, true, data.payload.c_str());
           if (nextpacketId > 0) waitingforack = true;
-          DEBUG ("MQTT PUBLISHING DATAMAP %s=%s (nextpacketId=%d)\n", topic.c_str(), data.payload.c_str(), nextpacketId);
+          DEBUG_D ("MQTT PUBLISHING DATAMAP %s=%s (nextpacketId=%d)\n", topic.c_str(), data.payload.c_str(), nextpacketId);
         }
         else
         {
@@ -1877,7 +1903,7 @@ void publishdatamap(int32_t packetId, bool publishall, bool init)
     {
       datamappointer = 0;
       mainstate.mqttready = true;
-    }
+    } 
   }
   }
 }
@@ -1893,7 +1919,7 @@ void flashbutton_handle()
     if ((digitalRead(FLASHBUTTON) == 0) && (flashbuttontimer < (2 ^ (sizeof(flashbuttontimer) * 8))))
     {
       flashbuttontimer++;
-      DEBUG("Flash button is pressed, flashbuttontimer=%d\n", flashbuttontimer);
+      DEBUG_I("Flash button is pressed, flashbuttontimer=%d\n", flashbuttontimer);
     }
     else
     {
@@ -1904,16 +1930,16 @@ void flashbutton_handle()
     {
       flashbuttonstatus = 2;
       esp_password = "esplogin";
-      DEBUG("Web Password defaulted to esplogin until reboot!\n");
+      DEBUG_I("Web Password defaulted to esplogin until reboot!\n");
       mainstate.defaultpassword = true;
     }
 
     if (flashbuttontimer == 6) // After 6 seconds start access point
     {
       flashbuttonstatus = 1;
-      if (!WiFi.softAP(WiFi.hostname().c_str(), "esplogin", 6, 0)) DEBUG("Failed setting WiFi.softAP()");
-      WiFi.mode(WIFI_AP_STA);
-      DEBUG("Wifi Accesspoint started!\n");
+      if (!WiFi.softAP(WiFi.hostname().c_str(), "esplogin", 6, 0)) DEBUG_E("Failed setting WiFi.softAP()");
+      WiFi.mode(WIFI_AP);
+      DEBUG_I("Wifi Accesspoint started!\n");
       mainstate.accesspoint = true;
     }
 
@@ -1924,7 +1950,7 @@ void flashbutton_handle()
 
 uint8_t oldeeprom_read(String * data, byte eepromindex)
 {
-  DEBUG("%s", String("read_oldeeprom(" + String(eepromindex) + ");\n").c_str());
+  DEBUG_D("%s", String("read_oldeeprom(" + String(eepromindex) + ");\n").c_str());
   String eepromstring = "";
   char calcchecksum = 20;
   char readchecksum = 0;
@@ -1958,22 +1984,22 @@ byte oldeeprom_read()
 
 void eeprom_commit()
 {
-  DEBUG("commit_eeprom();\n");
+  DEBUG_D("commit_eeprom();\n");
   int eeprompointer = 0;
   for (int i = 0; i < eepromMap->size(); i++)
   {
     uint8_t checksum = 20;
     String eepromdata = eepromMap->get(i);
-    DEBUG("EEPROM.write(%d,%d) (length)\n", eeprompointer, eepromdata.length() + 1);
+    DEBUG_D("EEPROM.write(%d,%d) (length)\n", eeprompointer, eepromdata.length() + 1);
     EEPROM.write(eeprompointer++, eepromdata.length() + 1);
     for (int pos = 0; pos < eepromdata.length(); pos++)
     {
       char chr = eepromdata.c_str()[pos];
-      DEBUG("EEPROM.write(%d,%c) (data)\n", eeprompointer, chr);
+      DEBUG_D("EEPROM.write(%d,%c) (data)\n", eeprompointer, chr);
       EEPROM.write(eeprompointer++, chr);
       checksum += chr;
     }
-    DEBUG("EEPROM.write(%d,%d) (checksum)\n", eeprompointer, checksum);
+    DEBUG_D("EEPROM.write(%d,%d) (checksum)\n", eeprompointer, checksum);
     EEPROM.write(eeprompointer++, checksum);
   }
   EEPROM.write(eeprompointer++, 0);
@@ -1982,7 +2008,7 @@ void eeprom_commit()
 
 void eeprom_write(String value, int eepromindex)
 {
-  DEBUG("eeprom_write %d,%s\n", eepromindex, value.c_str());
+  DEBUG_D("eeprom_write %d,%s\n", eepromindex, value.c_str());
   for (int i = 0; i < eepromindex; i++)
   {
     if (!eepromMap->has(i)) eepromMap->put(i, "");
@@ -2001,7 +2027,7 @@ void eeprom_init ()
 
 uint8_t eeprom_read()
 {
-  DEBUG("eeprom_read();\n");
+  DEBUG_D("eeprom_read();\n");
   int eeprompointer = 0;
   int index = 0;
   while (eeprompointer < 512)
@@ -2017,8 +2043,12 @@ uint8_t eeprom_read()
       checksum += char(EEPROM.read(eeprompointer++));
     }
     byte eepromchecksum = EEPROM.read(eeprompointer++);
-    DEBUG("Read from eeprom %d=%s (%d=%d)\n", eeprompointer, data.c_str(), checksum, eepromchecksum);
-    if (eepromchecksum != checksum) return 0;
+    DEBUG_D("Read from eeprom %d=%s (%d=%d)\n", eeprompointer, data.c_str(), checksum, eepromchecksum);
+    if (eepromchecksum != checksum) 
+    {
+      return 0;
+      DEBUG_E("Error reading eeprom!");
+    }
     eepromMap->put(index++, data);
   }
   return 1;
@@ -2026,10 +2056,10 @@ uint8_t eeprom_read()
 
 uint8_t eeprom_read(String * data, byte eepromindex)
 {
-  DEBUG("eeprom_read(%d)\n", eepromindex);
+  DEBUG_V("eeprom_read(%d)\n", eepromindex);
   if (eepromindex >= eepromMap->size()) return 0;
   *data = eepromMap->getData(eepromindex);
-  DEBUG("eeprom_read(%d)=%s\n", eepromindex, data->c_str());
+  DEBUG_D("eeprom_read(%d)=%s\n", eepromindex, data->c_str());
   return 1;
 }
 
@@ -2099,13 +2129,12 @@ uint8_t MHZ19_handle(int *ppm, int *temp)
     readtime = 0;
     if (MHZ19_read(ppm, temp))
     {
-      DEBUG("MHZ19 ppm=%d\n", *ppm);
-      DEBUG("MHZ19 temp=%d\n", *temp);
+      DEBUG_I("MHZ19 ppm=%d temp=%d\n", *ppm, *temp);
       return 1;
     }
     else
     {
-      DEBUG("MHZ19 read error!\n");
+      DEBUG_E("MHZ19 read error!\n");
       return -1;
     }
   }
@@ -2117,7 +2146,7 @@ void MHZ19_send_request_cmd()
   uint8_t cmd[9] = {0xFF, 0x01, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00, 0x79};
   // command to ask for data
 
-  DEBUG("Sending MHZ19 request packet...\n");
+  DEBUG_V("Sending MHZ19 request packet...\n");
 
   Serial.flush();
   Serial.write(cmd, 9); //request PPM CO2
@@ -2129,7 +2158,7 @@ bool MHZ19_read(int *ppm, int *temp)
   bool error = 0;
   uint8_t response[9]; // for answer
 
-  DEBUG("Receiving MHZ19 data...\n");
+  DEBUG_D("Receiving MHZ19 data...\n");
 
   // The serial stream can get out of sync. The response starts with 0xff, try to resync.
   uint8_t maxcounter = 0;
@@ -2164,7 +2193,7 @@ bool MHZ19_read(int *ppm, int *temp)
   }
   else
   {
-    DEBUG("Invalid response from MHZ_19 CO2 sensor!\n");
+    DEBUG_E("Invalid response from MHZ_19 CO2 sensor!\n");
     if (errorcounter < 255) errorcounter++;
     if (errorcounter == 5)
     {
@@ -2301,7 +2330,7 @@ void handleJsonData() {
 }
 
 void handleWWWRoot() {
-  DEBUG("New webclient connected...\n");
+  DEBUG_I("New webclient connected...\n");
   webserver.send_P(200, "text/html", webpage_P);
 }
 
@@ -2356,7 +2385,7 @@ void setup() {
 #endif
 
   Debug.begin("");
-  DEBUG("\n\nInitializing ESP8266...\n\n");
+  DEBUG_I("\n\nInitializing ESP8266...\n\n");
 
   char buffer[25];
   snprintf(buffer, 25, "%08X", ESP.getChipId());
@@ -2365,65 +2394,65 @@ void setup() {
   sntp_set_timezone(1);
   sntp_setservername(0, "nl.pool.ntp.org");
   // Read settings from EEPROM
-  DEBUG("Reading internal EEPROM...\n");
+  DEBUG_D("Reading internal EEPROM...\n");
   eeprom_init();
   if (!eeprom_read(&mqtt_server, 0))
   {
-    DEBUG("Error reading mqtt server from internal eeprom\n");
+    DEBUG_E("Error reading mqtt server from internal eeprom\n");
   }
   if (!eeprom_read(&mqtt_username, 1))
   {
-    DEBUG("Error reading mqtt username from internal eeprom\n");
+    DEBUG_E("Error reading mqtt username from internal eeprom\n");
   }
-  DEBUG("mqtt username=%s\n", mqtt_username.c_str());
+  DEBUG_D("mqtt username=%s\n", mqtt_username.c_str());
 
   if (!eeprom_read(&mqtt_password, 2))
   {
-    DEBUG("Error reading mqtt password from internal eeprom\n");
+    DEBUG_E("Error reading mqtt password from internal eeprom\n");
   }
-  DEBUG("mqtt password=%s\n", mqtt_password.c_str());
+  DEBUG_D("mqtt password=%s\n", mqtt_password.c_str());
 
   if (!eeprom_read(&esp_password, 3))
   {
-    DEBUG("Error reading esp password from internal eeprom\n");
+    DEBUG_E("Error reading esp password from internal eeprom\n");
   }
-  DEBUG("esp password=%s\n", esp_password.c_str());
+  DEBUG_D("esp password=%s\n", esp_password.c_str());
 
   if (!eeprom_read(&esp_hostname, 4))
   {
-    DEBUG("Error reading hostname from internal eeprom\n");
+    DEBUG_E("Error reading hostname from internal eeprom\n");
     esp_hostname = ESPNAME;
   }
-  DEBUG("esp hostname=%s\n", esp_hostname.c_str());
+  DEBUG_D("esp hostname=%s\n", esp_hostname.c_str());
 
   String mqttportstr = "";
   if (!eeprom_read(&mqttportstr, 5))
   {
-    DEBUG("Error reading mqttport from internal eeprom\n");
+    DEBUG_E("Error reading mqttport from internal eeprom\n");
   }
   else
   {
     if ((mqttportstr != "") && (mqttportstr.toInt() > 0 ) && (mqttportstr.toInt() < 65536)) mqtt_port = mqttportstr.toInt();
   }
-  DEBUG("mqtt port=%d\n", mqtt_port);
+  DEBUG_D("mqtt port=%d\n", mqtt_port);
 
   String mqttsslstr = "";
   if (!eeprom_read(&mqttsslstr, 6))
   {
-    DEBUG("Error reading mqtt ssl from internal eeprom\n");
+    DEBUG_E("Error reading mqtt ssl from internal eeprom\n");
   }
   else
   {
     if (mqttsslstr != "") mqtt_ssl = mqttsslstr == "1" ? 1 : 0;
   }
-  DEBUG("mqtt ssl=%d\n", mqtt_ssl);
+  DEBUG_D("mqtt ssl=%d\n", mqtt_ssl);
 
   if (!eeprom_read(&mqtt_topicprefix, 7))
   {
-    DEBUG("Error reading mqtt main topic from internal eeprom\n");
+    DEBUG_E("Error reading mqtt main topic from internal eeprom\n");
     mqtt_topicprefix = "home/" + esp_hostname + "/";
   }
-  DEBUG("mqtt topicprefix=%s\n", mqtt_topicprefix.c_str());
+  DEBUG_D("mqtt topicprefix=%s\n", mqtt_topicprefix.c_str());
 
 #ifdef DDNS
   EasyDDNS.service("duckdns");
@@ -2450,8 +2479,8 @@ void setup() {
   syslog.appName(ESPNAME);
   syslog.defaultPriority(LOG_KERN);
 
-  DEBUG("ESP8266 Started...\n");
-  DEBUG("Hostname=%s\n", WiFi.hostname().c_str());
+  DEBUG_I("ESP8266 Started...\n");
+  DEBUG_I("Hostname=%s\n", WiFi.hostname().c_str());
 
   ArduinoOTA.setPassword(esp_password.c_str());
 
@@ -2517,11 +2546,11 @@ void setup() {
 
 #ifdef OPENTHERM
   if (!oneWireSensors.getAddress(onewire_dcwSupplyWaterThermometer, 0)) {
-    DEBUG("Unable to find address for onewire_dcwSupplyWaterThermometer\n");
+    DEBUG_E("Unable to find address for onewire_dcwSupplyWaterThermometer\n");
   }
   else onewire_dcwSupplyWaterEnabled = true;
   if (!oneWireSensors.getAddress(onewire_chReturnWaterThermometer, 1)) {
-    DEBUG("Unable to find address for Device onewire_chReturnWaterThermometer\n");
+    DEBUG_E("Unable to find address for Device onewire_chReturnWaterThermometer\n");
 
   }
   else onewire_chReturnWaterEnabled = true;
@@ -2529,13 +2558,13 @@ void setup() {
 
 #ifdef WEATHER
   if (!oneWireSensors.getAddress(onewire_OutsideAddress, 0)) {
-    DEBUG("Unable to find address for onewire_outsidetemp\n");
+    DEBUG_E("Unable to find address for onewire_outsidetemp\n");
   }
 #endif
 
 #ifdef SONOFF_FLOORHEATING
   if (!oneWireSensors.getAddress(onewire_floorWaterAddress, 0)) {
-    DEBUG("Unable to find address for onewire_floorwater\n");
+    DEBUG_E("Unable to find address for onewire_floorwater\n");
   }
 #endif
 #endif
@@ -2613,7 +2642,7 @@ void setup() {
 
 #ifdef DHTPIN
   dht.begin();
-#endif;
+#endif
 }
 
 void processCmdRemoteDebug()
@@ -2680,4 +2709,33 @@ void processCmdRemoteDebug()
     i2cEeprom_write(watermeter_getliters());
   }
 #endif
+
+#ifdef WIFIDIMMERDUO
+  if (lastCmd == "wda")
+  {
+    DEBUG ("SENDING CMD WDA TO MCU\n");
+    Serial.flush();
+    Serial.write(0xFF); //Header
+    Serial.write(0x55); //Header
+    Serial.write(0x01); //Channel
+    Serial.write(0xFF); //Dimvalue
+    Serial.write(0x05); 
+    Serial.write(0xDC); 
+    Serial.write(0x0A);
+  }
+  if (lastCmd == "wdu")
+  {
+    DEBUG ("SENDING CMD WDU TO MCU\n");
+    Serial.flush();
+    Serial.write(0xFF); //Header
+    Serial.write(0x55); //Header
+    Serial.write(0x01); //Channel
+    Serial.write(0x00); //Dimvalue
+    Serial.write(0x05); 
+    Serial.write(0xDC); 
+    Serial.write(0x0A);
+  }
+#endif
+
+
 }
