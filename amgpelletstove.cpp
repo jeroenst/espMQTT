@@ -55,8 +55,8 @@ void amgpelletstove_receivemqtt(String topicstring, String payloadstring)
 void _amgpelletstove_sendserial()
 {
   amgcmdnr++;
-  if (amgpowercmd != "") amgcmdnr = 254;
-  else if (amgtempcmd != "") amgcmdnr = 255;
+  if (amgpowercmd != "") amgcmdnr = 253;
+  else if (amgtempcmd != "") amgcmdnr = 254;
   digitalWrite(NODEMCULEDPIN, 0);
   Serial.write (27);
   static String sendcmd; // needs to be static otherwise debug call fails..
@@ -108,17 +108,17 @@ void _amgpelletstove_sendserial()
     case 15:
       sendcmd = "RDB00068&"; // Extractor sensorlevel
       break;
-    case 254:
+    case 253:
       DEBUG_V("Writing to amg pelletstove:%s\n",amgpowercmd.c_str());
       sendcmd = amgpowercmd;
       amgpowercmd = "";
-      amgcmdnr = 0;
+      amgcmdnr = 255;
       break;
-    case 255:
+    case 254:
       DEBUG_V("Writing to amg pelletstove:%s\n", amgtempcmd.c_str());
       sendcmd = amgtempcmd;
       amgtempcmd = "";
-      amgcmdnr = 0;
+      amgcmdnr = 255;
       break;
     default:
       amgcmdnr = 0;
@@ -134,6 +134,7 @@ void amgpelletstove_handle()
   static unsigned long nextupdatetime = millis() + 1000; // Wait 1 second after startup before sending first cmd...
   static String serstr = "";
   static uint8_t currentpower = 0;
+  static bool commok = 1;
   if (Serial.available() > 0)
   {
     int serval = Serial.read();
@@ -147,44 +148,6 @@ void amgpelletstove_handle()
       serstr = "";
       switch (amgcmdnr)
       {
-        case 12:
-          _amgpelletstove_callback("exhaust/fanspeed/measured", String(value * 10));
-          break;
-        case 1:
-          _amgpelletstove_callback("room/temperature/measured", String(float(value) / 10, 1));
-          break;
-        case 2:
-          _amgpelletstove_callback("room/temperature/setpoint", String(value));
-          break;
-        case 3:
-          _amgpelletstove_callback("controlpanel/power/setpoint", String(value));
-          break;
-        case 4:
-          _amgpelletstove_callback("exhaust/temperature", String(value));
-          break;
-        case 5:
-          _amgpelletstove_callback("exhaust/fanspeed", String(value));
-          break;
-        case 6:
-          _amgpelletstove_callback("room/fanspeed", String(value));
-          currentpower = value;
-          break;
-        case 7:
-          _amgpelletstove_callback("auger/speed", String(value));
-          if ((value > 0) && (currentpower > value)) currentpower = value;
-          break;
-        case 8:
-          _amgpelletstove_callback("board/temperature", String(value));
-          break;
-        case 9:
-          _amgpelletstove_callback("exhaust/fanspeed/correction", String(value * 10));
-          break;
-        case 10:
-          _amgpelletstove_callback("auger/correction", String(value));
-          break;
-        case 11:
-          _amgpelletstove_callback("board/errorcode", String(value));
-          break;
         case 0:
           switch (value)
           {
@@ -222,6 +185,44 @@ void amgpelletstove_handle()
           _amgpelletstove_callback("phase/value", String(value));
           _amgpelletstove_callback("power/value", String(currentpower));
           break;
+        case 1:
+          _amgpelletstove_callback("room/temperature/measured", String(float(value) / 10, 1));
+          break;
+        case 2:
+          _amgpelletstove_callback("room/temperature/setpoint", String(value));
+          break;
+        case 3:
+          _amgpelletstove_callback("controlpanel/power/setpoint", String(value));
+          break;
+        case 4:
+          _amgpelletstove_callback("exhaust/temperature", String(value));
+          break;
+        case 5:
+          _amgpelletstove_callback("exhaust/fanspeed", String(value));
+          break;
+        case 6:
+          _amgpelletstove_callback("room/fanspeed", String(value));
+          currentpower = value;
+          break;
+        case 7:
+          _amgpelletstove_callback("auger/speed", String(value));
+          if ((value > 0) && (currentpower > value)) currentpower = value;
+          break;
+        case 8:
+          _amgpelletstove_callback("board/temperature", String(value));
+          break;
+        case 9:
+          _amgpelletstove_callback("exhaust/fanspeed/correction", String(value * 10));
+          break;
+        case 10:
+          _amgpelletstove_callback("auger/correction", String(value));
+          break;
+        case 11:
+          _amgpelletstove_callback("board/errorcode", String(value));
+          break;
+        case 12:
+          _amgpelletstove_callback("exhaust/fanspeed/measured", String(value * 10));
+          break;
         case 13:
           _amgpelletstove_callback("phase/timer", String(value));
           break;
@@ -230,17 +231,19 @@ void amgpelletstove_handle()
           break;
         case 15:
           _amgpelletstove_callback("extractorsensorlevel", String(value));
-          break;
-        case 255:
+          _amgpelletstove_callback("status", "ready");
           break;
       }
       serstr = "";
       nextupdatetime = millis() + 500; // After successfull transfer wait 500ms before requesting next value
+      commok = 1;
     }
   }
 
   if (millis() > nextupdatetime)
   {
+    if (!commok) _amgpelletstove_callback("status", "commerror");
+    commok = 0;
     nextupdatetime = millis() + 5000; // On first or failed transefer wait 5 second before next (re)try
     _amgpelletstove_sendserial();
   }
