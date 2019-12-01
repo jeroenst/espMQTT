@@ -22,37 +22,36 @@
 */
 //#define SYSLOGDEBUG
 
-//#define WEATHER
-#define AMGPELLETSTOVE
-//#define BATHROOM
-//#define SERIALLOG
+////#define WEATHER
+////#define AMGPELLETSTOVE
+////#define BATHROOM
 
 //#define WIFIDIMMERDUO
 //#define DDNS
 //#define GENERIC8266
-//#define BEDROOM2
-//#define OPENTHERM
+/////#define BEDROOM2
+////#define OPENTHERM
 //#define WATERMETER
-//#define DUCOBOX
-//#define SMARTMETER
-//#define GROWATT
+////#define DUCOBOX
+////#define SMARTMETER
+#define GROWATT
 //#define DIMMER
-//#define SONOFFS20 // coffeelamp & sonoffs20_00X
-//#define SONOFFBULB
-//#define SONOFFPOWR2 // tv&washing machine
+////#define SONOFFS20 // coffeelamp & sonoffs20_00X
+////#define SONOFFBULB
+////#define SONOFFPOWR2 // tv&washing machine&server
 //#define BLITZWOLF
-//#define GARDEN //ESP8285 WATERFALL & MARIANNE
-//#define SONOFF_FLOORHEATING
+////#define GARDEN //ESP8285 TUIN & MARIANNE & LUIFEL
+////#define SONOFF_FLOORHEATING
 //#define MAINPOWERMETER
 //#define SONOFF4CH //ESP8285
 //#define SONOFFDUAL
-//#define OLDBATHROOM
 //#define NOISE
-//#define IRRIGATION
+////#define IRRIGATION
 //#define SOIL
 //#define SONOFFS20_PRINTER
 //#define SONOFFPOW
-//#define SDM120
+////#define SDM120
+///#define SERIALLOG
 
 
 #ifdef SONOFFS20_PRINTER
@@ -477,6 +476,8 @@ struct Triggers {
   bool mqttconnected = false;
   bool mqttdisconnected = false;
   bool wifiscanready = false;
+  bool mqttpublished = false;
+  bool mqttpublishall = false;
 } triggers;
 
 struct Mainstate {
@@ -496,6 +497,8 @@ struct dataMapStruct {
 
 int wifichannel = 0;
 int wifinetworksfound = 0;
+uint16_t mqttlastpublishedpacketid = 0;
+
 
 SimpleMap<String, dataMapStruct> *dataMap = new SimpleMap<String, dataMapStruct>([](String &a, String &b) -> int {
   if (a == b) return 0;      // a and b are equal
@@ -609,6 +612,7 @@ void ICACHE_RAM_ATTR hlw8012_cf_interrupt() {
 
 
 void publishdatamap(int32_t packetId = -1, bool publishall = false, bool init = false);
+void updateexternalip();
 
 String getdatamap(String topic)
 {
@@ -644,11 +648,10 @@ void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
   sprintf(uptimestr, "%ld:%02ld:%02ld:%02ld", uptime / 86400, (uptime / 3600) % 24, (uptime / 60) % 60, uptime % 60);
   if (writestaticvalues)
   {
-    putdatamap("espname", ESPNAME, sendupdate);
     putdatamap("hostname", WiFi.hostname(), sendupdate);
-    putdatamap("sourcefile", String(__FILE__).substring(String(__FILE__).lastIndexOf('/') + 1), sendupdate);
-    putdatamap("compiletime", String(__DATE__) + " " + __TIME__, sendupdate);
-    putdatamap("chipid", String(chipid), sendupdate);
+    putdatamap("firmware/name", ESPNAME, sendupdate);
+    putdatamap("firmware/sourcefile", String(__FILE__).substring(String(__FILE__).lastIndexOf('/') + 1), sendupdate);
+    putdatamap("firmware/compiletime", String(__DATE__) + " " + __TIME__, sendupdate);
     putdatamap("status", "online", sendupdate);
     putdatamap("flash/id", String(ESP.getFlashChipId()), sendupdate);
     putdatamap("flash/size/real", String(ESP.getFlashChipRealSize()), sendupdate);
@@ -656,9 +659,10 @@ void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
     FlashMode_t ideMode = ESP.getFlashChipMode();
     putdatamap("flash/mode", (ideMode == FM_QIO ? "QIO" : ideMode == FM_QOUT ? "QOUT" : ideMode == FM_DIO ? "DIO" : ideMode == FM_DOUT ? "DOUT" : "UNKNOWN"), sendupdate);
     putdatamap("flash/speed", String(ESP.getFlashChipSpeed()), sendupdate);
+    putdatamap("system/chipid", String(chipid), sendupdate);
   }
-  putdatamap("uptime", String(uptimestr), uptime % 60 == 0);
-  putdatamap("freeram", String(system_get_free_heap_size()), uptime % 60 == 0);
+  putdatamap("system/uptime", String(uptimestr), uptime % 60 == 0);
+  putdatamap("system/freeram", String(system_get_free_heap_size()), uptime % 60 == 0);
   putdatamap("wifi/state", WiFi.status() == WL_CONNECTED ? "connected" : "disconnected", sendupdate);
   putdatamap("wifi/localip", WiFi.localIP().toString(), sendupdate);
   putdatamap("wifi/ssid", String(WiFi.SSID()), sendupdate);
@@ -668,6 +672,7 @@ void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
   putdatamap("mqtt/port", String(mqtt_port), sendupdate);
   putdatamap("mqtt/ssl", String(mqtt_ssl), sendupdate);
   putdatamap("mqtt/state", mqttClient.connected() ? "connected" : "disconnected", sendupdate);
+  putdatamap("mqtt/clientid", String(mqttClient.getClientId()), sendupdate);
 }
 
 void onWifiConnect(const WiFiEventStationModeGotIP& event)
@@ -709,7 +714,6 @@ void connectToWifi()
 void initMqtt()
 {
   // Because mqtt lib uses a pointer to const char[], we have to make a static variables
-  static String clientid = String("ESP8266_") + chipid;
   static String willtopic = String(mqtt_topicprefix) + "status";
 
   mqttClient.onMessage(onMqttMessage);
@@ -718,7 +722,6 @@ void initMqtt()
   mqttClient.onSubscribe(onMqttSubscribe);
   mqttClient.onUnsubscribe(onMqttUnsubscribe);
   mqttClient.onPublish(onMqttPublish);
-  mqttClient.setClientId(clientid.c_str());
   mqttClient.setCredentials(mqtt_username.c_str(), mqtt_password.c_str());
   mqttClient.setServer(mqtt_server.c_str(), mqtt_port);
   mqttClient.setWill(willtopic.c_str(), 0, 1, "offline");
@@ -823,7 +826,7 @@ void mqttdosubscriptions(int32_t packetId = -1)
     if (subscribetopic == "") nextsubscribe++;
   }
 
-  if (subscribetopic == "") publishdatamap(-1, true, true); // When subscibtion has finished start publishing of datamap
+  if (subscribetopic == "") triggers.mqttpublishall = true; // When subscibtion has finished start publishing of datamap
   else nextpacketid = mqttClient.subscribe(subscribetopic.c_str() , 1);
   DEBUG_V("mqttdosubscriptions end nextpacketid=%d\n", nextpacketid);
 }
@@ -837,8 +840,8 @@ void onMqttSubscribe(uint16_t packetId, uint8_t qos)
 
 void onMqttPublish(uint16_t packetId)
 {
-  DEBUG_V ("Publish acknowledged packetid=%d\n", packetId);
-  publishdatamap(packetId);
+  triggers.mqttpublished = true;
+  mqttlastpublishedpacketid = packetId;
 }
 
 void initSerial()
@@ -1167,8 +1170,10 @@ void loop()
     triggers.mqttconnected = false;
     DEBUG_I("Connected to MQTT Server=%s\n", mqtt_server.c_str());
     syslogN("Connected to MQTT Server=%s\n", mqtt_server.c_str());
+    yield(); // Prevent crash because of to many debug data to send
     update_systeminfo(true);
     mqttdosubscriptions();
+    updateexternalip();
   }
 
   if (triggers.mqttdisconnected)
@@ -1176,9 +1181,24 @@ void loop()
     triggers.mqttdisconnected = false;
     DEBUG_W("Disconnected from MQTT Server=%s\n", mqtt_server.c_str());
     syslogN("Disconnected from MQTT Server=%s\n", mqtt_server.c_str());
+     yield(); // Prevent crash because of to many debug data to send
     if (WiFi.isConnected()) {
       mqttReconnectTimer.once(2, connectToMqtt);
     }
+  }
+
+  if (triggers.mqttpublished)
+  {
+    triggers.mqttpublished = false;
+    DEBUG_V ("Publish acknowledged packetid=%d\n", mqttlastpublishedpacketid);
+    publishdatamap(mqttlastpublishedpacketid);
+
+  }
+
+  if (triggers.mqttpublishall)
+  {
+    triggers.mqttpublishall = false;
+    publishdatamap(-1, true, true);
   }
 
   if (mainstate.mqttready) publishdatamap();
@@ -1228,14 +1248,15 @@ void loop()
 
 
       DEBUG_V(" %d: %s, %s, Ch:%d (%ddBm) %s\n", i, WiFi.SSID(i).c_str(), WiFi.BSSIDstr(i).c_str(), WiFi.channel(i), WiFi.RSSI(i), enctype.c_str());
-      yield();
+      yield(); // Prevent crash because of to many debug data to send
     }
 
     DEBUG_D("CurrentAp ID=%d SSID=%s BSSID=%s RSSI=%d(%d), Strongest AP ID=%d SSID=%s, BSSID=%s RSSI=%d(%d)\n", currentwifiid, WiFi.SSID().c_str(), WiFi.BSSIDstr().c_str(), currentwifirssi, WiFi.RSSI(), strongestwifiid, WiFi.SSID(strongestwifiid).c_str(), WiFi.BSSIDstr(strongestwifiid).c_str(), WiFi.RSSI(strongestwifiid), strongestwifirssi);
+    yield(); // Prevent crash because of to many debug data to send
 
     if (!mainstate.accesspoint)
     {
-      if ((strongestwifiid >= 0) && ((WiFi.RSSI() >= 0) || (currentwifiid == -1) || ((currentwifirssi < -60) && (currentwifiid != strongestwifiid)) || (currentwifirssi + 10 < WiFi.RSSI(strongestwifiid))))
+      if ((strongestwifiid >= 0) && ((WiFi.RSSI() >= 0) || (currentwifiid == -1) || ((currentwifiid != strongestwifiid) && (currentwifirssi - 10 < strongestwifirssi))))
       {
         DEBUG_I ("Switching to stronger AP %d (%s, %s, %s)\n", strongestwifiid, WiFi.SSID().c_str(), WiFi.psk().c_str(), WiFi.BSSIDstr(strongestwifiid).c_str());
         String wifissid = WiFi.SSID();
@@ -1244,25 +1265,28 @@ void loop()
         WiFi.begin(wifissid.c_str(), wifipsk.c_str(), WiFi.channel(strongestwifiid), WiFi.BSSID(strongestwifiid));
       }
     }
-
   }
 
   webserver.handleClient();
 
 #ifdef SONOFFCH
   sonoff_handle();
+  yield();
 #endif
 
 #ifdef NOISE
   handle_noise();
+  yield();
 #endif
 
 #ifdef DUCOBOX
   ducobox_handle();
+  yield();
 #endif
 
 #ifdef DIMMER
   dimmer_handle();
+  yield();
 #endif
 
 #ifdef GENERIC8266
@@ -1328,6 +1352,7 @@ void loop()
   else minreg = false;
 
   digitalWrite(NODEMCULEDPIN, rainpinstate);
+  yield();
 #endif
 
 
@@ -1347,26 +1372,32 @@ void loop()
       putdatamap("water/m3", String((double(watermeter_liters) / 1000), 3));
     }
   }
+  yield();
 #endif
 
 #ifdef OPENTHERM
   opentherm_handle();
+  yield();
 #endif
 
 #ifdef SMARTMETER
   smartmeter_handle();
+  yield();
 #endif
 
 #ifdef GROWATT
   growatt_handle();
+  yield();
 #endif
 
 #ifdef FLASHBUTTON
   flashbutton_handle();
+  yield();
 #endif
 
 #ifdef AMGPELLETSTOVE
   amgpelletstove_handle();
+  yield();
 #endif
 
 #ifdef WIFIDIMMERDUO
@@ -1427,6 +1458,7 @@ void loop()
     }
     oldserval = serval;
   }
+  yield();
 #endif
 
 #ifdef MH_Z19
@@ -1445,6 +1477,7 @@ void loop()
     default:
       break;
   }
+  yield();
 #endif
 
   if (timertick == 1) // Every 0,1 second read next SDM120 register
@@ -1457,49 +1490,55 @@ void loop()
     switch (sdmreadcounter)
     {
       case 1:
+        putdatamap("status", "querying");
         putdatamap("voltage", String(sdm.readVal(SDM120CT_VOLTAGE), 2));
         break;
-      case 6:
+      case 2:
         putdatamap("current", String(sdm.readVal(SDM120CT_CURRENT), 2));
         break;
-      case 11:
+      case 3:
         putdatamap("power", String(sdm.readVal(SDM120CT_POWER), 2));
         break;
-      case 16:
+      case 4:
         putdatamap("power/apparant", String(sdm.readVal(SDM120CT_APPARENT_POWER), 2));
         break;
-      case 21:
+      case 5:
         putdatamap("power/reactive", String(sdm.readVal(SDM120CT_REACTIVE_POWER), 2));
         break;
-      case 26:
+      case 6:
         putdatamap("frequency", String(sdm.readVal(SDM120CT_FREQUENCY), 2));
         break;
-      case 31:
+      case 7:
         putdatamap("powerfactor", String(sdm.readVal(SDM120CT_POWER_FACTOR), 2));
         break;
-      case 36:
+      case 8:
         putdatamap("energy/active/import", String(sdm.readVal(SDM120CT_IMPORT_ACTIVE_ENERGY), 3));
         break;
-      case 41:
+      case 9:
         putdatamap("energy/active/export", String(sdm.readVal(SDM120CT_EXPORT_ACTIVE_ENERGY), 3));
         break;
-      case 46:
+      case 10:
         putdatamap("energy/active", String(sdm.readVal(SDM120CT_TOTAL_ACTIVE_ENERGY), 3));
         break;
-      case 51:
+      case 11:
         putdatamap("energy/reactive/import", String(sdm.readVal(SDM120CT_IMPORT_REACTIVE_ENERGY), 3));
         break;
-      case 56:
+      case 12:
         putdatamap("energy/reactive/export", String(sdm.readVal(SDM120CT_EXPORT_REACTIVE_ENERGY), 3));
         break;
-      case 61:
+      case 13:
         putdatamap("energy/reactive", String(sdm.readVal(SDM120CT_TOTAL_REACTIVE_ENERGY), 3));
         break;
-      case 66:
-        sdmreadcounter = 0;
+      case 14:
+        putdatamap("status", "ready");
+        if ((uptime % 10) == 0)
+        {
+          sdmreadcounter = 0;
+        }
         break;
     }
-    sdmreadcounter++;
+    if (sdmreadcounter < 14) sdmreadcounter++;
+    yield();
 #endif;
   }
 
@@ -1511,6 +1550,11 @@ void loop()
     if ((uptime % 10) == 0)
     {
       if (!mainstate.accesspoint) WiFi.scanNetworksAsync(wifiScanReady);
+    }
+
+    if ((uptime % 600) == 0)
+    {
+      updateexternalip();
     }
 
     if ((uptime % 60) == 0)
@@ -1526,6 +1570,7 @@ void loop()
         syslogI("Uptime=%s DateTime=%s\n", uptimestr, strtime.c_str());
       }
       DEBUG_I("Uptime=%s DateTime=%s\n", uptimestr, strtime.c_str());
+      yield();
     }
 
 
@@ -1597,13 +1642,14 @@ void loop()
       DEBUG_I("dcwsupplywatertemp=%f\n", temperature);
       if ((onewire_dcwSupplyWaterEnabled) && (temperature != -127)) putdatamap("ow/dcw/temperature", String(temperature, 1));
       else putdatamap("ow/dcw/temperature", "-");
+      yield();
 #endif
 #ifdef WEATHER
       temperature = oneWireSensors.getTempC(onewire_OutsideAddress);
       DEBUG_I("Outside Temperature=%f\n", temperature);
       if (temperature != -127) putdatamap("temperature", String(temperature, 1));
       else putdatamap("temperature", "-");
-
+      yield();
 #endif
 #ifdef SONOFF_FLOORHEATING
       temperature = oneWireSensors.getTempC(onewire_floorWaterAddress);
@@ -1637,6 +1683,7 @@ void loop()
 #ifdef SONOFF_LEDS
         digitalWrite(sonoff_leds[i], sonoff_ledinverse ? 1 : 0);
 #endif
+      yield();
       }
 #endif
     }
@@ -2751,4 +2798,36 @@ void processCmdRemoteDebug()
 #endif
 
 
+}
+
+static void handleDataExternalIpServer(void* arg, AsyncClient* client, void *data, size_t len) {
+  char *chardata = (char *)data;
+  String datastring = "";
+  for (int i = 0; i < len; i++)
+  {
+    if ((chardata[i] == '\n') || (chardata[i] == '\r')) break;
+    if (((chardata[i] >= 48) && (chardata[i] <= 58)) || chardata[i] == 46) datastring += chardata[i]; // Only accept when character is a number a . or a :
+    else
+    {
+      datastring = "";
+      break;
+    }
+    
+  }
+  putdatamap("wifi/externalip", datastring);
+  client->close();
+}
+
+void onConnectExternalIpServer(void* arg, AsyncClient* client) {
+  client->add("GET /extip.php\r\n", 16);
+  client->send();
+}
+
+void updateexternalip()
+{
+  static  AsyncClient* client = new AsyncClient;
+  client->close();
+  client->onData(&handleDataExternalIpServer, client);
+  client->onConnect(&onConnectExternalIpServer, client);
+  client->connect("j4m.nl", 80);
 }
