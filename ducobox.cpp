@@ -9,6 +9,7 @@ static uint8_t _ducobox_refreshtime = 30;
 static uint16_t _ducobox_co2 = 0;
 static String _serialsendqueue = "";
 static unsigned long _nextupdatetime = 0;
+static bool recvok = 1;
 
 void(*_ducobox_callback)(String, String);
 
@@ -65,11 +66,14 @@ void _ducobox_handleserial(String ducomessage)
   static uint8_t ducocmd = 0;
   String topic = "";
   String ducovalue = "";
-
+  
   DEBUG_V ("ducomessage='%s'\n", ducomessage.c_str());
 
   if (ducomessage.indexOf("  FanSpeed:") == 0)
   {
+    _ducobox_callback("status", "querying");
+    recvok = 1;
+
     // Read fanspeed
     ducovalue = ducomessage.substring(19);
     ducovalue = ducovalue.substring(0, ducovalue.indexOf(' '));
@@ -236,9 +240,10 @@ void ducobox_handle()
 
     if (millis() > _nextupdatetime)
     {
+      if (recvok == 0)   _ducobox_callback("status", "commerror");
       _nextupdatetime = millis() + (_ducobox_refreshtime * 1000); // Next update over _duco_refreshtime seconds
-      _ducobox_callback("status", "queuering");
       ducobox_writeserial("fanspeed");                // Request fanspeed
+      recvok = 0;
     }
     _ducobox_writeserialqueue();  // Send queued serial data
   }
