@@ -101,10 +101,9 @@ void growatt_handle()
          analogWrite(_growatt_fanpin, 0);
       }
     }
+    else _growatt_callback("status", "querying");
     RxPowerDataOk = 0;
-
     growatt_send_command(0x41);
-    _growatt_callback("status", "querying");
   }
 
   if (Serial.available())
