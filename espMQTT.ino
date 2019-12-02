@@ -29,7 +29,7 @@
 //#define WIFIDIMMERDUO
 //#define DDNS
 //#define GENERIC8266
-/////#define BEDROOM2
+// #define BEDROOM2
 ////#define OPENTHERM
 //#define WATERMETER
 ////#define DUCOBOX
@@ -55,14 +55,14 @@
 
 
 #ifdef SONOFFS20_PRINTER
-#define ESPNAME "SONOFFS20_PRINTER"
+#define FIRMWARE_TARGET "SONOFFS20_PRINTER"
 #define SONOFFS20
 #define SONOFFCH_TIMEOUT 1800
 uint32_t sonoffch_starttime[1];
 #endif
 
 #ifdef SONOFF_FLOORHEATING
-#define ESPNAME "SONOFF_FLOORHEATING"
+#define FIRMWARE_TARGET "SONOFF_FLOORHEATING"
 #define SONOFFS20
 // Use RX pin for onewire
 #define ONEWIREPIN 3
@@ -71,7 +71,7 @@ uint32_t sonoffch_starttime[1];
 #endif
 
 #ifdef DIMMER
-#define ESPNAME "DIMMER"
+#define FIRMWARE_TARGET "DIMMER"
 #define TRIAC_PIN D1
 #define ZEROCROSS_PIN D2
 #define FLASHBUTTON D3
@@ -80,7 +80,7 @@ uint32_t sonoffch_starttime[1];
 #endif
 
 #ifdef NOISE
-#define ESPNAME "NOISE"
+#define FIRMWARE_TARGET "NOISE"
 #define MICOFFSET 0
 #define MICGAIN 1
 #define FLASHBUTTON D3
@@ -88,7 +88,7 @@ uint32_t sonoffch_starttime[1];
 #endif
 
 #ifdef SDM120
-#define ESPNAME "SDM120"
+#define FIRMWARE_TARGET "SDM120"
 #define FLASHBUTTON D3
 #define ESPLED D4
 #undef SERIALLOG
@@ -98,21 +98,21 @@ SDM sdm(serSDM, 2400, NOT_A_PIN);
 #endif
 
 #ifdef WIFIDIMMERDUO
-#define ESPNAME "WIFIDIMMERDUO"
+#define FIRMWARE_TARGET "WIFIDIMMERDUO"
 #define APONBOOT
 #define ESPLED 4
 #endif
 
 
 #ifdef GENERIC8266
-#define ESPNAME "GENERIC8266"
+#define FIRMWARE_TARGET "GENERIC8266"
 #define FLASHBUTTON D3
 #define ESPLED D4
 #define SERIALLOG
 #endif
 
 #ifdef AMGPELLETSTOVE
-#define ESPNAME "AMGPELLETSTOVE"
+#define FIRMWARE_TARGET "AMGPELLETSTOVE"
 #define NODEMCULEDPIN D0
 #define FLASHBUTTON D3
 #define ESPLED D4
@@ -121,7 +121,7 @@ SDM sdm(serSDM, 2400, NOT_A_PIN);
 #endif
 
 #ifdef WEATHER
-#define ESPNAME "WEATHER"
+#define FIRMWARE_TARGET "WEATHER"
 #define NODEMCULEDPIN D0
 #define FLASHBUTTON D3
 #define ESPLED D4
@@ -132,7 +132,7 @@ SDM sdm(serSDM, 2400, NOT_A_PIN);
 #endif
 
 #ifdef GROWATT
-#define ESPNAME "GROWATT"
+#define FIRMWARE_TARGET "GROWATT"
 #define NODEMCULEDPIN D0
 #define FLASHBUTTON D3
 #define ESPLED D4
@@ -142,13 +142,13 @@ SDM sdm(serSDM, 2400, NOT_A_PIN);
 #endif
 
 #ifdef SOIL
-#define ESPNAME "SOIL"
+#define FIRMWARE_TARGET "SOIL"
 #define FLASHBUTTON D3
 #define ESPLED D4
 #endif
 
 #ifdef DUCOBOX
-#define ESPNAME "DUCOBOX"
+#define FIRMWARE_TARGET "DUCOBOX"
 #define SONOFFDUAL
 #define FLASHBUTTON 10
 #define ESPLED 13
@@ -157,7 +157,7 @@ SDM sdm(serSDM, 2400, NOT_A_PIN);
 #endif
 
 #ifdef GARDEN
-#define ESPNAME "GARDEN"
+#define FIRMWARE_TARGET "GARDEN"
 #ifndef ARDUINO_ESP8266_ESP01
 #error "Wrong board selected! Select Generic ESP8285 module"
 #endif
@@ -165,7 +165,7 @@ SDM sdm(serSDM, 2400, NOT_A_PIN);
 #endif
 
 #ifdef IRRIGATION
-#define ESPNAME "IRRIGATION"
+#define FIRMWARE_TARGET "IRRIGATION"
 uint32_t sonoffch_starttime[4];
 static bool sonoffch_timeout_enabled[4] = {1, 1, 1, 0};
 #define SONOFFCH_TIMEOUT 1800
@@ -176,8 +176,8 @@ static bool sonoffch_timeout_enabled[4] = {1, 1, 1, 0};
 #endif
 
 #ifdef SONOFF4CH
-#ifndef ESPNAME
-#define ESPNAME "SONOFF4CH"
+#ifndef FIRMWARE_TARGET
+#define FIRMWARE_TARGET "SONOFF4CH"
 #endif
 #ifndef ARDUINO_ESP8266_ESP01
 #error "Wrong board selected! Select Generic ESP8285 module"
@@ -191,8 +191,8 @@ static bool sonoff_oldbuttons[4] = {1, 1, 1, 1};
 #endif
 
 #ifdef SONOFFDUAL
-#ifndef ESPNAME
-#define ESPNAME "SONOFFDUAL"
+#ifndef FIRMWARE_TARGET
+#define FIRMWARE_TARGET "SONOFFDUAL"
 #endif
 #ifndef ARDUINO_ESP8266_ESP01
 #error "Wrong board selected! Select Generic ESP8285 module"
@@ -206,7 +206,7 @@ static bool sonoff_oldbuttons[2] = {1, 1};
 #endif
 
 #ifdef BLITZWOLF
-#define ESPNAME "BLITZWOLF"
+#define FIRMWARE_TARGET "BLITZWOLF"
 #ifndef ARDUINO_ESP8266_ESP01
 #error "Wrong board selected! Select Generic ESP8285 module"
 #endif
@@ -235,7 +235,7 @@ const bool sonoff_ledinverse = 1;
 #endif
 
 #ifdef SONOFFPOW
-#define ESPNAME "SONOFFPOW"
+#define FIRMWARE_TARGET "SONOFFPOW"
 #ifndef ARDUINO_ESP8266_ESP01
 #error "Wrong board selected! Select Generic ESP8285 module"
 #endif
@@ -265,7 +265,7 @@ static bool sonoff_oldbuttons[1] = {1};
 
 #ifdef SONOFFPOWR2
 #undef SERIALLOG
-#define ESPNAME "SONOFFPOWR2"
+#define FIRMWARE_TARGET "SONOFFPOWR2"
 #ifndef ARDUINO_ESP8266_ESP01
 #error "Wrong board selected! Select Generic ESP8285 module"
 #endif
@@ -283,8 +283,8 @@ double powerval = 0;
 
 #ifdef SONOFFBULB
 // Remember: board: generic esp8266 module, flashmode=dio
-#ifndef ESPNAME
-#define ESPNAME "SONOFFBULB"
+#ifndef FIRMWARE_TARGET
+#define FIRMWARE_TARGET "SONOFFBULB"
 #define APONBOOT 1
 #include "my92xx.h";
 my92xx * _my92xx;
@@ -307,8 +307,8 @@ my92xx * _my92xx;
 
 #ifdef SONOFFS20
 // Remember: board: generic esp8266 module, flashmode=dio
-#ifndef ESPNAME
-#define ESPNAME "SONOFFS20"
+#ifndef FIRMWARE_TARGET
+#define FIRMWARE_TARGET "SONOFFS20"
 #endif
 #ifndef ARDUINO_ESP8266_ESP01
 #error "Wrong board selected! Select Generic ESP8285 module"
@@ -322,7 +322,7 @@ static bool sonoff_oldbuttons[1] = {1};
 #endif
 
 #ifdef MAINPOWERMETER
-#define ESPNAME "MAINPOWERMETER"
+#define FIRMWARE_TARGET "MAINPOWERMETER"
 #define FLASHBUTTON D3
 #define ESPLED D4
 #define ADS0_RDY_PIN    D0 //ADS1256 data ready
@@ -333,7 +333,7 @@ static bool sonoff_oldbuttons[1] = {1};
 #endif
 
 #ifdef OPENTHERM
-#define ESPNAME "OPENTHERM"
+#define FIRMWARE_TARGET "OPENTHERM"
 #define FLASHBUTTON D3
 #define ESPLED D4
 #define ONEWIREPIN D6
@@ -342,7 +342,7 @@ static bool sonoff_oldbuttons[1] = {1};
 #endif
 
 #ifdef WATERMETER
-#define ESPNAME "WATERMETER"
+#define FIRMWARE_TARGET "WATERMETER"
 #define NODEMCULEDPIN D0
 #define FLASHBUTTON D3
 #define ESPLED D4
@@ -356,7 +356,7 @@ static bool sonoff_oldbuttons[1] = {1};
 #endif
 
 #ifdef GARDEN2
-#define ESPNAME "GARDEN2"
+#define FIRMWARE_TARGET "GARDEN2"
 #define FLASHBUTTON D3
 #define ESPLED D4
 #define DHTPIN D5
@@ -365,7 +365,7 @@ static bool sonoff_oldbuttons[1] = {1};
 #endif
 
 #ifdef OLDBATHROOM
-#define ESPNAME "OLDBATHROOM"
+#define FIRMWARE_TARGET "OLDBATHROOM"
 #define SMALLOLED
 #define I2C_SDA D2
 #define I2C_SCL D1
@@ -380,7 +380,7 @@ static bool sonoff_oldbuttons[1] = {1};
 #endif
 
 #ifdef BATHROOM
-#define ESPNAME "BATHROOM"
+#define FIRMWARE_TARGET "BATHROOM"
 #define ESPLED_TIMEOUT_OFF 0 // In sleepingroom we want the led to go off after some time
 #define FLASHBUTTON D3
 #define ESPLED D4
@@ -393,7 +393,7 @@ Adafruit_NeoPixel neopixelleds = Adafruit_NeoPixel(2, NEOPIXELPIN, NEO_RGB + NEO
 #endif
 
 #ifdef BEDROOM2
-#define ESPNAME "BEDROOM2"
+#define FIRMWARE_TARGET "BEDROOM2"
 #define FLASHBUTTON D3
 #define ESPLED D4
 #define ESPLED_TIMEOUT_OFF 60 // In sleepingroom we want the led to go off after some time
@@ -408,7 +408,7 @@ Adafruit_NeoPixel neopixelleds = Adafruit_NeoPixel(2, NEOPIXELPIN, NEO_RGB + NEO
 #endif
 
 #ifdef SMARTMETER
-#define ESPNAME "SMARTMETER"
+#define FIRMWARE_TARGET "SMARTMETER"
 #define FLASHBUTTON D3
 #define ESPLED D4
 #include "smartmeter.h"
@@ -417,7 +417,7 @@ Adafruit_NeoPixel neopixelleds = Adafruit_NeoPixel(2, NEOPIXELPIN, NEO_RGB + NEO
 
 #ifdef DDNS
 #include<EasyDDNS.h>
-#define ESPNAME "DDNS"
+#define FIRMWARE_TARGET "DDNS"
 #define NODEMCULEDPIN D0
 #define FLASHBUTTON D3
 #define ESPLED D4
@@ -649,7 +649,12 @@ void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
   if (writestaticvalues)
   {
     putdatamap("hostname", WiFi.hostname(), sendupdate);
-    putdatamap("firmware/name", ESPNAME, sendupdate);
+    String firmwarename = __FILE__;
+    firmwarename = firmwarename.substring(firmwarename.lastIndexOf("\/")+1);
+    firmwarename = firmwarename.substring(firmwarename.lastIndexOf("\\")+1);
+    firmwarename = firmwarename.substring(0, firmwarename.lastIndexOf("."));
+    putdatamap("firmware/name", firmwarename, sendupdate);
+    putdatamap("firmware/target", FIRMWARE_TARGET, sendupdate);
     putdatamap("firmware/sourcefile", String(__FILE__).substring(String(__FILE__).lastIndexOf('/') + 1), sendupdate);
     putdatamap("firmware/compiletime", String(__DATE__) + " " + __TIME__, sendupdate);
     putdatamap("status", "online", sendupdate);
@@ -1215,7 +1220,7 @@ void loop()
     {
       if (WiFi.SSID(i) == WiFi.SSID())
       {
-        if (currentwifirssi < WiFi.RSSI(i))
+        if (strongestwifirssi < WiFi.RSSI(i))
         {
           strongestwifiid = i;
           strongestwifirssi = WiFi.RSSI(i);
@@ -1256,7 +1261,7 @@ void loop()
 
     if (!mainstate.accesspoint)
     {
-      if ((strongestwifiid >= 0) && ((WiFi.RSSI() >= 0) || (currentwifiid == -1) || ((currentwifiid != strongestwifiid) && (currentwifirssi - 10 < strongestwifirssi))))
+      if ((strongestwifiid >= 0) && ((WiFi.RSSI() >= 0) || (currentwifiid == -1) || ((currentwifiid != strongestwifiid) && (currentwifirssi + 10 < strongestwifirssi))))
       {
         DEBUG_I ("Switching to stronger AP %d (%s, %s, %s)\n", strongestwifiid, WiFi.SSID().c_str(), WiFi.psk().c_str(), WiFi.BSSIDstr(strongestwifiid).c_str());
         String wifissid = WiFi.SSID();
@@ -2481,7 +2486,7 @@ void setup() {
   if (!eeprom_read(&esp_hostname, 4))
   {
     DEBUG_E("Error reading hostname from internal eeprom\n");
-    esp_hostname = ESPNAME;
+    esp_hostname = FIRMWARE_TARGET;
   }
   DEBUG_D("esp hostname=%s\n", esp_hostname.c_str());
 
@@ -2536,7 +2541,7 @@ void setup() {
 
   syslog.server(mqtt_server.c_str(), 514);
   syslog.deviceHostname(esp_hostname.c_str());
-  syslog.appName(ESPNAME);
+  syslog.appName(FIRMWARE_TARGET);
   syslog.defaultPriority(LOG_KERN);
 
   DEBUG_I("ESP8266 Started...\n");
