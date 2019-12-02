@@ -44,7 +44,7 @@ void growatt_init(void(*callback)(String,String), int fanpin)
 
 void growatt_send_command(uint8_t c1)
 {
-  DEBUG("Requesting Growatt Data %#02x...\n");
+  DEBUG_V("Requesting Growatt Data %#02x...\n");
   uint8_t TxBuffer[10];
   TxBuffer[0] = 0x3F;
   TxBuffer[1] = 0x23;
@@ -62,7 +62,7 @@ void growatt_send_command(uint8_t c1)
   TxBuffer[7] = wStringSum & 0xFF;
   for (int i = 0; i < 8; i++)
   {
-    DEBUG ("Sending to Growatt inverter: %#02x\n", TxBuffer[i]);
+    DEBUG_V ("Sending to Growatt inverter: %#02x\n", TxBuffer[i]);
     Serial.write(TxBuffer[i]);
   }
 }
@@ -111,7 +111,7 @@ void growatt_handle()
     if (RxBufferPointer < 50)
     {
       RxBuffer[RxBufferPointer] = Serial.read();
-//      DEBUG ("Received from Growatt inverter: 0x%02x\n", RxBuffer[RxBufferPointer]);
+      DEBUG_V ("Received from Growatt inverter: 0x%02x\n", RxBuffer[RxBufferPointer]);
       if (RxBuffer[0] != 0x23) RxBufferPointer = 0;
       if (RxBufferPointer == 1)
       {
@@ -121,7 +121,7 @@ void growatt_handle()
     }
     else
     {
-//      DEBUG("Serial Buffer Overflow!!\n");
+      DEBUG_E("Serial Buffer Overflow!!\n");
       RxBufferPointer = 0;
     }
     if (RxBufferPointer > 5)
@@ -130,10 +130,10 @@ void growatt_handle()
       {
         double value = 0;
         uint32_t intvalue = 0;
-        DEBUG("Received complete message from Growatt Inverter...\n");
+        DEBUG_D("Received complete message from Growatt Inverter...\n");
         if ((RxBuffer[3] == 0x32) && (RxBuffer[4] == 0x41) && (RxBufferPointer >= 34))
         {
-          DEBUG("Received power data from Growatt Inverter...\n");
+          DEBUG_D("Received power data from Growatt Inverter...\n");
           intvalue = RxBuffer[6];
           _growatt_callback("inverterstatus/value", String(intvalue));
           _growatt_callback("inverterstatus", intvalue == 0 ? "waiting" : intvalue == 1 ? "ready" : intvalue == 3 ? "fault" : "unknown");
@@ -176,24 +176,14 @@ void growatt_handle()
             if (fanstop == 1) _growatt_fanspeed = 0;
             analogWrite(_growatt_fanpin, _growatt_fanspeed);
             _growatt_callback("fanspeed", String((100 * _growatt_fanspeed)/PWMRANGE));
-            DEBUG("Temperature=%.01f, Fanspeed=%d\n", value, _growatt_fanspeed);
-
-            
-            //int fanspeed = 0;
-           
-            //fanspeed = max(min((int)((value - GROWATT_FANSPEED_MINTEMP) * GROWATT_FANSPEED_MULTIPLIER) + GROWATT_FANSPEED_OFFSET, PWMRANGE), GROWATT_FANSPEED_OFFSET);
-            //analogWrite(_growatt_fanpin, fanspeed);
-            //DEBUG("Temperature=%.01f, Fanspeed=%d\n", value, fanspeed);
-            //_growatt_callback("fan/speed", String((fanspeed*100)/PWMRANGE));
-            //_growatt_callback("fan/on", String(digitalRead(_growatt_fanpin)));
+            DEBUG_D("Temperature=%.01f, Fanspeed=%d\n", value, _growatt_fanspeed);
           }
-          
           RxPowerDataOk = 1;
           growatt_send_command(0x42);
         }
         if ((RxBuffer[3] == 0x32) && (RxBuffer[4] == 0x42) && (RxBufferPointer >= 22))
         {
-          DEBUG("Received energy data from Growatt Inverter...\n");
+          DEBUG_D("Received energy data from Growatt Inverter...\n");
           value = double((uint16_t(RxBuffer[13]) << 8) + RxBuffer[14]) / 10;
           if (pv1volt > 100) _growatt_callback("grid/today/kwh", String(value, 1)); // Only reset today value when pv 1 volt is above 100 volt (steady voltage) otherwise this gets resets during shutdown
           value = double((uint32_t(RxBuffer[15]) << 24) + (uint32_t(RxBuffer[16]) << 16) + (uint16_t(RxBuffer[17]) << 8) + RxBuffer[18]) / 10;
