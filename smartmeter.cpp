@@ -23,8 +23,9 @@ int8_t smartmeter_handle()
   char summerwinter;
   static char buffer[1000];
   static uint16_t bufpos = 0;
+  static int watt = 0;
 
-  while (Serial.available()) {
+  if (Serial.available()) {
     char input = Serial.read() & 127;
     // Fill buffer up to and including a new line (\n)
     buffer[bufpos] = input;
@@ -44,6 +45,8 @@ int8_t smartmeter_handle()
 
       if (buffer[0] == '!')
       {
+        _smartmeter_callback("electricity/watt", String(watt));
+        watt = 0;
         _smartmeter_callback("status", "ready");
       }
 
@@ -80,6 +83,7 @@ int8_t smartmeter_handle()
       if (sscanf(buffer, "1-0:1.7.0(%f" , &value) == 1)
       {
         _smartmeter_callback("electricity/kw_using", String(value, 3));
+        watt += value * 1000;
         returnvalue++;
       }
 
@@ -87,6 +91,7 @@ int8_t smartmeter_handle()
       if (sscanf(buffer, "1-0:2.7.0(%f" , &value) == 1)
       {
         _smartmeter_callback("electricity/kw_providing", String(value, 3));
+        watt -= value * 1000;
         returnvalue++;
       }
 
