@@ -1,4 +1,6 @@
 /*
+   Version of esp8266 library: 2.6.2
+   
    Needed libraries:
     https://github.com/jeroenst/RemoteDebug
     https://github.com/jeroenst/ESPAsyncTCP
@@ -14,44 +16,46 @@
 
    Libraries via Arduino Library Manager:
     (I2C) Wire
-
-
-   Known bugs:
-    MQTT SSL not working https://github.com/marvinroger/async-mqtt-client/issues/107
-    When using a delay in call back functions this causes esp to crash when another delay is allready in progress.https://github.com/esp8266/Arduino/issues/5722
 */
+
+/* SETTINGS */
+#define SERIALLOG
 //#define SYSLOGDEBUG
+#define DEBUGLEVEL Debug.VERBOSE
 
-////#define WEATHER
-////#define AMGPELLETSTOVE
-////#define BATHROOM
 
-//#define WIFIDIMMERDUO
-//#define DDNS
-//#define GENERIC8266
+/* ESP8266 */
+// #define WEATHER
+// #define AMGPELLETSTOVE
+// #define BATHROOM
 // #define BEDROOM2
-////#define OPENTHERM
+// #define OPENTHERM
+// #define SMARTMETER
+// #define GROWATT
+// #define SDM120
 //#define WATERMETER
-////#define DUCOBOX
-////#define SMARTMETER
-#define GROWATT
-//#define DIMMER
-////#define SONOFFS20 // coffeelamp & sonoffs20_00X
-////#define SONOFFBULB
-////#define SONOFFPOWR2 // tv&washing machine&server
-//#define BLITZWOLF
-////#define GARDEN //ESP8285 TUIN & MARIANNE & LUIFEL
-////#define SONOFF_FLOORHEATING
+//#define DDNS
+#define GENERIC8266
 //#define MAINPOWERMETER
+//#define NOISE
+//#define SOIL
+
+
+/* ESP8285 */
+// #define DUCOBOX
+// #define SONOFFS20 // coffeelamp & sonoffs20_00X
+// #define SONOFFBULB
+// #define SONOFFPOWR2 // tv&washing machine&server
+// #define GARDEN //ESP8285 TUIN & MARIANNE & LUIFEL
+// #define SONOFF_FLOORHEATING
+// #define IRRIGATION
+//#define BLITZWOLF
+//#define WIFIDIMMERDUO
+//#define DIMMER
 //#define SONOFF4CH //ESP8285
 //#define SONOFFDUAL
-//#define NOISE
-////#define IRRIGATION
-//#define SOIL
 //#define SONOFFS20_PRINTER
 //#define SONOFFPOW
-////#define SDM120
-///#define SERIALLOG
 
 
 #ifdef SONOFFS20_PRINTER
@@ -228,10 +232,10 @@ const bool sonoff_ledinverse = 1;
 #define HLW8012_CF_PIN 5
 #define HLW8012_CURRENT_MODE LOW
 #define HLW8012_CF_INTERRUPT_EDGE FALLING
-#define HLW8012_CF1_INTERRUPT_EDGE CHANGE
-#define HLW8012_CURRENT_MULTIPLIER 25740
-#define HLW8012_VOLTAGE_MULTIPLIER 313400
-#define HLW8012_POWER_MULTIPLIER 3414290
+#define HLW8012_CF1_INTERRUPT_EDGE FALLING
+#define HLW8012_CURRENT_MULTIPLIER 20500 //25740
+#define HLW8012_VOLTAGE_MULTIPLIER 327800 //313400
+#define HLW8012_POWER_MULTIPLIER 3160000
 #endif
 
 #ifdef SONOFFPOW
@@ -650,8 +654,8 @@ void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
   {
     putdatamap("hostname", WiFi.hostname(), sendupdate);
     String firmwarename = __FILE__;
-    firmwarename = firmwarename.substring(firmwarename.lastIndexOf("\/")+1);
-    firmwarename = firmwarename.substring(firmwarename.lastIndexOf("\\")+1);
+    firmwarename = firmwarename.substring(firmwarename.lastIndexOf("\/") + 1);
+    firmwarename = firmwarename.substring(firmwarename.lastIndexOf("\\") + 1);
     firmwarename = firmwarename.substring(0, firmwarename.lastIndexOf("."));
     putdatamap("firmware/name", firmwarename, sendupdate);
     putdatamap("firmware/target", FIRMWARE_TARGET, sendupdate);
@@ -1186,7 +1190,7 @@ void loop()
     triggers.mqttdisconnected = false;
     DEBUG_W("Disconnected from MQTT Server=%s\n", mqtt_server.c_str());
     syslogN("Disconnected from MQTT Server=%s\n", mqtt_server.c_str());
-     yield(); // Prevent crash because of to many debug data to send
+    yield(); // Prevent crash because of to many debug data to send
     if (WiFi.isConnected()) {
       mqttReconnectTimer.once(2, connectToMqtt);
     }
@@ -1252,7 +1256,7 @@ void loop()
       }
 
 
-      DEBUG_V(" %d: %s, %s, Ch:%d (%ddBm) %s\n", i, WiFi.SSID(i).c_str(), WiFi.BSSIDstr(i).c_str(), WiFi.channel(i), WiFi.RSSI(i), enctype.c_str());
+      DEBUG_D(" %d: %s, %s, Ch:%d (%ddBm) %s\n", i, WiFi.SSID(i).c_str(), WiFi.BSSIDstr(i).c_str(), WiFi.channel(i), WiFi.RSSI(i), enctype.c_str());
       yield(); // Prevent crash because of to many debug data to send
     }
 
@@ -1688,7 +1692,7 @@ void loop()
 #ifdef SONOFF_LEDS
         digitalWrite(sonoff_leds[i], sonoff_ledinverse ? 1 : 0);
 #endif
-      yield();
+        yield();
       }
 #endif
     }
@@ -1759,6 +1763,8 @@ void sonoff_init()
 #endif
 
 #ifdef HLW8012_CF_PIN
+
+
   // Initialize HLW8012
   // void begin(unsigned char cf_pin, unsigned char cf1_pin, unsigned char sel_pin, unsigned char currentWhen = HIGH, bool use_interrupts = false, unsigned long pulse_timeout = PULSE_TIMEOUT);
   // * cf_pin, cf1_pin and sel_pin are GPIOs to the HLW8012 IC
@@ -1859,15 +1865,16 @@ void sonoff_handle()
   if (millis() > nextupdatetime)
   {
     putdatamap("voltage", String(hlw8012.getVoltage()));
-    putdatamap("voltage/multiplier", String(hlw8012.getVoltageMultiplier(), 2));
+    putdatamap("voltage/multiplier", String(hlw8012.getVoltageMultiplier()));
     putdatamap("current", String(hlw8012.getCurrent(), 3));
-    putdatamap("current/multiplier", String(hlw8012.getCurrentMultiplier(), 2));
+    putdatamap("current/multiplier", String(hlw8012.getCurrentMultiplier()));
     putdatamap("power/active", String(hlw8012.getActivePower()));
     putdatamap("power/apparent", String(hlw8012.getApparentPower()));
     putdatamap("power/reactive", String(hlw8012.getReactivePower()));
-    putdatamap("power/ws", String(hlw8012.getEnergy()));
     putdatamap("power/factor", String(hlw8012.getPowerFactor(), 2));
-    putdatamap("power/multiplier", String(hlw8012.getPowerMultiplier(), 2));
+    putdatamap("power/multiplier", String(hlw8012.getPowerMultiplier()));
+    putdatamap("energy/ws", String(hlw8012.getEnergy()));
+    putdatamap("energy/kwh", String(hlw8012.getEnergy() / 3600000, 3));
     nextupdatetime = millis() + 1000;
   }
 #endif
@@ -2411,7 +2418,7 @@ void amgpelletstovecallback (String topic, String payload)
 
 //void logdebug (String function, String message, loglevel level = DEBUG)
 //{
- // Debug.printf("(%s) %s", function.c_str(), message.c_str());
+// Debug.printf("(%s) %s", function.c_str(), message.c_str());
 //}
 
 void openthermcallback (String topic, String payload)
@@ -2431,10 +2438,27 @@ void growattcallback (String topic, String payload)
   putdatamap(topic, payload);
 }
 #endif
+#ifdef SMARTMETER
 void smartmetercallback (String topic, String payload)
 {
-  putdatamap(topic, payload);
+  static uint32 nextupdatetime = 0;
+  static bool sendupdate = 0;
+
+  if (nextupdatetime < uptime)
+  if ((topic == "status") && (payload == "receiving")) // wait for start of new packet from smartmeter
+  {
+    sendupdate = 1;
+  }
+
+  if (sendupdate) putdatamap(topic, payload);
+
+  if ((topic == "status") && (payload == "ready") && sendupdate) // stop processing when a complete packet was pushed to datamap
+  {
+    sendupdate = 0;
+    nextupdatetime = uptime + 5; // wait 5 seconds before accepting new values from smartmeter
+  }
 }
+#endif
 
 void setup() {
 
@@ -2534,7 +2558,7 @@ void setup() {
 
   ArduinoOTA.setHostname(esp_hostname.c_str());
 
-  Debug.begin(esp_hostname.c_str());
+  Debug.begin(esp_hostname.c_str(), DEBUGLEVEL);
   Debug.setPassword(esp_password);
   Debug.setResetCmdEnabled(true);
   Debug.setCallBackProjectCmds(&processCmdRemoteDebug);
@@ -2817,7 +2841,7 @@ static void handleDataExternalIpServer(void* arg, AsyncClient* client, void *dat
       datastring = "";
       break;
     }
-    
+
   }
   putdatamap("wifi/externalip", datastring);
   client->close();
