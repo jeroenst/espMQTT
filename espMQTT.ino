@@ -19,9 +19,9 @@
 */
 
 /* SETTINGS */
-#define SERIALLOG
+//#define SERIALLOG
 //#define SYSLOGDEBUG
-#define DEBUGLEVEL Debug.VERBOSE
+#define DEBUGLEVEL Debug.DEBUG
 
 
 /* ESP8266 */
@@ -30,12 +30,12 @@
 // #define BATHROOM
 // #define BEDROOM2
 // #define OPENTHERM
-// #define SMARTMETER
+#define SMARTMETER
 // #define GROWATT
 // #define SDM120
 //#define WATERMETER
 //#define DDNS
-#define GENERIC8266
+// #define GENERIC8266
 //#define MAINPOWERMETER
 //#define NOISE
 //#define SOIL
@@ -416,7 +416,6 @@ Adafruit_NeoPixel neopixelleds = Adafruit_NeoPixel(2, NEOPIXELPIN, NEO_RGB + NEO
 #define FLASHBUTTON D3
 #define ESPLED D4
 #include "smartmeter.h"
-#undef SERIALLOG
 #endif
 
 #ifdef DDNS
@@ -867,6 +866,8 @@ void initSerial()
 #elif defined (SDM120)
   Serial.setDebugOutput(false);
   sdm.begin();
+#elif defined (SMARTMETER)
+  // do nothing, smartmeter initializes serial in init function.
 #else
   Serial.begin(115200); //Init serial 115200 baud
 #endif
@@ -1164,6 +1165,7 @@ void loop()
       yield();
     }
 #endif
+    MDNS.begin(esp_hostname.c_str());
   }
 
   if (triggers.wifidisconnected)
