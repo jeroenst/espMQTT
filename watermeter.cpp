@@ -32,7 +32,6 @@ void watermeter_init(uint8_t watermeter_pulsepin, uint8_t watermeter_ledpin, uin
 
 bool watermeter_handle()
 {
-  static uint16_t lmincountdowntimer = 0;
   static long long lmincountdownmillis = 0;
   static long long last_pulse_time = 0;
   static bool oldinputpinstate = digitalRead(_watermeter_pulsepin);

@@ -44,7 +44,7 @@ void growatt_init(void(*callback)(String,String), int fanpin)
 
 void growatt_send_command(uint8_t c1)
 {
-  DEBUG_V("Requesting Growatt Data %#02x...\n");
+  DEBUG_V("Requesting Growatt Data %02x...\n", c1);
   uint8_t TxBuffer[10];
   TxBuffer[0] = 0x3F;
   TxBuffer[1] = 0x23;
@@ -52,7 +52,7 @@ void growatt_send_command(uint8_t c1)
   TxBuffer[3] = 0x32;
   TxBuffer[4] = c1;
   TxBuffer[5] = 0x00;
-  uint16_t wStringSum = 0;
+  uint32_t wStringSum = 0;
   for (int i = 0; i < 6; i++)
   {
     wStringSum = wStringSum + (TxBuffer[i] ^ i);

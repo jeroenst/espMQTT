@@ -100,7 +100,7 @@ int8_t smartmeter_handle()
       {
         _smartmeter_callback("gas/m3", String(value, 3));
         char gasdatetime[20];
-        sprintf(gasdatetime, "%02ld-%02ld-%02ld %ld:%02ld:%02ld", day, month, year, hour, minute, second);
+        sprintf(gasdatetime, "%02d-%02d-%02d %d:%02d:%02d", day, month, year, hour, minute, second);
         _smartmeter_callback("gas/datetime", String(gasdatetime));
         returnvalue += 2;
       }

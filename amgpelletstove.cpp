@@ -42,9 +42,9 @@ void amgpelletstove_receivemqtt(String topicstring, String payloadstring)
     if ((payloadstring.toInt() >= 16) && (payloadstring.toInt() <= 25)) // No wider range supported for now..
     {
       char str[9];
-      sprintf(str, "%02X", payloadstring.toInt());
+      sprintf(str, "%02X", (uint16_t)payloadstring.toInt());
       String temp = str;
-      sprintf(str, "%02X", payloadstring.toInt() + 75);
+      sprintf(str, "%02X", (uint16_t)(payloadstring.toInt() + 75));
       String checksum = str;
       amgtempcmd = "RF2" + temp + "0" + checksum + "&";
       _amgpelletstove_callback("room/temperature/setpoint", String(payloadstring.toInt()));

@@ -79,19 +79,11 @@ U SimpleMap<T, U>::get(T key) {
 template<typename T, typename U>
 SimpleMapNode<T, U>* SimpleMap<T, U>::getNode(T key) {
     if (listSize > 0) {
-        SimpleMapNode<T, U>* h = listBegin;
-
         int lowerEnd = 0;
         int upperEnd = listSize - 1;
-        int res;
-
-        int hIndex = 0;
 
         while (lowerEnd <= upperEnd) {
-            h      = lastNodeGot;
-            hIndex = lastIndexGot;
-
-            res = compare(key, getNodeIndex(lowerEnd)->key);
+            int res = compare(key, getNodeIndex(lowerEnd)->key);
 
             if (res == 0) {
                 return lastNodeGot;

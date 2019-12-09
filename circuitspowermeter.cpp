@@ -90,7 +90,7 @@ void setADSch(byte cspin, byte drdypin, byte channel)
   SPI.transfer(0x00);
   delayMicroseconds(10);
 
-  for (int i = 5; i--; i > 0) // Wait 5 drdy periods for analog input to settle (settling time)
+  for (int i = 5; i > 0; i--) // Wait 5 drdy periods for analog input to settle (settling time)
   {
     while (!digitalRead(drdypin)) {} ; // Wait for DRDY pin to become high..
     while (digitalRead(drdypin)) {} ; // Wait for DRDY pin to become low..
@@ -195,7 +195,7 @@ void debugvoltread()
 
 }
 */
-byte readADSpower(byte adchannel, int32 * mA, int32 * mV, int32 * mW, int32 * mVA)
+int8_t readADSpower(byte adchannel, int32 * mA, int32 * mV, int32 * mW, int32 * mVA)
 {
 #define NROFSAMPLES 200
   int32_t ac_mA[NROFSAMPLES]; // 200 samples is 20 ms
@@ -315,6 +315,7 @@ byte readADSpower(byte adchannel, int32 * mA, int32 * mV, int32 * mW, int32 * mV
   *mV = sum_mV / NROFSAMPLES;
   *mW = (sum_mW / NROFSAMPLES) / 1000;
   *mVA = (*mA * *mV) / 1000;
+  return 0;
 }
 
 
