@@ -23,6 +23,7 @@
 //#define SYSLOGDEBUG
 #define DEBUGLEVEL Debug.DEBUG
 
+
 //#define ESPMQTT_SMARTMETER
 
 /* ESP8266 */
@@ -57,6 +58,10 @@
 //#define SONOFFDUAL
 //#define SONOFFS20_PRINTER
 //#define SONOFFPOW
+
+#ifndef ESPMQTT_VERSION
+#define ESPMQTT_VERSION "TESTVERSION"
+#endif
 
 #ifdef ESPMQTT_SMARTMETER
 #define SMARTMETER 
@@ -467,7 +472,6 @@ AsyncMqttClient mqttClient;
 #define syslogA(fmt, ...) if (WiFi.status() == WL_CONNECTED) syslog.logf(LOG_ALERT,"(%s) " fmt, __func__, ##__VA_ARGS__)
 #define syslogEM(fmt, ...) if (WiFi.status() == WL_CONNECTED) syslog.logf(LOG_EMERG,"(%s) " fmt, __func__, ##__VA_ARGS__)
 
-
 #include <ESP8266Ping.h>
 
 // A UDP instance to let us send and receive packets over UDP
@@ -668,6 +672,7 @@ void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
     putdatamap("firmware/name", firmwarename, sendupdate);
     putdatamap("firmware/target", FIRMWARE_TARGET, sendupdate);
     putdatamap("firmware/sourcefile", String(__FILE__).substring(String(__FILE__).lastIndexOf('/') + 1), sendupdate);
+    putdatamap("firmware/version", ESPMQTT_VERSION, sendupdate);
     putdatamap("firmware/compiletime", String(__DATE__) + " " + __TIME__, sendupdate);
     putdatamap("status", "online", sendupdate);
     putdatamap("flash/id", String(ESP.getFlashChipId()), sendupdate);
