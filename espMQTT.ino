@@ -17,78 +17,66 @@
    Libraries via Arduino Library Manager:
     (I2C) Wire
 */
+#define DEBUGLEVEL Debug.DEBUG
+//#define SYSLOGDEBUG
 
+#ifndef ESPMQTT_BUILDSCRIPT // Only use defines when we are not compiled from the build script...
 /* SETTINGS */
 //#define SERIALLOG
-//#define SYSLOGDEBUG
-#define DEBUGLEVEL Debug.DEBUG
-
-
-//#define ESPMQTT_SMARTMETER
 
 /* ESP8266 */
-// #define WEATHER
-// #define AMGPELLETSTOVE
-// #define BATHROOM
-// #define BEDROOM2
-// #define OPENTHERM
-// #define SMARTMETER
-// #define GROWATT
-// #define SDM120
-//#define WATERMETER
-//#define DDNS
-// #define GENERIC8266
-//#define MAINPOWERMETER
-//#define NOISE
-//#define SOIL
-
+// #define  ESPMQTT_WEATHER
+// #define  ESPMQTT_AMGPELLETSTOVE
+// #define  ESPMQTT_BATHROOM
+// #define  ESPMQTT_BEDROOM2
+// #define  ESPMQTT_OPENTHERM
+// #define ESPMQTT_SMARTMETER
+// #define  ESPMQTT_GROWATT
+// #define  ESPMQTT_SDM120
+#define  ESPMQTT_WATERMETER
+//#define  ESPMQTT_DDNS
+// #define  ESPMQTT_GENERIC8266
+//#define  ESPMQTT_MAINPOWERMETER
+//#define  ESPMQTT_NOISE
+//#define  ESPMQTT_SOIL
 
 /* ESP8285 */
-// #define DUCOBOX
-// #define SONOFFS20 // coffeelamp & sonoffs20_00X
-// #define SONOFFBULB
-// #define SONOFFPOWR2 // tv&washing machine&server
-// #define GARDEN //ESP8285 TUIN & MARIANNE & LUIFEL
-// #define SONOFF_FLOORHEATING
-// #define IRRIGATION
-//#define BLITZWOLF
-//#define WIFIDIMMERDUO
-//#define DIMMER
-//#define SONOFF4CH //ESP8285
-//#define SONOFFDUAL
-//#define SONOFFS20_PRINTER
-//#define SONOFFPOW
+// #define  ESPMQTT_DUCOBOX
+// #define  ESPMQTT_SONOFFS20 // coffeelamp & sonoffs20_00X
+// #define  ESPMQTT_SONOFFBULB
+// #define  ESPMQTT_SONOFFPOWR2 // tv&washing machine&server
+// #define  ESPMQTT_GARDEN //ESP8285 TUIN & MARIANNE & LUIFEL
+// #define  ESPMQTT_SONOFF_FLOORHEATING
+// #define  ESPMQTT_IRRIGATION
+//#define  ESPMQTT_BLITZWOLF
+//#define  ESPMQTT_WIFIDIMMERDUO
+//#define  ESPMQTT_DIMMER
+//#define  ESPMQTT_SONOFF4CH //ESP8285
+//#define  ESPMQTT_SONOFFDUAL
+//#define  ESPMQTT_SONOFFS20_PRINTER
+//#define  ESPMQTT_SONOFFPOW
 
-#ifndef ESPMQTT_VERSION
 #define ESPMQTT_VERSION "TESTVERSION"
 #endif
 
-#ifdef ESPMQTT_SMARTMETER
-#define SMARTMETER 
-#endif
 
-#ifdef ESPMQTT_AMGPELLETSTOVE
-#define AMGPELLETSTOVE
-#endif
-
-
-#ifdef SONOFFS20_PRINTER
+#ifdef  ESPMQTT_SONOFFS20_PRINTER
 #define FIRMWARE_TARGET "SONOFFS20_PRINTER"
-#define SONOFFS20
+#define  ESPMQTT_SONOFFS20
 #define SONOFFCH_TIMEOUT 1800
 uint32_t sonoffch_starttime[1];
 #endif
 
-#ifdef SONOFF_FLOORHEATING
+#ifdef  ESPMQTT_SONOFF_FLOORHEATING
 #define FIRMWARE_TARGET "SONOFF_FLOORHEATING"
-#define SONOFFS20
+#define  ESPMQTT_SONOFFS20
 // Use RX pin for onewire
 #define ONEWIREPIN 3
 #undef SERIALLOG
 #define SONOFF_FLOORHEATING_TEMPMAX 45
 #endif
 
-#ifdef DIMMER
+#ifdef  ESPMQTT_DIMMER
 #define FIRMWARE_TARGET "DIMMER"
 #define TRIAC_PIN D1
 #define ZEROCROSS_PIN D2
@@ -97,7 +85,7 @@ uint32_t sonoffch_starttime[1];
 #include "dimmer.h"
 #endif
 
-#ifdef NOISE
+#ifdef  ESPMQTT_NOISE
 #define FIRMWARE_TARGET "NOISE"
 #define MICOFFSET 0
 #define MICGAIN 1
@@ -105,7 +93,7 @@ uint32_t sonoffch_starttime[1];
 #define ESPLED D4
 #endif
 
-#ifdef SDM120
+#ifdef  ESPMQTT_SDM120
 #define FIRMWARE_TARGET "SDM120"
 #define FLASHBUTTON D3
 #define ESPLED D4
@@ -115,21 +103,21 @@ HardwareSerial serSDM(0);
 SDM sdm(serSDM, 2400, NOT_A_PIN);
 #endif
 
-#ifdef WIFIDIMMERDUO
+#ifdef  ESPMQTT_WIFIDIMMERDUO
 #define FIRMWARE_TARGET "WIFIDIMMERDUO"
 #define APONBOOT
 #define ESPLED 4
 #endif
 
 
-#ifdef GENERIC8266
+#ifdef  ESPMQTT_GENERIC8266
 #define FIRMWARE_TARGET "GENERIC8266"
 #define FLASHBUTTON D3
 #define ESPLED D4
 #define SERIALLOG
 #endif
 
-#ifdef AMGPELLETSTOVE
+#ifdef  ESPMQTT_AMGPELLETSTOVE
 #define FIRMWARE_TARGET "AMGPELLETSTOVE"
 #define NODEMCULEDPIN D0
 #define FLASHBUTTON D3
@@ -138,7 +126,7 @@ SDM sdm(serSDM, 2400, NOT_A_PIN);
 #undef SERIALLOG
 #endif
 
-#ifdef WEATHER
+#ifdef  ESPMQTT_WEATHER
 #define FIRMWARE_TARGET "WEATHER"
 #define NODEMCULEDPIN D0
 #define FLASHBUTTON D3
@@ -149,7 +137,7 @@ SDM sdm(serSDM, 2400, NOT_A_PIN);
 #undef SERIALLOG
 #endif
 
-#ifdef GROWATT
+#ifdef  ESPMQTT_GROWATT
 #define FIRMWARE_TARGET "GROWATT"
 #define NODEMCULEDPIN D0
 #define FLASHBUTTON D3
@@ -159,30 +147,30 @@ SDM sdm(serSDM, 2400, NOT_A_PIN);
 #undef SERIALLOG
 #endif
 
-#ifdef SOIL
+#ifdef  ESPMQTT_SOIL
 #define FIRMWARE_TARGET "SOIL"
 #define FLASHBUTTON D3
 #define ESPLED D4
 #endif
 
-#ifdef DUCOBOX
+#ifdef  ESPMQTT_DUCOBOX
 #define FIRMWARE_TARGET "DUCOBOX"
-#define SONOFFDUAL
+#define  ESPMQTT_SONOFFDUAL
 #define FLASHBUTTON 10
 #define ESPLED 13
 #include "ducobox.h"
 #undef SERIALLOG
 #endif
 
-#ifdef GARDEN
+#ifdef  ESPMQTT_GARDEN
 #define FIRMWARE_TARGET "GARDEN"
 #ifndef ARDUINO_ESP8266_ESP01
 #error "Wrong board selected! Select Generic ESP8285 module"
 #endif
-#define SONOFF4CH
+#define  ESPMQTT_SONOFF4CH
 #endif
 
-#ifdef IRRIGATION
+#ifdef  ESPMQTT_IRRIGATION
 #define FIRMWARE_TARGET "IRRIGATION"
 uint32_t sonoffch_starttime[4];
 static bool sonoffch_timeout_enabled[4] = {1, 1, 1, 0};
@@ -190,10 +178,10 @@ static bool sonoffch_timeout_enabled[4] = {1, 1, 1, 0};
 #ifndef ARDUINO_ESP8266_ESP01
 #error "Wrong board selected! Select Generic ESP8285 module"
 #endif
-#define SONOFF4CH
+#define  ESPMQTT_SONOFF4CH
 #endif
 
-#ifdef SONOFF4CH
+#ifdef  ESPMQTT_SONOFF4CH
 #ifndef FIRMWARE_TARGET
 #define FIRMWARE_TARGET "SONOFF4CH"
 #endif
@@ -208,7 +196,7 @@ const byte sonoff_buttons[4] = {0, 9, 10, 14};
 static bool sonoff_oldbuttons[4] = {1, 1, 1, 1};
 #endif
 
-#ifdef SONOFFDUAL
+#ifdef  ESPMQTT_SONOFFDUAL
 #ifndef FIRMWARE_TARGET
 #define FIRMWARE_TARGET "SONOFFDUAL"
 #endif
@@ -223,7 +211,7 @@ const byte sonoff_buttons[2] = {0, 9};
 static bool sonoff_oldbuttons[2] = {1, 1};
 #endif
 
-#ifdef BLITZWOLF
+#ifdef  ESPMQTT_BLITZWOLF
 #define FIRMWARE_TARGET "BLITZWOLF"
 #ifndef ARDUINO_ESP8266_ESP01
 #error "Wrong board selected! Select Generic ESP8285 module"
@@ -252,7 +240,7 @@ const bool sonoff_ledinverse = 1;
 #define HLW8012_POWER_MULTIPLIER 3160000
 #endif
 
-#ifdef SONOFFPOW
+#ifdef  ESPMQTT_SONOFFPOW
 #define FIRMWARE_TARGET "SONOFFPOW"
 #ifndef ARDUINO_ESP8266_ESP01
 #error "Wrong board selected! Select Generic ESP8285 module"
@@ -281,7 +269,7 @@ static bool sonoff_oldbuttons[1] = {1};
 #endif
 
 
-#ifdef SONOFFPOWR2
+#ifdef  ESPMQTT_SONOFFPOWR2
 #undef SERIALLOG
 #define FIRMWARE_TARGET "SONOFFPOWR2"
 #ifndef ARDUINO_ESP8266_ESP01
@@ -299,7 +287,7 @@ double currentval = 0;
 double powerval = 0;
 #endif
 
-#ifdef SONOFFBULB
+#ifdef  ESPMQTT_SONOFFBULB
 // Remember: board: generic esp8266 module, flashmode=dio
 #ifndef FIRMWARE_TARGET
 #define FIRMWARE_TARGET "SONOFFBULB"
@@ -323,7 +311,7 @@ my92xx * _my92xx;
 #endif
 
 
-#ifdef SONOFFS20
+#ifdef  ESPMQTT_SONOFFS20
 // Remember: board: generic esp8266 module, flashmode=dio
 #ifndef FIRMWARE_TARGET
 #define FIRMWARE_TARGET "SONOFFS20"
@@ -339,7 +327,7 @@ const byte sonoff_buttons[1] = {0};
 static bool sonoff_oldbuttons[1] = {1};
 #endif
 
-#ifdef MAINPOWERMETER
+#ifdef  ESPMQTT_MAINPOWERMETER
 #define FIRMWARE_TARGET "MAINPOWERMETER"
 #define FLASHBUTTON D3
 #define ESPLED D4
@@ -350,7 +338,7 @@ static bool sonoff_oldbuttons[1] = {1};
 #include "circuitspowermeter.h"
 #endif
 
-#ifdef OPENTHERM
+#ifdef  ESPMQTT_OPENTHERM
 #define FIRMWARE_TARGET "OPENTHERM"
 #define FLASHBUTTON D3
 #define ESPLED D4
@@ -359,7 +347,7 @@ static bool sonoff_oldbuttons[1] = {1};
 #undef SERIALLOG
 #endif
 
-#ifdef WATERMETER
+#ifdef  ESPMQTT_WATERMETER
 #define FIRMWARE_TARGET "WATERMETER"
 #define NODEMCULEDPIN D0
 #define FLASHBUTTON D3
@@ -373,7 +361,7 @@ static bool sonoff_oldbuttons[1] = {1};
 #include "i2ceeprom_wearleveling.h"
 #endif
 
-#ifdef GARDEN2
+#ifdef  ESPMQTT_GARDEN2
 #define FIRMWARE_TARGET "GARDEN2"
 #define FLASHBUTTON D3
 #define ESPLED D4
@@ -397,7 +385,7 @@ static bool sonoff_oldbuttons[1] = {1};
 #define OLEDSMALL
 #endif
 
-#ifdef BATHROOM
+#ifdef  ESPMQTT_BATHROOM
 #define FIRMWARE_TARGET "BATHROOM"
 #define ESPLED_TIMEOUT_OFF 0 // In sleepingroom we want the led to go off after some time
 #define FLASHBUTTON D3
@@ -410,7 +398,7 @@ static bool sonoff_oldbuttons[1] = {1};
 Adafruit_NeoPixel neopixelleds = Adafruit_NeoPixel(2, NEOPIXELPIN, NEO_RGB + NEO_KHZ400);
 #endif
 
-#ifdef BEDROOM2
+#ifdef  ESPMQTT_BEDROOM2
 #define FIRMWARE_TARGET "BEDROOM2"
 #define FLASHBUTTON D3
 #define ESPLED D4
@@ -425,14 +413,14 @@ Adafruit_NeoPixel neopixelleds = Adafruit_NeoPixel(2, NEOPIXELPIN, NEO_RGB + NEO
 #undef SERIALLOG
 #endif
 
-#ifdef SMARTMETER
+#ifdef ESPMQTT_SMARTMETER
 #define FIRMWARE_TARGET "SMARTMETER"
 #define FLASHBUTTON D3
 #define ESPLED D4
 #include "smartmeter.h"
 #endif
 
-#ifdef DDNS
+#ifdef  ESPMQTT_DDNS
 #include<EasyDDNS.h>
 #define FIRMWARE_TARGET "DDNS"
 #define NODEMCULEDPIN D0
@@ -558,20 +546,20 @@ OneWire oneWire(ONEWIREPIN);
 // Pass our oneWire reference to Dallas Temperature.
 DallasTemperature oneWireSensors(&oneWire);
 
-#ifdef OPENTHERM
+#ifdef  ESPMQTT_OPENTHERM
 DeviceAddress onewire_chReturnWaterThermometer, onewire_dcwSupplyWaterThermometer;
 float onewire_chReturnWaterTemperature = -127, onewire_dcwSupplyWaterTemperature = -127;
 float oldonewire_chReturnWaterTemperature = -127, oldonewire_dcwSupplyWaterTemperature = -127;
 bool onewire_chReturnWaterEnabled = false, onewire_dcwSupplyWaterEnabled = false;
 #endif
 
-#ifdef WEATHER
+#ifdef  ESPMQTT_WEATHER
 DeviceAddress onewire_OutsideAddress;
 float onewire_chOutsideTemperature = -127;
 float oldonewire_chOutsideTemperature = -127;
 #endif
 
-#ifdef SONOFF_FLOORHEATING
+#ifdef  ESPMQTT_SONOFF_FLOORHEATING
 DeviceAddress onewire_floorWaterAddress;
 float onewire_floorWaterTemperature = -127;
 bool floorheating_valveon = 0;
@@ -598,8 +586,6 @@ bool mqtt_ssl = 0;
 String esp_password = "esplogin";
 String esp_hostname = "";
 String esp_orig_hostname = "";
-static bool debug;
-static bool mqttReady = false;
 //#include "esp8266_peri.h"
 RemoteDebug Debug;
 
@@ -661,12 +647,12 @@ void putdatamap(String topic, String value, bool sendupdate = true, bool forcese
 void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
 {
   char uptimestr[20];
-  sprintf(uptimestr, "%ld:%02ld:%02ld:%02ld", uptime / 86400, (uptime / 3600) % 24, (uptime / 60) % 60, uptime % 60);
+  sprintf(uptimestr, "%d:%02d:%02d:%02d", uptime / 86400, (uptime / 3600) % 24, (uptime / 60) % 60, uptime % 60);
   if (writestaticvalues)
   {
     putdatamap("hostname", WiFi.hostname(), sendupdate);
     String firmwarename = __FILE__;
-    firmwarename = firmwarename.substring(firmwarename.lastIndexOf("\/") + 1);
+    firmwarename = firmwarename.substring(firmwarename.lastIndexOf("/") + 1);
     firmwarename = firmwarename.substring(firmwarename.lastIndexOf("\\") + 1);
     firmwarename = firmwarename.substring(0, firmwarename.lastIndexOf("."));
     putdatamap("firmware/name", firmwarename, sendupdate);
@@ -697,7 +683,7 @@ void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
   putdatamap("mqtt/clientid", String(mqttClient.getClientId()), sendupdate);
 }
 
-void onWifiConnect(const WiFiEventStationModeGotIP& event)
+void onWifiConnect(const WiFiEventStationModeGotIP&)
 {
   wifichannel = WiFi.channel(); // We can't rely on wifi.channel because while scanning the channel is changed.
   //wifiReconnectTimer.detach();
@@ -705,7 +691,7 @@ void onWifiConnect(const WiFiEventStationModeGotIP& event)
   mainstate.wificonnected = true;
 }
 
-void onWifiDisconnect(const WiFiEventStationModeDisconnected& event)
+void onWifiDisconnect(const WiFiEventStationModeDisconnected&)
 {
   wifichannel = 0;
   triggers.wifidisconnected = true;
@@ -803,7 +789,6 @@ void mqttdosubscriptions(int32_t packetId = -1)
   DEBUG_D("mqttdosubscriptions (%d)\n", packetId);
   static int32_t nextpacketid = -1;
   static uint16_t nextsubscribe = 0;
-  bool startpublish = false;
   static String subscribetopic = ""; // We need this static variable because mqttclient.subscribe uses a pointer
 
   if (packetId == -1) nextsubscribe = 0;
@@ -815,22 +800,22 @@ void mqttdosubscriptions(int32_t packetId = -1)
     //DEBUG("mqttdosubscriptions while nextsubscribe=%d\n", nextsubscribe);
     switch (nextsubscribe)
     {
-#if defined(OPENTHERM) || defined(GENERIC8266)
+#if defined( ESPMQTT_OPENTHERM) || defined( ESPMQTT_GENERIC8266)
       case 0: subscribetopic = mqtt_topicprefix + "setthermostattemporary"; break;
       case 1: subscribetopic = mqtt_topicprefix + "setthermostatcontinue"; break;
       case 2: subscribetopic = mqtt_topicprefix + "setchwatertemperature"; break;
 #endif
-#ifdef DUCOBOX
+#ifdef  ESPMQTT_DUCOBOX
       case 3: subscribetopic = mqtt_topicprefix + "setfan"; break;
 #endif
-#ifdef DIMMER
+#ifdef  ESPMQTT_DIMMER
       case 4: subscribetopic = mqtt_topicprefix + "setdimvalue"; break;
       case 5: subscribetopic = mqtt_topicprefix + "setdimstate"; break;
 #endif
-#ifdef SONOFFBULB
+#ifdef  ESPMQTT_SONOFFBULB
       case 6: subscribetopic = mqtt_topicprefix + "setcolor"; break;
 #endif
-#if defined(AMGPELLETSTOVE)
+#if defined( ESPMQTT_AMGPELLETSTOVE)
       case 7: subscribetopic = mqtt_topicprefix + "setonoff"; break;
       case 8: subscribetopic = mqtt_topicprefix + "setpower"; break;
       case 9: subscribetopic = mqtt_topicprefix + "settemperature"; break;
@@ -841,7 +826,7 @@ void mqttdosubscriptions(int32_t packetId = -1)
       case 12:  if (2 < SONOFFCH) subscribetopic = mqtt_topicprefix + "setrelay/" + String(2); break;
       case 13:  if (3 < SONOFFCH) subscribetopic = mqtt_topicprefix + "setrelay/" + String(3); break;
 #endif
-#ifdef SONOFF_FLOORHEATING
+#ifdef  ESPMQTT_SONOFF_FLOORHEATING
       case 14: subscribetopic = mqtt_topicprefix + "setvalve"; break;
 #endif
     }
@@ -869,18 +854,18 @@ void onMqttPublish(uint16_t packetId)
 void initSerial()
 {
   Serial.setRxBufferSize(2048);
-#if defined(MH_Z19) || defined(OPENTHERM) || defined(GROWATT) || defined (WIFIDIMMERDUO)
+#if defined(MH_Z19) || defined( ESPMQTT_OPENTHERM) || defined( ESPMQTT_GROWATT) || defined ( ESPMQTT_WIFIDIMMERDUO)
   Serial.setDebugOutput(false);
   Serial.begin(9600);  //Init serial 9600 baud
-#elif defined (SONOFFPOWR2)
+#elif defined ( ESPMQTT_SONOFFPOWR2)
   Serial.setDebugOutput(false);
   Serial.begin(4800, SERIAL_8E1);
-#elif defined (AMGPELLETSTOVE)
+#elif defined ( ESPMQTT_AMGPELLETSTOVE)
   Serial.setDebugOutput(false);
-#elif defined (SDM120)
+#elif defined ( ESPMQTT_SDM120)
   Serial.setDebugOutput(false);
   sdm.begin();
-#elif defined (SMARTMETER)
+#elif defined (ESPMQTT_SMARTMETER)
   // do nothing, smartmeter initializes serial in init function.
 #else
   Serial.begin(115200); //Init serial 115200 baud
@@ -939,9 +924,9 @@ void update_dht()
 }
 #endif
 
-void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total) {
+void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties, size_t len, size_t, size_t) {
   String payloadstring = "";
-  for (int i = 0; i < len; i++)
+  for (unsigned int i = 0; i < len; i++)
   {
     payloadstring += char(payload[i]);
   }
@@ -982,7 +967,7 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
   }
 #endif
 
-#ifdef OPENTHERM
+#ifdef  ESPMQTT_OPENTHERM
   if (String(topic) == String(mqtt_topicprefix + "setthermostattemporary"))
   {
     DEBUG_I("RECEIVED SETTHERMOSTATTEMPORARY %s\n", payloadstring.c_str());
@@ -1000,16 +985,16 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
   }
 #endif
 
-#ifdef SONOFF_FLOORHEATING
+#ifdef  ESPMQTT_SONOFF_FLOORHEATING
   if (String(topic) == String(mqtt_topicprefix + "setvalve")) floorheating_valveon = payloadstring == "1" ? true : false;
 #endif
 
 
-#ifdef DUCOBOX
+#ifdef  ESPMQTT_DUCOBOX
   if (String(topic) == String(mqtt_topicprefix + "setfan")) ducobox_setfan(payloadstring.toInt());
 #endif
 
-#ifdef DIMMER
+#ifdef  ESPMQTT_DIMMER
   if (String(topic) == String(mqtt_topicprefix + "setdimvalue"))
   {
     dimmer_setdimvalue(payloadstring.toInt());
@@ -1017,7 +1002,7 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
   }
 #endif
 
-#ifdef SONOFFBULB
+#ifdef  ESPMQTT_SONOFFBULB
   if (String(topic) == String(mqtt_topicprefix + "setcolor"))
   {
     long number = strtol(payloadstring.substring(0, 6).c_str(), NULL, 16);
@@ -1033,7 +1018,7 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
   }
 #endif
 
-#ifdef AMGPELLETSTOVE
+#ifdef  ESPMQTT_AMGPELLETSTOVE
   amgpelletstove_receivemqtt(topicstring, payloadstring);
 #endif
 }
@@ -1057,9 +1042,8 @@ String uint64ToString(uint64_t input) {
 
 void write_oled_display()
 {
-  int lcdline = -9;
 #ifdef OLED_ADDRESS
-
+  int lcdline = -9;
   DEBUG_V ("Writing OLED display\n");
   display.clear();
   int rssi = WiFi.RSSI();
@@ -1115,7 +1099,7 @@ void write_oled_display()
 #endif
 }
 
-#ifdef NOISE
+#ifdef  ESPMQTT_NOISE
 void handle_noise()
 {
   static uint8_t timeout = 0; // We can't read ADC all the time because it will disconnect wifi
@@ -1151,15 +1135,12 @@ static int8_t previouswifistatus = -1;
 
 void loop()
 {
-  static int8_t rssi = 0;
-  static int8_t oldrssi = 0;
-
   ESP.wdtFeed(); // Prevent HW WD to kick in...
   ArduinoOTA.handle();
   Debug.handle();
   yield();
 
-#ifdef DDNS
+#ifdef  ESPMQTT_DDNS
   EasyDDNS.update(10000);
 #endif
 
@@ -1299,22 +1280,22 @@ void loop()
   yield();
 #endif
 
-#ifdef NOISE
+#ifdef  ESPMQTT_NOISE
   handle_noise();
   yield();
 #endif
 
-#ifdef DUCOBOX
+#ifdef  ESPMQTT_DUCOBOX
   ducobox_handle();
   yield();
 #endif
 
-#ifdef DIMMER
+#ifdef  ESPMQTT_DIMMER
   dimmer_handle();
   yield();
 #endif
 
-#ifdef GENERIC8266
+#ifdef  ESPMQTT_GENERIC8266
 #endif
 
 #ifdef RAINMETERPIN
@@ -1381,7 +1362,7 @@ void loop()
 #endif
 
 
-#ifdef WATERMETER
+#ifdef  ESPMQTT_WATERMETER
   static uint32_t watermeter_liters = watermeter_getliters();
   if (watermeter_handle())
   {
@@ -1400,17 +1381,17 @@ void loop()
   yield();
 #endif
 
-#ifdef OPENTHERM
+#ifdef  ESPMQTT_OPENTHERM
   opentherm_handle();
   yield();
 #endif
 
-#ifdef SMARTMETER
+#ifdef  ESPMQTT_SMARTMETER
   smartmeter_handle();
   yield();
 #endif
 
-#ifdef GROWATT
+#ifdef  ESPMQTT_GROWATT
   growatt_handle();
   yield();
 #endif
@@ -1420,12 +1401,12 @@ void loop()
   yield();
 #endif
 
-#ifdef AMGPELLETSTOVE
+#ifdef  ESPMQTT_AMGPELLETSTOVE
   amgpelletstove_handle();
   yield();
 #endif
 
-#ifdef WIFIDIMMERDUO
+#ifdef  ESPMQTT_WIFIDIMMERDUO
   /*if (Serial.available() > 0)
     {
     int serval = Serial.read();
@@ -1433,7 +1414,7 @@ void loop()
     }*/
 #endif
 
-#ifdef SONOFFPOWR2
+#ifdef  ESPMQTT_SONOFFPOWR2
   static char serbuffer[100];
   static int serpointer = -1;
   static char oldserval = 0;
@@ -1509,7 +1490,7 @@ void loop()
   {
     //    Serial.print(".");
     timertick = 0;
-#ifdef SDM120
+#ifdef  ESPMQTT_SDM120
     static uint8_t sdmreadcounter = 1;
 
     switch (sdmreadcounter)
@@ -1585,7 +1566,7 @@ void loop()
     if ((uptime % 60) == 0)
     {
       char uptimestr[20];
-      sprintf(uptimestr, "%ld:%02ld:%02ld:%02ld", uptime / 86400, (uptime / 3600) % 24, (uptime / 60) % 60, uptime % 60);
+      sprintf(uptimestr, "%d:%02d:%02d:%02d", uptime / 86400, (uptime / 3600) % 24, (uptime / 60) % 60, uptime % 60);
       time_t now;
       time(&now);
       String strtime = ctime(&now);
@@ -1599,7 +1580,7 @@ void loop()
     }
 
 
-#ifdef SONOFFPOWR2
+#ifdef  ESPMQTT_SONOFFPOWR2
     static uint8_t powr2sec = 0;
     if (powr2sec++ > 5) // Every 5 seconds send update about power usage
     {
@@ -1629,7 +1610,7 @@ void loop()
 
     update_systeminfo();
 
-#ifdef MAINPOWERMETER
+#ifdef  ESPMQTT_MAINPOWERMETER
     static uint8_t circuitnr = 0;
     int32_t mW;
     int32_t mVA;
@@ -1658,7 +1639,7 @@ void loop()
       DEBUG_V("Requesting DS18B20 temperatures...\n");
       oneWireSensors.requestTemperatures();
       float temperature;
-#ifdef OPENTHERM
+#ifdef  ESPMQTT_OPENTHERM
       temperature = oneWireSensors.getTempC(onewire_chReturnWaterThermometer);
       DEBUG_I("chreturnwatertemp=%f\n", temperature);
       if ((onewire_chReturnWaterEnabled) && (temperature != -127)) putdatamap("ow/ch/returnwatertemperature", String(temperature, 1));
@@ -1669,14 +1650,14 @@ void loop()
       else putdatamap("ow/dcw/temperature", "-");
       yield();
 #endif
-#ifdef WEATHER
+#ifdef  ESPMQTT_WEATHER
       temperature = oneWireSensors.getTempC(onewire_OutsideAddress);
       DEBUG_I("Outside Temperature=%f\n", temperature);
       if (temperature != -127) putdatamap("temperature", String(temperature, 1));
       else putdatamap("temperature", "-");
       yield();
 #endif
-#ifdef SONOFF_FLOORHEATING
+#ifdef  ESPMQTT_SONOFF_FLOORHEATING
       temperature = oneWireSensors.getTempC(onewire_floorWaterAddress);
       DEBUG_I("Floor Water Temperature=%f\n", temperature);
       bool inverse = false;
@@ -1718,7 +1699,6 @@ void loop()
 
     if (WiFi.status() == WL_CONNECTED)
     {
-      static uint8_t mqttreconnecttimer = 10;
       wifiTimer = 0;
       if (WiFi.status() != previouswifistatus)
       {
@@ -1856,7 +1836,7 @@ void sonoff_handle()
           if (digitalRead(sonoff_relays[i]) != inverse) sonoffch_starttime[i] = uptime;
           else sonoffch_starttime[i] = 0;
 #endif
-#ifdef SONOFF_FLOORHEATING
+#ifdef  ESPMQTT_SONOFF_FLOORHEATING
           if (i == 0) floorheating_valveon = digitalRead(sonoff_relays[i]) != inverse ? 1 : 0;
 #endif
           DEBUG_I ("SONOFF RELAY IS %s\n", digitalRead(sonoff_relays[i]) != inverse ? "ON" : "OFF");
@@ -1916,7 +1896,7 @@ void publishdatamap(int32_t packetId, bool publishall, bool init)
 
   if (publishall)
   {
-    uint32_t publishallpointer = 0;
+    int32_t publishallpointer = 0;
     while (publishallpointer < dataMap->size())
     {
       String topic = dataMap->getKey(publishallpointer);
@@ -2078,7 +2058,7 @@ void eeprom_commit()
     String eepromdata = eepromMap->get(i);
     DEBUG_D("EEPROM.write(%d,%d) (length)\n", eeprompointer, eepromdata.length() + 1);
     EEPROM.write(eeprompointer++, eepromdata.length() + 1);
-    for (int pos = 0; pos < eepromdata.length(); pos++)
+    for (unsigned int pos = 0; pos < eepromdata.length(); pos++)
     {
       char chr = eepromdata.c_str()[pos];
       DEBUG_D("EEPROM.write(%d,%c) (data)\n", eeprompointer, chr);
@@ -2200,7 +2180,7 @@ void systemTimerCallback()
 }
 
 #ifdef MH_Z19
-uint8_t MHZ19_handle(int *ppm, int *temp)
+int8_t MHZ19_handle(int *ppm, int *temp)
 {
   static unsigned long requesttime = 0;
   static unsigned long readtime = 0;
@@ -2241,7 +2221,6 @@ void MHZ19_send_request_cmd()
 bool MHZ19_read(int *ppm, int *temp)
 {
   static uint8_t errorcounter = 0;
-  bool error = 0;
   uint8_t response[9]; // for answer
 
   DEBUG_D("Receiving MHZ19 data...\n");
@@ -2326,7 +2305,7 @@ void handleWWWSettings()
       if (webserver.argName(i) == "mqttssl") mqtt_ssl = 1;
       if (webserver.argName(i) == "webpassword") esp_password = webserver.arg(i);
       if (webserver.argName(i) == "hostname") esp_hostname = webserver.arg(i);
-#ifdef WATERMETER
+#ifdef  ESPMQTT_WATERMETER
       if (webserver.argName(i) == "watermeterliter")
       {
         if (webserver.arg(i) != getdatamap("water/liter"))
@@ -2396,7 +2375,7 @@ void handleWWWSettings()
     webpage += String("<TR><TD>MQTT Password</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttpassword\" value=\"") + mqtt_password + "\"></TD></TR>";
     webpage += String("<TR><TD>MQTT Topic Prefix</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"50\" name=\"mqtttopicprefix\" value=\"") + mqtt_topicprefix + "\"></TD></TR>";
     webpage += String("<TR><TD>ESP Password</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"webpassword\" value=\"") + esp_password + "\"></TD></TR>";
-#ifdef WATERMETER
+#ifdef  ESPMQTT_WATERMETER
     webpage += String("<TR><TD>Watermeter Liter</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"64\" name=\"watermeterliter\" value=\"") + getdatamap("water/liter") + "\"></TD></TR>";
 #endif
     webpage += "</TABLE><BR><CENTER><input type=\"submit\" value=\"Save Settings\"></form><BR><BR><form action=\"/settings\" method=\"post\" autocomplete=\"off\"><input type=\"hidden\" name=\"rebootdevice\" value=\"1\"><input type=\"submit\" value=\"Reboot Device\"></form><BR><BR><A HREF=\"/\">Return to main page</A></CENTER></div></BODY></HTML>";
@@ -2430,19 +2409,12 @@ void amgpelletstovecallback (String topic, String payload)
   putdatamap(topic, payload);
 }
 
-
-
-//void logdebug (String function, String message, loglevel level = DEBUG)
-//{
-// Debug.printf("(%s) %s", function.c_str(), message.c_str());
-//}
-
 void openthermcallback (String topic, String payload)
 {
   putdatamap(topic, payload);
 }
 
-#ifdef GROWATT
+#ifdef  ESPMQTT_GROWATT
 void growattcallback (String topic, String payload)
 {
   if (topic == "status")
@@ -2454,7 +2426,7 @@ void growattcallback (String topic, String payload)
   putdatamap(topic, payload);
 }
 #endif
-#ifdef SMARTMETER
+#ifdef  ESPMQTT_SMARTMETER
 void smartmetercallback (String topic, String payload)
 {
   static uint32 nextupdatetime = 0;
@@ -2558,7 +2530,7 @@ void setup() {
   }
   DEBUG_D("mqtt topicprefix=%s\n", mqtt_topicprefix.c_str());
 
-#ifdef DDNS
+#ifdef  ESPMQTT_DDNS
   EasyDDNS.service("duckdns");
   EasyDDNS.client("renegusta.duckdns.org", "c4f55de5-0d15-477d-a938-f39c19c67b33");
 #endif
@@ -2590,19 +2562,19 @@ void setup() {
 
   ArduinoOTA.onStart([]() {
     Serial.end();
-#ifdef DIMMER
+#ifdef  ESPMQTT_DIMMER
     dimmer_stop();
 #endif
   });
 
   ArduinoOTA.onEnd([]() {
     initSerial();
-#ifdef DIMMER
+#ifdef  ESPMQTT_DIMMER
     dimmer_init(ZEROCROSS_PIN, TRIAC_PIN);
 #endif
   });
 
-  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+  ArduinoOTA.onProgress([](unsigned int, unsigned int) {
     //    ESP.wdtFeed();
   });
 
@@ -2626,8 +2598,8 @@ void setup() {
   display.display();
 #endif
 
-#ifdef WATERMETER
-  i2cEeprom_init(I2C_SDA, I2C_SCL, I2C_EEPROM_ADDRESS, EE24LC512MAXBYTES, logdebug);
+#ifdef  ESPMQTT_WATERMETER
+  i2cEeprom_init(I2C_SDA, I2C_SCL, I2C_EEPROM_ADDRESS, (uint32_t)EE24LC512MAXBYTES);
   uint32_t watermeter_liters = i2cEeprom_read();
   watermeter_init(WATERPULSEPIN, NODEMCULEDPIN, watermeter_liters);
   putdatamap("water/lmin", "0");
@@ -2636,11 +2608,11 @@ void setup() {
   putdatamap("water/m3", String(double(watermeter_liters) / 1000, 3));
 #endif
 
-#ifdef MAINPOWERMETER
+#ifdef  ESPMQTT_MAINPOWERMETER
   circuitspowermeter_init(ADS0_CS_PIN, ADS0_RDY_PIN, ADS1_CS_PIN, ADS1_RDY_PIN);
 #endif
 
-#ifdef SONOFF_FLOORHEATING
+#ifdef  ESPMQTT_SONOFF_FLOORHEATING
   pinMode(3, FUNCTION_3);
 #endif
 
@@ -2648,7 +2620,7 @@ void setup() {
   oneWireSensors.setWaitForConversion(false);
   oneWireSensors.setResolution(12);
 
-#ifdef OPENTHERM
+#ifdef  ESPMQTT_OPENTHERM
   if (!oneWireSensors.getAddress(onewire_dcwSupplyWaterThermometer, 0)) {
     DEBUG_E("Unable to find address for onewire_dcwSupplyWaterThermometer\n");
   }
@@ -2660,13 +2632,13 @@ void setup() {
   else onewire_chReturnWaterEnabled = true;
 #endif
 
-#ifdef WEATHER
+#ifdef  ESPMQTT_WEATHER
   if (!oneWireSensors.getAddress(onewire_OutsideAddress, 0)) {
     DEBUG_E("Unable to find address for onewire_outsidetemp\n");
   }
 #endif
 
-#ifdef SONOFF_FLOORHEATING
+#ifdef  ESPMQTT_SONOFF_FLOORHEATING
   if (!oneWireSensors.getAddress(onewire_floorWaterAddress, 0)) {
     DEBUG_E("Unable to find address for onewire_floorwater\n");
   }
@@ -2698,19 +2670,19 @@ void setup() {
   pinMode(FLASHBUTTON, INPUT_PULLUP);
 #endif
 
-#ifdef SMARTMETER
+#ifdef  ESPMQTT_SMARTMETER
   smartmeter_init(smartmetercallback);
 #endif
 
-#ifdef OPENTHERM
+#ifdef  ESPMQTT_OPENTHERM
   opentherm_init(openthermcallback);
 #endif
 
-#ifdef GROWATT
+#ifdef  ESPMQTT_GROWATT
   growatt_init(growattcallback, FANPIN);
 #endif
 
-#ifdef AMGPELLETSTOVE
+#ifdef  ESPMQTT_AMGPELLETSTOVE
   amgpelletstove_init(amgpelletstovecallback);
 #endif
 
@@ -2721,15 +2693,15 @@ void setup() {
   neopixelleds.show();
 #endif
 
-#ifdef DIMMER
+#ifdef  ESPMQTT_DIMMER
   dimmer_init(ZEROCROSS_PIN, TRIAC_PIN);
 #endif
 
-#ifdef DUCOBOX
+#ifdef  ESPMQTT_DUCOBOX
   ducobox_init(sonoff_relays[0], sonoff_relays[1], 10, ducoboxcallback);
 #endif
 
-#ifdef SONOFFBULB
+#ifdef  ESPMQTT_SONOFFBULB
   // MY9291 with 4 channels (like the AiThinker Ai-Light)
   _my92xx = new my92xx(MY92XX_MODEL, MY92XX_CHIPS, MY92XX_DI_PIN, MY92XX_DCKI_PIN, MY92XX_COMMAND_DEFAULT);
   _my92xx->setState(true);
@@ -2800,7 +2772,7 @@ void processCmdRemoteDebug()
   }
 
   if (lastCmd == "showdatamap") showdatamap();
-#ifdef WATERMETER
+#ifdef  ESPMQTT_WATERMETER
   if (lastCmd == "help") DEBUG("  watermeterreadeeprom\n  watermeterwriteeeprom\n");
   if (lastCmd == "watermeterreadeeprom")
   {
@@ -2814,7 +2786,7 @@ void processCmdRemoteDebug()
   }
 #endif
 
-#ifdef WIFIDIMMERDUO
+#ifdef  ESPMQTT_WIFIDIMMERDUO
   if (lastCmd == "wda")
   {
     DEBUG ("SENDING CMD WDA TO MCU\n");
@@ -2844,10 +2816,10 @@ void processCmdRemoteDebug()
 
 }
 
-static void handleDataExternalIpServer(void* arg, AsyncClient* client, void *data, size_t len) {
+static void handleDataExternalIpServer(void*, AsyncClient* client, void *data, size_t len) {
   char *chardata = (char *)data;
   String datastring = "";
-  for (int i = 0; i < len; i++)
+  for (unsigned int i = 0; i < len; i++)
   {
     if ((chardata[i] == '\n') || (chardata[i] == '\r')) break;
     if (((chardata[i] >= 48) && (chardata[i] <= 58)) || chardata[i] == 46) datastring += chardata[i]; // Only accept when character is a number a . or a :
@@ -2862,7 +2834,7 @@ static void handleDataExternalIpServer(void* arg, AsyncClient* client, void *dat
   client->close();
 }
 
-void onConnectExternalIpServer(void* arg, AsyncClient* client) {
+void onConnectExternalIpServer(void*, AsyncClient* client) {
   client->add("GET /extip.php\r\n", 16);
   client->send();
 }

@@ -9,8 +9,10 @@ increment_version ()
   for (( CNTR=${#part[@]}-1; CNTR>=0; CNTR-=1 )); do
     len=${#part[CNTR]}
     new=$((part[CNTR]+carry))
-    [ ${#new} -gt $len ] && carry=1 || carry=0
-    [ $CNTR -gt 0 ] && part[CNTR]=${new: -len} || part[CNTR]=${new}
+    part[CNTR]=${new}
+#    [ ${#new} -gt $len ] && carry=1 || carry=0
+#    [ $CNTR -gt 0 ] && part[CNTR]=${new: -len} || part[CNTR]=${new}
+    break;
   done
   new="${part[*]}"
   new="${new// /.}"
@@ -26,9 +28,9 @@ mkdir /tmp/espMQTT_build
 VERSION=$(increment_version $VERSION)
 echo $VERSION > ~/Arduino/espMQTT/version
 
-array=( SMARTMETER AMGPELLETSTOVE )
+declare -a TARGETS8266=("ESPMQTT_WEATHER" "ESPMQTT_AMGPELLETSTOVE" "ESPMQTT_BATHROOM" "ESPMQTT_BEDROOM2" "ESPMQTT_OPENTHERM" "ESPMQTT_SMARTMETER" "ESPMQTT_GROWATT" "ESPMQTT_SDM120" "ESPMQTT_WATERMETER" "ESPMQTT_DDNS" "ESPMQTT_GENERIC8266" "ESPMQTT_MAINPOWERMETER" "ESPMQTT_NOISE" "ESPMQTT_SOIL")
 
-for targetname in "${array[@]}"
+for targetname in "${TARGETS8266[@]}"
 do
 
 echo ''
@@ -36,7 +38,7 @@ echo '########################################################'
 echo BUILDING $targetname VERSION $VERSION...
 echo '########################################################'
 echo ''
-arduino --board esp8266git:esp8266:nodemcuv2 --verify ~/Arduino/espMQTT/espMQTT.ino --pref build.path=/tmp/espMQTT_build/ --pref build.extra_flags='-DESPMQTT_'$targetname' -DESP8266 -DESPMQTT_VERSION="'$VERSION'"'
+arduino --board esp8266git:esp8266:nodemcuv2 --verify ~/Arduino/espMQTT/espMQTT.ino --pref build.path=/tmp/espMQTT_build/ --pref build.extra_flags='-D'$targetname' -DESP8266 -DESPMQTT_BUILDSCRIPT -DESPMQTT_VERSION="'$VERSION'"'
 
 if [ $? -ne 0 ]
 then 
