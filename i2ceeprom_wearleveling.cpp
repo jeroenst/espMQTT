@@ -1,19 +1,15 @@
 #include <ESP8266WiFi.h>
 #include <Wire.h>
-#include <RemoteDebug.h>
+#include "espMQTT.h"
 // DO NOT DISABLE DEBUG, READING EEPROM WILL NOT WORK..
 static uint8_t _i2cEeprom_sda = 0;
 static uint8_t _i2cEeprom_scl = 0;
 static uint16_t _i2cEeprom_address = 0;
 static uint16_t _i2cEeprom_bytes = 0;
 static uint16_t _i2cEeprom_WritememPage = 0;
-void(*_i2cEeprom_debug_callback)(String, String);
 
-#define _DEBUG(message) _i2cEeprom_debug_callback(__func__, message);
-
-void i2cEeprom_init(uint8_t i2c_sda, uint8_t i2c_scl, uint16_t eepromaddress, uint16_t eeprombytes, void(*debugcallback)(String, String))
+void i2cEeprom_init(uint8_t i2c_sda, uint8_t i2c_scl, uint16_t eepromaddress, uint16_t eeprombytes)
 {
-  _i2cEeprom_debug_callback = debugcallback;
   _i2cEeprom_sda = i2c_sda;
   _i2cEeprom_scl = i2c_scl;
   _i2cEeprom_address = eepromaddress;
@@ -32,7 +28,7 @@ void i2cEeprom_WriteByte(uint16_t theMemoryAddress, uint8_t u8Byte)
   delay(1);
   Wire.write(u8Byte);
   delay(1);
-  if (Wire.endTransmission() != 0) _DEBUG("Failing writing I2C eeprom!\n");
+  if (Wire.endTransmission() != 0) DEBUG_E("Failing writing I2C eeprom!\n");
 }
 
 uint8_t i2cEeprom_ReadByte(uint32_t theMemoryAddress)
@@ -42,14 +38,13 @@ uint8_t i2cEeprom_ReadByte(uint32_t theMemoryAddress)
   Wire.write( (theMemoryAddress >> 8) & 0xFF );
   Wire.write( (theMemoryAddress >> 0) & 0xFF );
   Wire.endTransmission();
- if (Wire.requestFrom(_i2cEeprom_address, 1) == 0) _DEBUG("Failing reading I2C eeprom!\n");
+ if (Wire.requestFrom(_i2cEeprom_address, 1) == 0) DEBUG_E("Failing reading I2C eeprom!\n");
   u8retVal = Wire.read();
   return u8retVal ;
 }
 
 void i2cEeprom_Writeuint32crc(uint32_t memoryPage, uint32_t data)
 {
-  uint8_t readbyte = 0;
   uint8_t calccrc = 0;
   uint16_t theMemoryAddress = memoryPage * 128;
   for (uint8_t pointer = 0; pointer < 4; pointer++)
@@ -59,7 +54,7 @@ void i2cEeprom_Writeuint32crc(uint32_t memoryPage, uint32_t data)
     calccrc += writebyte;
   }
   i2cEeprom_WriteByte(theMemoryAddress + 4, calccrc);
-  _DEBUG("Written i2c eeprom startaddress "+String(theMemoryAddress)+", value "+data+", crc "+calccrc+"\n");
+  DEBUG_V("Written i2c eeprom startaddress %d, value %d, crc %d\n", theMemoryAddress, data, calccrc);
 }
 
 uint32_t i2cEeprom_Readuint32crc(uint16_t memoryPage)
@@ -78,10 +73,10 @@ uint32_t i2cEeprom_Readuint32crc(uint16_t memoryPage)
   uint8_t readcrc = i2cEeprom_ReadByte(theMemoryAddress + 4);
   if (readcrc != calccrc)
   {
-    _DEBUG("Read i2c eeprom CRC error, page="+String(memoryPage)+", value="+String(returnval)+", readcrc="+String(readcrc)+", calccrc="+String(calccrc)+"\n");
+    DEBUG_E("Read i2c eeprom CRC error, page=%d, value=%d, readcrc=%d, calccrc=%d\n", memoryPage, returnval, readcrc, calccrc);
     returnval = 0xFFFF;
   }
-  _DEBUG("Read i2c eeprom startaddress "+String(theMemoryAddress)+", value "+String(returnval)+", crc "+String(readcrc)+", calccrc "+String(calccrc)+"\n");
+  DEBUG_V("Read i2c eeprom startaddress=%d, value=%d, crc=%d, calccrc=%d\n", theMemoryAddress, returnval, readcrc, calccrc);
   return returnval;
 }
 
@@ -99,7 +94,7 @@ uint32_t i2cEeprom_read()
     yield();
     ESP.wdtFeed(); // Prevent HW WD to kick in...
   }
-  _DEBUG("Read "+String(watermetercounter)+" from memPage "+String(watermeterpage)+"\n");
+  DEBUG_V("Read %d from memPage %d\n",watermetercounter, watermeterpage);
   return watermetercounter;
 }
 
