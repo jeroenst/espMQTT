@@ -19,46 +19,57 @@ increment_version ()
   echo $new
 } 
 
+build ()
+{
+  echo ''
+  echo '########################################################'
+  echo BUILDING $targetname VERSION $VERSION...
+  echo '########################################################'
+  echo ''
+  
+  arduino --board $BOARD --verify ~/Arduino/espMQTT/espMQTT.ino --pref build.path=/tmp/espMQTT_build/ --pref build.extra_flags='-D'$targetname' -DESP8266 -DESPMQTT_BUILDSCRIPT -DESPMQTT_VERSION="'$VERSION'"'
+
+  if [ $? -ne 0 ]
+  then 
+  echo ''
+  echo '########################################################'
+  echo BUILDING $targetname VERSION $VERSION FAILED!!!
+  echo '########################################################'
+  echo ''
+  exit $?
+  fi
+
+  echo $VERSION > /tmp/espMQTT/$VERSION/$targetname.version
+  mv /tmp/espMQTT_build/espMQTT.ino.bin '/tmp/espMQTT/'$VERSION'/'$targetname'_'$VERSION.bin
+
+  echo ''
+  echo '########################################################'
+  echo BUILDING $targetname VERSION $VERSION FINISHED.
+  echo '########################################################'
+  echo ''
+}
+
 VERSION=$(head -n 1 ~/Arduino/espMQTT/version)
-
-mkdir /tmp/espMQTT
-rm -rf /tmp/espMQTT_build
-mkdir /tmp/espMQTT_build
-
 VERSION=$(increment_version $VERSION)
 echo $VERSION > ~/Arduino/espMQTT/version
 
-declare -a TARGETS8266=("ESPMQTT_WEATHER" "ESPMQTT_AMGPELLETSTOVE" "ESPMQTT_BATHROOM" "ESPMQTT_BEDROOM2" "ESPMQTT_OPENTHERM" "ESPMQTT_SMARTMETER" "ESPMQTT_GROWATT" "ESPMQTT_SDM120" "ESPMQTT_WATERMETER" "ESPMQTT_DDNS" "ESPMQTT_GENERIC8266" "ESPMQTT_MAINPOWERMETER" "ESPMQTT_NOISE" "ESPMQTT_SOIL")
+mkdir -p /tmp/espMQTT/$VERSION
+rm -rf /tmp/espMQTT_build
+mkdir /tmp/espMQTT_build
 
-for targetname in "${TARGETS8266[@]}"
+
+declare -a TARGETS=("ESPMQTT_WEATHER" "ESPMQTT_AMGPELLETSTOVE" "ESPMQTT_BATHROOM" "ESPMQTT_BEDROOM2" "ESPMQTT_OPENTHERM" "ESPMQTT_SMARTMETER" "ESPMQTT_GROWATT" "ESPMQTT_SDM120" "ESPMQTT_WATERMETER" "ESPMQTT_DDNS" "ESPMQTT_GENERIC8266" "ESPMQTT_MAINPOWERMETER" "ESPMQTT_NOISE" "ESPMQTT_SOIL" "ESPMQTT_DIMMER")
+BOARD=esp8266git:esp8266:nodemcuv2
+for targetname in "${TARGETS[@]}"
 do
+  build
+done
 
-echo ''
-echo '########################################################'
-echo BUILDING $targetname VERSION $VERSION...
-echo '########################################################'
-echo ''
-arduino --board esp8266git:esp8266:nodemcuv2 --verify ~/Arduino/espMQTT/espMQTT.ino --pref build.path=/tmp/espMQTT_build/ --pref build.extra_flags='-D'$targetname' -DESP8266 -DESPMQTT_BUILDSCRIPT -DESPMQTT_VERSION="'$VERSION'"'
-
-if [ $? -ne 0 ]
-then 
-echo ''
-echo '########################################################'
-echo BUILDING $targetname VERSION $VERSION FAILED!!!
-echo '########################################################'
-echo ''
-exit $?
-fi
-
-echo $VERSION > /tmp/espMQTT/$targetname.version
-mv /tmp/espMQTT_build/espMQTT.ino.bin '/tmp/espMQTT/'$targetname'_'$VERSION.bin
-
-echo ''
-echo '########################################################'
-echo BUILDING $targetname VERSION $VERSION FINISHED.
-echo '########################################################'
-echo ''
-
+declare -a TARGETS=("ESPMQTT_DUCOBOX" "ESPMQTT_SONOFFS20" "ESPMQTT_SONOFFBULB" "ESPMQTT_SONOFFPOWR2" "ESPMQTT_GARDEN" "ESPMQTT_SONOFF_FLOORHEATING" "ESPMQTT_IRRIGATION" "ESPMQTT_BLITZWOLF" "ESPMQTT_WIFIDIMMERDUO"  "ESPMQTT_SONOFF4CH" "ESPMQTT_SONOFFDUAL" "ESPMQTT_SONOFFS20_PRINTER" "ESPMQTT_SONOFFPOW")
+BOARD=esp8266git:esp8266:esp8285
+for targetname in "${TARGETS[@]}"
+do
+  build
 done
 
 rm -rf /tmp/espMQTT_build
