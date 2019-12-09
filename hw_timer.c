@@ -29,7 +29,7 @@ in non autoload mode:
 *******************************************************************************/
 void  hw_timer_arm(u32 val)
 {
-    RTC_REG_WRITE(FRC1_LOAD_ADDRESS, US_TO_RTC_TIMER_TICKS(val));
+    TIMER_REG_WRITE(FRC1_LOAD_ADDRESS, US_TO_RTC_TIMER_TICKS(val));
 }
 
 static void (* user_hw_timer_cb)(void) = NULL;
@@ -67,10 +67,10 @@ u8 req:
 void ICACHE_FLASH_ATTR hw_timer_init(FRC1_TIMER_SOURCE_TYPE source_type, u8 req)
 {
     if (req == 1) {
-        RTC_REG_WRITE(FRC1_CTRL_ADDRESS,
+        TIMER_REG_WRITE(FRC1_CTRL_ADDRESS,
                       FRC1_AUTO_LOAD | DIVDED_BY_16 | FRC1_ENABLE_TIMER | TM_EDGE_INT);
     } else {
-        RTC_REG_WRITE(FRC1_CTRL_ADDRESS,
+        TIMER_REG_WRITE(FRC1_CTRL_ADDRESS,
                       DIVDED_BY_16 | FRC1_ENABLE_TIMER | TM_EDGE_INT);
     }
 
@@ -122,4 +122,3 @@ NOTE:
 3 if use frc1 source, this timer can't interrupt other isr.
 
 */
-
