@@ -33,7 +33,7 @@
 // #define ESPMQTT_SMARTMETER
 // #define  ESPMQTT_GROWATT
 // #define  ESPMQTT_SDM120
-#define  ESPMQTT_WATERMETER
+// #define  ESPMQTT_WATERMETER
 //#define  ESPMQTT_DDNS
 // #define  ESPMQTT_GENERIC8266
 //#define  ESPMQTT_MAINPOWERMETER
@@ -53,7 +53,7 @@
 //#define  ESPMQTT_WIFIDIMMERDUO
 //#define  ESPMQTT_SONOFF4CH //ESP8285
 //#define  ESPMQTT_SONOFFDUAL
-//#define  ESPMQTT_SONOFFS20_PRINTER
+#define  ESPMQTT_SONOFFS20_PRINTER
 //#define  ESPMQTT_SONOFFPOW
 
 #define ESPMQTT_VERSION "TESTVERSION"
@@ -65,6 +65,7 @@
 #define  ESPMQTT_SONOFFS20
 #define SONOFFCH_TIMEOUT 1800
 uint32_t sonoffch_starttime[1];
+static bool sonoffch_timeout_enabled[1] = {1};
 #endif
 
 #ifdef  ESPMQTT_SONOFF_FLOORHEATING
