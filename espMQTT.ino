@@ -23,6 +23,7 @@
 //#define SYSLOGDEBUG
 #define DEBUGLEVEL Debug.DEBUG
 
+//#define ESPMQTT_SMARTMETER
 
 /* ESP8266 */
 // #define WEATHER
@@ -30,7 +31,7 @@
 // #define BATHROOM
 // #define BEDROOM2
 // #define OPENTHERM
-#define SMARTMETER
+// #define SMARTMETER
 // #define GROWATT
 // #define SDM120
 //#define WATERMETER
@@ -56,6 +57,14 @@
 //#define SONOFFDUAL
 //#define SONOFFS20_PRINTER
 //#define SONOFFPOW
+
+#ifdef ESPMQTT_SMARTMETER
+#define SMARTMETER 
+#endif
+
+#ifdef ESPMQTT_AMGPELLETSTOVE
+#define AMGPELLETSTOVE
+#endif
 
 
 #ifdef SONOFFS20_PRINTER
@@ -97,7 +106,7 @@ uint32_t sonoffch_starttime[1];
 #define ESPLED D4
 #undef SERIALLOG
 HardwareSerial serSDM(0);
-#include <SDM.h>;
+#include <SDM.h>
 SDM sdm(serSDM, 2400, NOT_A_PIN);
 #endif
 
@@ -120,7 +129,7 @@ SDM sdm(serSDM, 2400, NOT_A_PIN);
 #define NODEMCULEDPIN D0
 #define FLASHBUTTON D3
 #define ESPLED D4
-#include "amgpelletstove.h";
+#include "amgpelletstove.h"
 #undef SERIALLOG
 #endif
 
@@ -156,7 +165,7 @@ SDM sdm(serSDM, 2400, NOT_A_PIN);
 #define SONOFFDUAL
 #define FLASHBUTTON 10
 #define ESPLED 13
-#include "ducobox.h";
+#include "ducobox.h"
 #undef SERIALLOG
 #endif
 
@@ -290,7 +299,7 @@ double powerval = 0;
 #ifndef FIRMWARE_TARGET
 #define FIRMWARE_TARGET "SONOFFBULB"
 #define APONBOOT 1
-#include "my92xx.h";
+#include "my92xx.h"
 my92xx * _my92xx;
 #define MY92XX_MODEL        MY92XX_MODEL_MY9231
 #define MY92XX_CHIPS        2
@@ -447,7 +456,7 @@ Adafruit_NeoPixel neopixelleds = Adafruit_NeoPixel(2, NEOPIXELPIN, NEO_RGB + NEO
 AsyncMqttClient mqttClient;
 #include <ArduinoOTA.h>
 //#include <user_interface.h>
-#include "SimpleMap.h";
+#include "SimpleMap.h"
 #include <Syslog.h>
 #define syslogD(fmt, ...) if (WiFi.status() == WL_CONNECTED) syslog.logf(LOG_DEBUG,"(%s) " fmt, __func__, ##__VA_ARGS__)
 #define syslogI(fmt, ...) if (WiFi.status() == WL_CONNECTED) syslog.logf(LOG_INFO,"(%s) " fmt, __func__, ##__VA_ARGS__)
@@ -587,7 +596,7 @@ String esp_hostname = "";
 String esp_orig_hostname = "";
 static bool debug;
 static bool mqttReady = false;
-//#include "esp8266_peri.h";
+//#include "esp8266_peri.h"
 RemoteDebug Debug;
 
 WiFiEventHandler wifiConnectHandler;
@@ -1550,7 +1559,7 @@ void loop()
     }
     if (sdmreadcounter < 14) sdmreadcounter++;
     yield();
-#endif;
+#endif
   }
 
   if (timersectick == 1) // Every 1 second check sensors and update display (it would be insane to do it more often right?)
@@ -2446,10 +2455,10 @@ void smartmetercallback (String topic, String payload)
   static uint32 nextupdatetime = 0;
   static bool sendupdate = 0;
 
-  if (nextupdatetime < uptime)
-  if ((topic == "status") && (payload == "receiving")) // wait for start of new packet from smartmeter
+  if ((nextupdatetime < uptime) && (topic == "status") && (payload == "receiving")) // wait for start of new packet from smartmeter
   {
     sendupdate = 1;
+    nextupdatetime = uptime + 8; // wait 8 seconds before accepting new values from smartmeter (some smartmeters keep sending out data)
   }
 
   if (sendupdate) putdatamap(topic, payload);
@@ -2457,7 +2466,6 @@ void smartmetercallback (String topic, String payload)
   if ((topic == "status") && (payload == "ready") && sendupdate) // stop processing when a complete packet was pushed to datamap
   {
     sendupdate = 0;
-    nextupdatetime = uptime + 5; // wait 5 seconds before accepting new values from smartmeter
   }
 }
 #endif
@@ -2683,11 +2691,11 @@ void setup() {
 
 #ifdef FLASHBUTTON
   pinMode(FLASHBUTTON, INPUT_PULLUP);
-#endif;
+#endif
 
 #ifdef SMARTMETER
   smartmeter_init(smartmetercallback);
-#endif;
+#endif
 
 #ifdef OPENTHERM
   opentherm_init(openthermcallback);
