@@ -49,9 +49,21 @@ build ()
   echo ''
 }
 
+DIFFERENCE=$(git diff | wc -w)
 VERSION=$(head -n 1 ~/Arduino/espMQTT/version)
 VERSION=$(increment_version $VERSION)
 echo $VERSION > ~/Arduino/espMQTT/version
+
+if [ $DIFFERENCE -eq 0 ]
+then
+	git tag v$VERSION 
+	git push --tags
+else
+	echo "Not writing version to git tag because there are uncommited changes"
+fi
+
+exit 0
+
 
 mkdir -p /tmp/espMQTT/$VERSION
 rm -rf /tmp/espMQTT_build
