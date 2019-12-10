@@ -1,3 +1,0 @@
-[submodule "libraries/async-mqtt-client"]
-	path = libraries/async-mqtt-client
-	url = git@github.com:jeroenst/async-mqtt-client.git
