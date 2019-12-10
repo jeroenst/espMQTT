@@ -30,7 +30,7 @@
 // #define  ESPMQTT_BATHROOM
 // #define  ESPMQTT_BEDROOM2
 // #define  ESPMQTT_OPENTHERM
-// #define ESPMQTT_SMARTMETER
+#define ESPMQTT_SMARTMETER
 // #define  ESPMQTT_GROWATT
 // #define  ESPMQTT_SDM120
 // #define  ESPMQTT_WATERMETER
@@ -53,10 +53,10 @@
 //#define  ESPMQTT_WIFIDIMMERDUO
 //#define  ESPMQTT_SONOFF4CH //ESP8285
 //#define  ESPMQTT_SONOFFDUAL
-#define  ESPMQTT_SONOFFS20_PRINTER
+//#define  ESPMQTT_SONOFFS20_PRINTER
 //#define  ESPMQTT_SONOFFPOW
 
-#define ESPMQTT_VERSION "TESTVERSION"
+#define ESPMQTT_VERSION "TEST"
 #endif
 
 
@@ -498,6 +498,7 @@ struct Mainstate {
 struct dataMapStruct {
   String payload = "";
   bool send = true;
+  bool onair = false;
 };
 
 int wifichannel = 0;
@@ -626,7 +627,7 @@ void showdatamap()
 {
   for (int i = 0; i < dataMap->size(); i++)
   {
-    DEBUG("%s=%s (%d)\n", dataMap->getKey(i).c_str(), dataMap->getData(i).payload.c_str(), dataMap->getData(i).send);
+    DEBUG("%s=%s (send=%d, onair=%d)\n", dataMap->getKey(i).c_str(), dataMap->getData(i).payload.c_str(), dataMap->getData(i).send, dataMap->getData(i).onair);
     yield();
   }
 }
@@ -638,11 +639,11 @@ void putdatamap(String topic, String value, bool sendupdate = true, bool forcese
   if (((datamapstruct.payload != value) || forcesend) && sendupdate)
   {
     DEBUG_D ("DATAMAP %s=%s (sendupdate=%d, oldval=%s oldsend=%d forcesend=%d)\n", topic.c_str(), value.c_str(), sendupdate, datamapstruct.payload.c_str(), datamapstruct.send, forcesend);
+    datamapstruct.onair = false;
     datamapstruct.send = true;
+    datamapstruct.payload = value;
+    dataMap->put(topic, datamapstruct);
   }
-  datamapstruct.payload = value;
-
-  dataMap->put(topic, datamapstruct);
 }
 
 void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
@@ -1902,6 +1903,7 @@ void publishdatamap(int32_t packetId, bool publishall, bool init)
     {
       String topic = dataMap->getKey(publishallpointer);
       dataMapStruct data = dataMap->getData(publishallpointer);
+      data.onair = false;
       data.send = true;
       dataMap->put(topic, data);
       publishallpointer++;
@@ -1917,22 +1919,31 @@ void publishdatamap(int32_t packetId, bool publishall, bool init)
     {
       if (packetId == 0)
       {
-        waitingforack = true;
         // If packetId == 0 resend because packet was not acked
+        waitingforack = true;
         String topic = dataMap->getKey(datamappointer);
-        topic = String("home/" + esp_hostname + "/" + topic);
+        String sendtopic = String("home/" + esp_hostname + "/" + topic);
         dataMapStruct data = dataMap->getData(datamappointer);
         String payload = data.payload;
-        nextpacketId = mqttClient.publish(topic.c_str(), 1, true, payload.c_str());
+        nextpacketId = mqttClient.publish(sendtopic.c_str(), 1, true, payload.c_str());
         if (nextpacketId == 0) waitingforack = false;
+        else
+        {
+          data.onair = true;
+          dataMap->put(topic, data);
+        }
       }
       if (packetId == nextpacketId)
       {
         // Packet succesfull delivered proceed to next item
         String topic = dataMap->getKey(datamappointer);
         dataMapStruct data = dataMap->getData(datamappointer);
-        data.send = false;
-        dataMap->put(topic, data);
+        if (data.onair) 
+        {
+          data.send = false;
+          data.onair = false;
+          dataMap->put(topic, data);
+        }
         datamappointer++;
         waitingforack = false;
       }
@@ -1950,9 +1961,14 @@ void publishdatamap(int32_t packetId, bool publishall, bool init)
           //DEBUG ("datamappointer=%d datamapsize=%d send=%d\n", datamappointer, dataMap->size(), data.send);
           if (data.send)
           {
-            topic = String(mqtt_topicprefix + topic);
-            nextpacketId = mqttClient.publish(topic.c_str(), 1, true, data.payload.c_str());
-            if (nextpacketId > 0) waitingforack = true;
+            String sendtopic = String(mqtt_topicprefix + topic);
+            nextpacketId = mqttClient.publish(sendtopic.c_str(), 1, true, data.payload.c_str());
+            if (nextpacketId > 0) 
+            {
+              waitingforack = true;
+              data.onair = true;
+              dataMap->put(topic, data);
+            }
             DEBUG_D ("MQTT PUBLISHING DATAMAP %s=%s (nextpacketId=%d)\n", topic.c_str(), data.payload.c_str(), nextpacketId);
           }
           else
