@@ -54,14 +54,14 @@ VERSION=$(head -n 1 ~/Arduino/espMQTT/version)
 VERSION=$(increment_version $VERSION)
 echo $VERSION > ~/Arduino/espMQTT/version
 
-if [ $DIFFERENCE -eq 0 ]
-then
-	git tag v$VERSION 
-	git push --tags
-else
-	echo "Not writing version to git tag because there are uncommited changes"
-	exit 1
-fi
+#if [ $DIFFERENCE -eq 0 ]
+#then
+#	git tag v$VERSION 
+#	git push --tags
+#else
+#	echo "Not writing version to git tag because there are uncommited changes"
+#	exit 1
+#fi
 
 mkdir -p /tmp/espMQTT/$VERSION
 rm -rf /tmp/espMQTT_build
@@ -75,7 +75,7 @@ do
   build
 done
 
-declare -a TARGETS=("ESPMQTT_DUCOBOX" "ESPMQTT_SONOFFS20" "ESPMQTT_SONOFFBULB" "ESPMQTT_SONOFFPOWR2" "ESPMQTT_GARDEN" "ESPMQTT_SONOFF_FLOORHEATING" "ESPMQTT_IRRIGATION" "ESPMQTT_BLITZWOLF" "ESPMQTT_SONOFF4CH" "ESPMQTT_SONOFFDUAL" "ESPMQTT_SONOFFS20_PRINTER" "ESPMQTT_SONOFFPOW" "QSWIFIDIMMERD01" "QSWIFIDIMMERD02")
+declare -a TARGETS=("ESPMQTT_DUCOBOX" "ESPMQTT_SONOFFS20" "ESPMQTT_SONOFFBULB" "ESPMQTT_SONOFFPOWR2" "ESPMQTT_GARDEN" "ESPMQTT_SONOFF_FLOORHEATING" "ESPMQTT_IRRIGATION" "ESPMQTT_BLITZWOLF" "ESPMQTT_SONOFF4CH" "ESPMQTT_SONOFFDUAL" "ESPMQTT_SONOFFS20_PRINTER" "ESPMQTT_SONOFFPOW" "ESPMQTT_QSWIFIDIMMERD01" "ESPMQTT_QSWIFIDIMMERD02")
 BOARD=esp8266:esp8266:esp8285
 for targetname in "${TARGETS[@]}"
 do
