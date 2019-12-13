@@ -60,10 +60,8 @@ then
 	git push --tags
 else
 	echo "Not writing version to git tag because there are uncommited changes"
+	exit 1
 fi
-
-exit 0
-
 
 mkdir -p /tmp/espMQTT/$VERSION
 rm -rf /tmp/espMQTT_build
