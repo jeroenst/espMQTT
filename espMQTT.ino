@@ -30,7 +30,7 @@
 // #define  ESPMQTT_BATHROOM
 // #define  ESPMQTT_BEDROOM2
 // #define  ESPMQTT_OPENTHERM
-#define ESPMQTT_SMARTMETER
+//#define ESPMQTT_SMARTMETER
 // #define  ESPMQTT_GROWATT
 // #define  ESPMQTT_SDM120
 // #define  ESPMQTT_WATERMETER
@@ -50,7 +50,8 @@
 // #define  ESPMQTT_SONOFF_FLOORHEATING
 // #define  ESPMQTT_IRRIGATION
 //#define  ESPMQTT_BLITZWOLF
-//#define  ESPMQTT_WIFIDIMMERDUO
+//#define  ESPMQTT_QSWIFIDIMMERD01
+#define  ESPMQTT_QSWIFIDIMMERD02
 //#define  ESPMQTT_SONOFF4CH //ESP8285
 //#define  ESPMQTT_SONOFFDUAL
 //#define  ESPMQTT_SONOFFS20_PRINTER
@@ -104,10 +105,18 @@ HardwareSerial serSDM(0);
 SDM sdm(serSDM, 2400, NOT_A_PIN);
 #endif
 
-#ifdef  ESPMQTT_WIFIDIMMERDUO
-#define FIRMWARE_TARGET "WIFIDIMMERDUO"
+#ifdef  ESPMQTT_QSWIFIDIMMERD01
+#define FIRMWARE_TARGET "QSWIFIDIMMERD01"
 #define APONBOOT
-#define ESPLED 4
+#define QSWIFIDIMMERCHANNELS 1
+#include "qswifidimmer.h"
+#endif
+
+#ifdef  ESPMQTT_QSWIFIDIMMERD02
+#define FIRMWARE_TARGET "QSWIFIDIMMERD02"
+#define APONBOOT
+#define QSWIFIDIMMERCHANNELS 2
+#include "qswifidimmer.h"
 #endif
 
 
@@ -797,7 +806,7 @@ void mqttdosubscriptions(int32_t packetId = -1)
   if (packetId > 0) nextsubscribe++;
   nextpacketid = -1;
   subscribetopic = "";
-  while ((subscribetopic == "") && (nextsubscribe < 15))
+  while ((subscribetopic == "") && (nextsubscribe <= 20))
   {
     //DEBUG("mqttdosubscriptions while nextsubscribe=%d\n", nextsubscribe);
     switch (nextsubscribe)
@@ -823,13 +832,23 @@ void mqttdosubscriptions(int32_t packetId = -1)
       case 9: subscribetopic = mqtt_topicprefix + "settemperature"; break;
 #endif
 #ifdef SONOFFCH
-      case 10:  if (0 < SONOFFCH) subscribetopic = mqtt_topicprefix + "setrelay/" + String(0); break;
-      case 11:  if (1 < SONOFFCH) subscribetopic = mqtt_topicprefix + "setrelay/" + String(1); break;
-      case 12:  if (2 < SONOFFCH) subscribetopic = mqtt_topicprefix + "setrelay/" + String(2); break;
-      case 13:  if (3 < SONOFFCH) subscribetopic = mqtt_topicprefix + "setrelay/" + String(3); break;
+      case 10:  if (0 < SONOFFCH) subscribetopic = mqtt_topicprefix + "setrelay/0"; break;
+      case 11:  if (1 < SONOFFCH) subscribetopic = mqtt_topicprefix + "setrelay/1"; break;
+      case 12:  if (2 < SONOFFCH) subscribetopic = mqtt_topicprefix + "setrelay/2"; break;
+      case 13:  if (3 < SONOFFCH) subscribetopic = mqtt_topicprefix + "setrelay/3"; break;
 #endif
 #ifdef  ESPMQTT_SONOFF_FLOORHEATING
       case 14: subscribetopic = mqtt_topicprefix + "setvalve"; break;
+#endif
+#ifdef ESPMQTT_QSWIFIDIMMERD01
+      case 15:  subscribetopic = mqtt_topicprefix + "setdimvalue"; break;
+      case 16:  subscribetopic = mqtt_topicprefix + "setdimstate"; break;
+#endif
+#ifdef ESPMQTT_QSWIFIDIMMERD02
+      case 17:  subscribetopic = mqtt_topicprefix + "setdimvalue/0"; break;
+      case 18:  subscribetopic = mqtt_topicprefix + "setdimvalue/1"; break;
+      case 19:  subscribetopic = mqtt_topicprefix + "setdimstate/0"; break;
+      case 20:  subscribetopic = mqtt_topicprefix + "setdimstate/1"; break;
 #endif
     }
     if (subscribetopic == "") nextsubscribe++;
@@ -856,7 +875,7 @@ void onMqttPublish(uint16_t packetId)
 void initSerial()
 {
   Serial.setRxBufferSize(2048);
-#if defined(MH_Z19) || defined( ESPMQTT_OPENTHERM) || defined( ESPMQTT_GROWATT) || defined ( ESPMQTT_WIFIDIMMERDUO)
+#if defined(MH_Z19) || defined( ESPMQTT_OPENTHERM) || defined( ESPMQTT_GROWATT)
   Serial.setDebugOutput(false);
   Serial.begin(9600);  //Init serial 9600 baud
 #elif defined ( ESPMQTT_SONOFFPOWR2)
@@ -867,7 +886,7 @@ void initSerial()
 #elif defined ( ESPMQTT_SDM120)
   Serial.setDebugOutput(false);
   sdm.begin();
-#elif defined (ESPMQTT_SMARTMETER)
+#elif defined (ESPMQTT_SMARTMETER)  || defined (QSWIFIDIMMERCHANNELS)
   // do nothing, smartmeter initializes serial in init function.
 #else
   Serial.begin(115200); //Init serial 115200 baud
@@ -1022,6 +1041,42 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties,
 
 #ifdef  ESPMQTT_AMGPELLETSTOVE
   amgpelletstove_receivemqtt(topicstring, payloadstring);
+#endif
+
+#ifdef  ESPMQTT_QSWIFIDIMMERD01
+  if (topicstring == mqtt_topicprefix + "setdimvalue") 
+  {
+    qswifidimmer_setdim(0, payloadstring.toInt());
+    putdatamap ("dimvalue" , String(payloadstring.toInt()));
+  }
+  if (topicstring == mqtt_topicprefix + "setdimstate") 
+  {
+    qswifidimmer_setstate(0, payloadstring.toInt() ? 1 : 0);
+    putdatamap ("dimstate" , payloadstring.toInt() ? "1" : "0");
+  }
+#endif
+#ifdef  ESPMQTT_QSWIFIDIMMERD02
+  if (topicstring == mqtt_topicprefix + "setdimvalue/0") 
+  {
+    qswifidimmer_setdim(0, payloadstring.toInt());
+    putdatamap ("dimvalue/0" , String(payloadstring.toInt()));
+  }
+  if (topicstring == mqtt_topicprefix + "setdimvalue/1") 
+  {
+    qswifidimmer_setdim(1, payloadstring.toInt());
+    putdatamap ("dimvalue/1" , String(payloadstring.toInt()));
+  }
+
+  if (topicstring == mqtt_topicprefix + "setdimstate/0") 
+  {
+    qswifidimmer_setdim(0, payloadstring.toInt());
+    putdatamap ("dimstate/0" , payloadstring.toInt() ? "1" : "0");
+  }
+  if (topicstring == mqtt_topicprefix + "setdimstate/1") 
+  {
+    qswifidimmer_setdim(1, payloadstring.toInt());
+    putdatamap ("dimstate/1" , payloadstring.toInt() ? "1" : "0");
+  }
 #endif
 }
 
@@ -1255,7 +1310,7 @@ void loop()
       }
 
 
-      DEBUG_D(" %d: %s, %s, Ch:%d (%ddBm) %s\n", i, WiFi.SSID(i).c_str(), WiFi.BSSIDstr(i).c_str(), WiFi.channel(i), WiFi.RSSI(i), enctype.c_str());
+      DEBUG_V(" %d: %s, %s, Ch:%d (%ddBm) %s\n", i, WiFi.SSID(i).c_str(), WiFi.BSSIDstr(i).c_str(), WiFi.channel(i), WiFi.RSSI(i), enctype.c_str());
       yield(); // Prevent crash because of to many debug data to send
     }
 
@@ -1406,14 +1461,6 @@ void loop()
 #ifdef  ESPMQTT_AMGPELLETSTOVE
   amgpelletstove_handle();
   yield();
-#endif
-
-#ifdef  ESPMQTT_WIFIDIMMERDUO
-  /*if (Serial.available() > 0)
-    {
-    int serval = Serial.read();
-    DEBUG ("Serial Received: %02x\n",serval);
-    }*/
 #endif
 
 #ifdef  ESPMQTT_SONOFFPOWR2
@@ -2736,6 +2783,20 @@ void setup() {
 #ifdef DHTPIN
   dht.begin();
 #endif
+
+#ifdef QSWIFIDIMMERCHANNELS
+  qswifidimmer_init(QSWIFIDIMMERCHANNELS);
+  #ifdef ESPMQTT_QSWIFIDIMMERD01
+  putdatamap (mqtt_topicprefix + "dimvalue" , "0");
+  putdatamap (mqtt_topicprefix + "dimstate" , "0");
+  #endif
+  #ifdef ESPMQTT_QSWIFIDIMMERD02
+  putdatamap (mqtt_topicprefix + "dimvalue/0" , "0");
+  putdatamap (mqtt_topicprefix + "dimstate/0" , "0");
+  putdatamap (mqtt_topicprefix + "dimvalue/1" , "0");
+  putdatamap (mqtt_topicprefix + "dimstate/1" , "0");
+  #endif
+#endif
 }
 
 void processCmdRemoteDebug()
@@ -2802,35 +2863,6 @@ void processCmdRemoteDebug()
     i2cEeprom_write(watermeter_getliters());
   }
 #endif
-
-#ifdef  ESPMQTT_WIFIDIMMERDUO
-  if (lastCmd == "wda")
-  {
-    DEBUG ("SENDING CMD WDA TO MCU\n");
-    Serial.flush();
-    Serial.write(0xFF); //Header
-    Serial.write(0x55); //Header
-    Serial.write(0x01); //Channel
-    Serial.write(0xFF); //Dimvalue
-    Serial.write(0x05);
-    Serial.write(0xDC);
-    Serial.write(0x0A);
-  }
-  if (lastCmd == "wdu")
-  {
-    DEBUG ("SENDING CMD WDU TO MCU\n");
-    Serial.flush();
-    Serial.write(0xFF); //Header
-    Serial.write(0x55); //Header
-    Serial.write(0x01); //Channel
-    Serial.write(0x00); //Dimvalue
-    Serial.write(0x05);
-    Serial.write(0xDC);
-    Serial.write(0x0A);
-  }
-#endif
-
-
 }
 
 static void handleDataExternalIpServer(void*, AsyncClient* client, void *data, size_t len) {
