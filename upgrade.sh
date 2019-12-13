@@ -52,6 +52,7 @@ upgrade $1 sonoffs20_001 ESPMQTT_SONOFFS20
 upgrade $1 sonoff_floorheating ESPMQTT_SONOFF_FLOORHEATING
 upgrade $1 esp_watermeter ESPMQTT_WATERMETER
 upgrade $1 esp_weather ESPMQTT_WEATHER
+upgrade $1 QSWIFIDIMMER01 ESPMQTT_QSWIFIDIMMERD02
 
 
 
