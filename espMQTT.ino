@@ -1060,11 +1060,13 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties,
   {
     qswifidimmer_setdim(0, payloadstring.toInt());
     putdatamap ("dimvalue/0" , String(payloadstring.toInt()));
+    putdatamap ("dimstate/0" , payloadstring.toInt() ? "1" : "0");
   }
   if (topicstring == mqtt_topicprefix + "setdimvalue/1") 
   {
     qswifidimmer_setdim(1, payloadstring.toInt());
     putdatamap ("dimvalue/1" , String(payloadstring.toInt()));
+    putdatamap ("dimstate/1" , payloadstring.toInt() ? "1" : "0");
   }
 
   if (topicstring == mqtt_topicprefix + "setdimstate/0") 
@@ -2787,14 +2789,14 @@ void setup() {
 #ifdef QSWIFIDIMMERCHANNELS
   qswifidimmer_init(QSWIFIDIMMERCHANNELS);
   #ifdef ESPMQTT_QSWIFIDIMMERD01
-  putdatamap (mqtt_topicprefix + "dimvalue" , "0");
-  putdatamap (mqtt_topicprefix + "dimstate" , "0");
+  putdatamap ("dimvalue" , "0");
+  putdatamap ("dimstate" , "0");
   #endif
   #ifdef ESPMQTT_QSWIFIDIMMERD02
-  putdatamap (mqtt_topicprefix + "dimvalue/0" , "0");
-  putdatamap (mqtt_topicprefix + "dimstate/0" , "0");
-  putdatamap (mqtt_topicprefix + "dimvalue/1" , "0");
-  putdatamap (mqtt_topicprefix + "dimstate/1" , "0");
+  putdatamap ("dimvalue/0" , "0");
+  putdatamap ("dimstate/0" , "0");
+  putdatamap ("dimvalue/1" , "0");
+  putdatamap ("dimstate/1" , "0");
   #endif
 #endif
 }
