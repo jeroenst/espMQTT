@@ -22,7 +22,14 @@ void qswifidimmer_send(uint8_t dimchannel)
 {
     if (qswifidimmer_nrofchannels == 1)
     {
-      // Implement code for QS-WIFI-D01
+      // Code for QS-WIFI-D01
+      Serial.write(0xFF); //Header
+      Serial.write(0x55); //Header
+      uint16_t calculateddimvalue = (((qswifidimmer_dimvalue[0] * (255 - qswifidimmer_minimaldimvalue[0]))) / 100) + qswifidimmer_minimaldimvalue[0];
+      Serial.write(qswifidimmer_state[0] ? calculateddimvalue : 0); //Value CH1
+      Serial.write(0x05); //Footer
+      Serial.write(0xDC); //Footer
+      Serial.write(0x0A); //Footer
     }
     if (qswifidimmer_nrofchannels == 2)
     {
@@ -41,14 +48,14 @@ void qswifidimmer_send(uint8_t dimchannel)
     }
 }
 
-void qswifidimmer_setminimaldim(uint8_t dimchannel, uint8_t value)
+void qswifidimmer_setminimaldim(uint8_t value, uint8_t dimchannel)
 {
   if (dimchannel < qswifidimmer_nrofchannels)
   {
     qswifidimmer_minimaldimvalue[dimchannel] = MIN(value, 100);
   }  
 }
-void qswifidimmer_setdim(uint8_t dimchannel, uint8_t value)
+void qswifidimmer_setdim(uint8_t value, uint8_t dimchannel)
 {
   if (dimchannel < qswifidimmer_nrofchannels)
   {
