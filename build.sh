@@ -84,5 +84,7 @@ do
   build
 done
 
+echo $VERSION > version
+
 rm -rf /tmp/espMQTT_build
 
