@@ -43,3 +43,6 @@
 [submodule "libraries/EasyDDNS"]
 	path = libraries/EasyDDNS
 	url = git@github.com:ayushsharma82/EasyDDNS.git
+[submodule "libraries/my92xx"]
+	path = libraries/my92xx
+	url = git@github.com:xoseperez/my92xx.git
