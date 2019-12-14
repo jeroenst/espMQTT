@@ -74,14 +74,30 @@ declare -a TARGETS=("ESPMQTT_WEATHER" "ESPMQTT_AMGPELLETSTOVE" "ESPMQTT_BATHROOM
 BOARD=esp8266com:esp8266:nodemcuv2
 for targetname in "${TARGETS[@]}"
 do
-  build
+	if [ "$1" == "" ]
+	then
+		build
+	else
+		if [ "$1" == "$targetname" ]
+		then
+			build
+		fi
+	fi
 done
 
 declare -a TARGETS=("ESPMQTT_DUCOBOX" "ESPMQTT_SONOFFS20" "ESPMQTT_SONOFFBULB" "ESPMQTT_SONOFFPOWR2" "ESPMQTT_GARDEN" "ESPMQTT_SONOFF_FLOORHEATING" "ESPMQTT_IRRIGATION" "ESPMQTT_BLITZWOLF" "ESPMQTT_SONOFF4CH" "ESPMQTT_SONOFFDUAL" "ESPMQTT_SONOFFS20_PRINTER" "ESPMQTT_SONOFFPOW" "ESPMQTT_QSWIFIDIMMERD01" "ESPMQTT_QSWIFIDIMMERD02")
 BOARD=esp8266com:esp8266:esp8285
 for targetname in "${TARGETS[@]}"
 do
-  build
+	if [ "$1" == "" ]
+	then
+		build
+	else
+		if [ "$1" == "$targetname" ]
+		then
+			build
+		fi
+	fi
 done
 
 echo $VERSION > version
