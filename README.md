@@ -41,4 +41,4 @@ Features:
 - Measure soil humidity (not finished yet) (SHT31)
 - Control Wifi Dimmers QS-WIFI-D01 and QS-WIFI-D02 (MOESHOUSE) (https://aliexpress.com/item/33010332202.html) (https://aliexpress.com/item/4000218700204.html)
 - Read a rainsensor (https://nl.aliexpress.com/item/1000001838878.html)
-- Read a SDM120(CT) kwh meter
+- Read a SDM120(CT) kwh meter (https://aliexpress.com/item/32686672714.html)
