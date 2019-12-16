@@ -49,9 +49,9 @@
 // #define  ESPMQTT_GARDEN //ESP8285 TUIN & MARIANNE & LUIFEL
 // #define  ESPMQTT_SONOFF_FLOORHEATING
 // #define  ESPMQTT_IRRIGATION
-//#define  ESPMQTT_BLITZWOLF
+#define  ESPMQTT_BLITZWOLF
 //#define  ESPMQTT_QSWIFIDIMMERD01
-#define  ESPMQTT_QSWIFIDIMMERD02
+//#define  ESPMQTT_QSWIFIDIMMERD02
 //#define  ESPMQTT_SONOFF4CH //ESP8285
 //#define  ESPMQTT_SONOFFDUAL
 //#define  ESPMQTT_SONOFFS20_PRINTER
@@ -1909,7 +1909,7 @@ void sonoff_handle()
     putdatamap("voltage/multiplier", String(hlw8012.getVoltageMultiplier()));
     putdatamap("current", String(hlw8012.getCurrent(), 3));
     putdatamap("current/multiplier", String(hlw8012.getCurrentMultiplier()));
-    putdatamap("power/active", String(hlw8012.getActivePower()));
+    putdatamap("power", String(hlw8012.getActivePower()));
     putdatamap("power/apparent", String(hlw8012.getApparentPower()));
     putdatamap("power/reactive", String(hlw8012.getReactivePower()));
     putdatamap("power/factor", String(hlw8012.getPowerFactor(), 2));
