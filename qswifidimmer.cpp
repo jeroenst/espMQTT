@@ -11,7 +11,7 @@
 */
 static uint8_t qswifidimmer_nrofchannels = 0;
 static uint8_t qswifidimmer_dimvalue[2] = {0, 0};
-static uint8_t qswifidimmer_minimaldimvalue[2] = {20 , 20};
+static uint8_t qswifidimmer_dimoffset[2] = {20 , 20};
 static bool qswifidimmer_dimstate[2] = {0, 0};
 static bool qswifidimmer_dimenabled[2] = {1, 1};
 
@@ -41,7 +41,7 @@ void qswifidimmer_send(uint8_t dimchannel)
     // Code for QS-WIFI-D01
     Serial.write(0xFF); //Header
     Serial.write(0x55); //Header
-    uint16_t calculateddimvalue = (((qswifidimmer_dimvalue[0] * (255 - qswifidimmer_minimaldimvalue[0]))) / 100) + qswifidimmer_minimaldimvalue[0];
+    uint16_t calculateddimvalue = (((qswifidimmer_dimvalue[0] * (255 - qswifidimmer_dimoffset[0]))) / 100) + qswifidimmer_dimoffset[0];
 
     Serial.write(qswifidimmer_dimstate[0] ? calculateddimvalue : 0); //Value CH1
     Serial.write(0x05); //Footer
@@ -56,9 +56,9 @@ void qswifidimmer_send(uint8_t dimchannel)
     Serial.write(0xFF); //Header
     Serial.write(0x55); //Header
     Serial.write(dimchannel + 1); //Channel
-    uint16_t calculateddimvalue = (((qswifidimmer_dimvalue[0] * (255 - qswifidimmer_minimaldimvalue[0]))) / 100) + qswifidimmer_minimaldimvalue[0];
+    uint16_t calculateddimvalue = (((qswifidimmer_dimvalue[0] * (255 - qswifidimmer_dimoffset[0]))) / 100) + qswifidimmer_dimoffset[0];
     Serial.write(qswifidimmer_dimstate[0] ? calculateddimvalue : 0); //Value CH1
-    calculateddimvalue = (((qswifidimmer_dimvalue[1] * (255 - qswifidimmer_minimaldimvalue[1]))) / 100) + qswifidimmer_minimaldimvalue[1];
+    calculateddimvalue = (((qswifidimmer_dimvalue[1] * (255 - qswifidimmer_dimoffset[1]))) / 100) + qswifidimmer_dimoffset[1];
     Serial.write(qswifidimmer_dimstate[1] ? calculateddimvalue : 0); //Value CH2
     Serial.write(0x05); //Footer
     Serial.write(0xDC); //Footer
@@ -151,13 +151,23 @@ void qswifidimmer_handle()
   }
 }
 
-void qswifidimmer_setminimaldimvalue(uint8_t value, uint8_t dimchannel)
+void qswifidimmer_setdimoffset(uint8_t value, uint8_t dimchannel)
 {
   if (dimchannel < qswifidimmer_nrofchannels)
   {
-    qswifidimmer_minimaldimvalue[dimchannel] = MIN(value, 100);
+    qswifidimmer_dimoffset[dimchannel] = MIN(value, 100);
   }
 }
+
+uint8_t qswifidimmer_getdimoffset(uint8_t dimchannel)
+{
+  if (dimchannel < qswifidimmer_nrofchannels)
+  {
+    return qswifidimmer_dimoffset[dimchannel];
+  }
+  return 0;
+}
+
 void qswifidimmer_setdimvalue(uint8_t value, uint8_t dimchannel)
 {
   if (dimchannel < qswifidimmer_nrofchannels)

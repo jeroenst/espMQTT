@@ -50,8 +50,8 @@
 // #define  ESPMQTT_SONOFF_FLOORHEATING
 // #define  ESPMQTT_IRRIGATION
 //#define  ESPMQTT_BLITZWOLF
-#define  ESPMQTT_QSWIFIDIMMERD01
-//#define  ESPMQTT_QSWIFIDIMMERD02
+//#define  ESPMQTT_QSWIFIDIMMERD01
+#define  ESPMQTT_QSWIFIDIMMERD02
 //#define  ESPMQTT_SONOFF4CH //ESP8285
 //#define  ESPMQTT_SONOFFDUAL
 //#define  ESPMQTT_SONOFFS20_PRINTER
@@ -2173,7 +2173,7 @@ uint8_t eeprom_read()
     if (eepromchecksum != checksum)
     {
       return 0;
-      DEBUG_E("Error reading eeprom!");
+      DEBUG_E("Error reading eeprom index %d (wrong checksum)!", index);
     }
     eepromMap->put(index++, data);
   }
@@ -2385,6 +2385,13 @@ void handleWWWSettings()
         }
       }
 #endif
+#ifdef  ESPMQTT_QSWIFIDIMMERD01
+      if (webserver.argName(i) == "qswifidimoffset") qswifidimmer_setdimoffset((webserver.arg(i)).toInt());
+#endif
+#ifdef  ESPMQTT_QSWIFIDIMMERD02
+      if (webserver.argName(i) == "qswifidimoffset0") qswifidimmer_setdimoffset((webserver.arg(i)).toInt(),0);
+      if (webserver.argName(i) == "qswifidimoffset1") qswifidimmer_setdimoffset((webserver.arg(i)).toInt(),1);
+#endif
     }
     eeprom_write(mqtt_server, 0);
     eeprom_write(mqtt_username, 1);
@@ -2394,6 +2401,16 @@ void handleWWWSettings()
     eeprom_write(String(mqtt_port), 5);
     eeprom_write(String(mqtt_ssl), 6);
     eeprom_write(mqtt_topicprefix, 7);
+#ifdef  ESPMQTT_QSWIFIDIMMERD01
+    eeprom_write(String(qswifidimmer_getdimoffset()), 8);
+    putdatamap("dimoffset", String(qswifidimmer_getdimoffset()));
+#endif
+#ifdef  ESPMQTT_QSWIFIDIMMERD02
+    eeprom_write(String(qswifidimmer_getdimoffset(0)), 8);
+    putdatamap("dimoffset/0", String(qswifidimmer_getdimoffset(0)));
+    eeprom_write(String(qswifidimmer_getdimoffset(1)), 9);
+    putdatamap("dimoffset/1", String(qswifidimmer_getdimoffset(1)));
+#endif
     eeprom_commit();
 
 
@@ -2450,6 +2467,13 @@ void handleWWWSettings()
 #ifdef  ESPMQTT_WATERMETER
     webpage += String("<TR><TD>Watermeter Liter</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"64\" name=\"watermeterliter\" value=\"") + getdatamap("water/liter") + "\"></TD></TR>";
 #endif
+#ifdef  ESPMQTT_QSWIFIDIMMERD01
+    webpage += String("<TR><TD>Dimmer Offset</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"3\" name=\"qswifidimoffset\" value=\"") + getdatamap("dimoffset") + "\"></TD></TR>";
+#endif
+#ifdef  ESPMQTT_QSWIFIDIMMERD02
+    webpage += String("<TR><TD>Dimmer Offset 0</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"3\" name=\"qswifidimoffset0\" value=\"") + getdatamap("dimoffset/0") + "\"></TD></TR>";
+    webpage += String("<TR><TD>Dimmer Offset 1</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"3\" name=\"qswifidimoffset1\" value=\"") + getdatamap("dimoffset/1") + "\"></TD></TR>";
+#endif
     webpage += "</TABLE><BR><CENTER><input type=\"submit\" value=\"Save Settings\"></form><BR><BR><form action=\"/settings\" method=\"post\" autocomplete=\"off\"><input type=\"hidden\" name=\"rebootdevice\" value=\"1\"><input type=\"submit\" value=\"Reboot Device\"></form><BR><BR><A HREF=\"/\">Return to main page</A></CENTER></div></BODY></HTML>";
     webserver.send(200, "text/html", webpage);
   }
@@ -2472,18 +2496,21 @@ void handleWWWRoot() {
 }
 
 
-#ifdef QSWIFIDIMMERCHANNELS
-void qswifidimmer_callback (uint8_t channel, uint8_t dimvalue, bool dimstate)
-{
 #if (QSWIFIDIMMERCHANNELS == 1) 
+void qswifidimmer_callback (uint8_t , uint8_t dimvalue, bool dimstate)
+{
   putdatamap ("dimvalue", String(dimvalue));
   putdatamap ("dimstate", String(dimstate));
-#else
-  putdatamap ("dimvalue/"+String(channel), String(dimvalue));
-  putdatamap ("dimstate/"+String(channel), String(dimstate));
-#endif
 }
 #endif
+#if (QSWIFIDIMMERCHANNELS == 2) 
+void qswifidimmer_callback (uint8_t dimchannel, uint8_t dimvalue, bool dimstate)
+{
+  putdatamap ("dimvalue/"+String(dimchannel), String(dimvalue));
+  putdatamap ("dimstate/"+String(dimchannel), String(dimstate));
+}
+#endif
+
 void ducoboxcallback (String topic, String payload)
 {
   putdatamap(topic, payload);
@@ -2614,6 +2641,7 @@ void setup() {
     mqtt_topicprefix = "home/" + esp_hostname + "/";
   }
   DEBUG_D("mqtt topicprefix=%s\n", mqtt_topicprefix.c_str());
+
 
 #ifdef  ESPMQTT_DDNS
   EasyDDNS.service("duckdns");
@@ -2807,6 +2835,33 @@ void setup() {
 
 #ifdef QSWIFIDIMMERCHANNELS
   qswifidimmer_init(QSWIFIDIMMERCHANNELS, qswifidimmer_callback);
+#ifdef ESPMQTT_QSWIFIDIMMERD01
+  String dimoffset = "0";
+  if (!eeprom_read(&dimoffset, 8))
+  {
+    DEBUG_E("Error reading dimmer offset from internal eeprom\n");
+    dimoffset = "20";
+  }
+  qswifidimmer_setdimoffset(dimoffset.toInt());
+#endif
+#ifdef ESPMQTT_QSWIFIDIMMERD02
+  String dimoffset = "0";
+  if (!eeprom_read(&dimoffset, 8))
+  {
+    DEBUG_E("Error reading dimmer offset 0 from internal eeprom\n");
+    dimoffset = "20";
+  }
+  qswifidimmer_setdimoffset(dimoffset.toInt(),0);
+  dimoffset = "0";
+  if (!eeprom_read(&dimoffset, 9))
+  {
+    DEBUG_E("Error reading dimmer offset 1 from internal eeprom\n");
+    dimoffset = "20";
+  }
+  qswifidimmer_setdimoffset(dimoffset.toInt(),1);
+#endif
+  putdatamap("dimoffset/0", String(qswifidimmer_getdimoffset(0)));
+  putdatamap("dimoffset/1", String(qswifidimmer_getdimoffset(1)));
 #endif
 }
 
