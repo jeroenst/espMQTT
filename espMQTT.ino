@@ -886,7 +886,7 @@ void initSerial()
 #elif defined ( ESPMQTT_SDM120)
   Serial.setDebugOutput(false);
   sdm.begin();
-#elif defined (ESPMQTT_SMARTMETER)  || defined (QSWIFIDIMMERCHANNELS)
+#elif defined (ESPMQTT_SMARTMETER) || defined (QSWIFIDIMMERCHANNELS)
   // do nothing, smartmeter initializes serial in init function.
 #else
   Serial.begin(115200); //Init serial 115200 baud
@@ -1181,7 +1181,11 @@ void loop()
   EasyDDNS.update(10000);
 #endif
 
-  if ((0 != reboottimeout) && (reboottimeout > uptime)) ESP.restart();
+  if ((0 != reboottimeout) && (reboottimeout > uptime))
+  {
+    ESP.restart();
+    delay(1000);
+  }
 
   if (triggers.wificonnected)
   {
@@ -1304,7 +1308,7 @@ void loop()
         DEBUG_I ("Switching to stronger AP %d (%s, %s, %s)\n", strongestwifiid, WiFi.SSID().c_str(), WiFi.psk().c_str(), WiFi.BSSIDstr(strongestwifiid).c_str());
         String wifissid = WiFi.SSID();
         String wifipsk =  WiFi.psk();
-        WiFi.disconnect(false);
+        WiFi.disconnect();
         WiFi.begin(wifissid.c_str(), wifipsk.c_str(), WiFi.channel(strongestwifiid), WiFi.BSSID(strongestwifiid));
       }
     }
@@ -1582,9 +1586,20 @@ void loop()
     timersectick = 0;
     updatemqtt = 1;
 
-    if ((uptime % 10) == 0)
+    // scan for stronger wifi network: every 10 minutes, directly when wifi is not connected or every 30 seconds if signal is bad
+    // try to do this as less as posisble because during scan the esp is unreachable for about a second.
+    if ((!mainstate.accesspoint))
     {
-      if (!mainstate.accesspoint) WiFi.scanNetworksAsync(wifiScanReady);
+      if (((uptime % 600) == 0) || (WiFi.status() != WL_CONNECTED) || (((uptime % 30) == 0) && WiFi.RSSI() < -70))
+      {
+        static uint32_t wifilastscan = 0;
+        // prevent scanning more than once per 10 seconds and wait 2 seconds before first scan
+        if (((uptime > 2) && (wifilastscan == 0)) || ((wifilastscan + 10 < uptime))) 
+        {
+          WiFi.scanNetworksAsync(wifiScanReady);
+          wifilastscan = uptime;
+        }
+      }
     }
 
     if ((uptime % 600) == 0)
@@ -1626,10 +1641,12 @@ void loop()
       DEBUG_W("Connection to wifi failed, starting accesspoint\n");
       mainstate.accesspoint = true;
       if (!WiFi.softAP(WiFi.hostname().c_str(), "esplogin", 6, 0)) DEBUG_E("Failed setting WiFi.softAP()");
+      static uint8 routermode = 0;
+      wifi_softap_set_dhcps_offer_option(OFFER_ROUTER, &routermode);
       WiFi.mode(WIFI_AP);
       esp_password = "esplogin";
     }
-    if (uptime == 330)
+    if (uptime == 630)
     {
       DEBUG_I("Stopping accesspoint");
       WiFi.mode(WIFI_STA);
@@ -1731,7 +1748,6 @@ void loop()
       wifiTimer = 0;
       if (WiFi.status() != previouswifistatus)
       {
-        DEBUG_I("Wifi connected to %s\n", WiFi.SSID().c_str());
 #ifdef NEOPIXELPIN
         neopixelleds.setPixelColor(0, neopixelleds.Color(30, 15, 0));
         neopixelleds.show();
@@ -2164,6 +2180,14 @@ uint8_t eeprom_read()
   return 1;
 }
 
+void eeprom_erase()
+{
+  DEBUG_W("eeprom_erase();\n");
+  EEPROM.write(512, 0);
+  EEPROM.commit();
+  EEPROM.end();
+}
+
 uint8_t eeprom_read(String * data, byte eepromindex)
 {
   DEBUG_V("eeprom_read(%d)\n", eepromindex);
@@ -2375,6 +2399,8 @@ void handleWWWSettings()
 
     ArduinoOTA.setPassword(esp_password.c_str());
     ArduinoOTA.setHostname(esp_hostname.c_str());
+    MDNS.begin(esp_hostname.c_str());
+    MDNS.notifyAPChange();
     Debug.setPassword(esp_password);
     mainstate.defaultpassword = false;
 
@@ -2385,9 +2411,11 @@ void handleWWWSettings()
     if ((postwifissid != WiFi.SSID()) || (postwifikey != WiFi.psk()) || (esp_hostname != WiFi.hostname()))
     {
       webserver.send(200, "text/html", "<HTML><BODY>Settings Saved.<BR>Please connect to proper wifi network and open the page of the saved hostname.</BODY></HTML>");
+      yield();
       delay(1000);
+      yield();
+      WiFi.disconnect();
       WiFi.hostname(esp_hostname);
-      WiFi.disconnect(true);
       WiFi.begin(postwifissid.c_str(), postwifikey.c_str()); // Save wifi ssid and key and also activate new hostname...
       flashbuttonstatus = 0;
       previouswifistatus = -1;
@@ -2800,6 +2828,7 @@ void processCmdRemoteDebug()
     DEBUG("  route\n");
     DEBUG("  mqttforceconnect\n");
     DEBUG("  showmainstate\n");
+    DEBUG("  factoryreset\n");
   }
 
   if (lastCmd == "ping")
@@ -2833,6 +2862,16 @@ void processCmdRemoteDebug()
   }
 
   if (lastCmd == "showdatamap") showdatamap();
+
+  if (lastCmd == "factoryreset")
+  {
+    WiFi.disconnect();
+    eeprom_erase();
+    delay(1000);
+    ESP.restart();
+    delay(1000);
+  }
+
 #ifdef  ESPMQTT_WATERMETER
   if (lastCmd == "help") DEBUG("  watermeterreadeeprom\n  watermeterwriteeeprom\n");
   if (lastCmd == "watermeterreadeeprom")
