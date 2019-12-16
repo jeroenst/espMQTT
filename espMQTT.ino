@@ -50,8 +50,8 @@
 // #define  ESPMQTT_SONOFF_FLOORHEATING
 // #define  ESPMQTT_IRRIGATION
 //#define  ESPMQTT_BLITZWOLF
-//#define  ESPMQTT_QSWIFIDIMMERD01
-#define  ESPMQTT_QSWIFIDIMMERD02
+#define  ESPMQTT_QSWIFIDIMMERD01
+//#define  ESPMQTT_QSWIFIDIMMERD02
 //#define  ESPMQTT_SONOFF4CH //ESP8285
 //#define  ESPMQTT_SONOFFDUAL
 //#define  ESPMQTT_SONOFFS20_PRINTER
@@ -2582,7 +2582,7 @@ void setup() {
   if (!eeprom_read(&esp_hostname, 4))
   {
     DEBUG_E("Error reading hostname from internal eeprom\n");
-    esp_hostname = FIRMWARE_TARGET;
+    esp_hostname = String(FIRMWARE_TARGET) + "_" + String(chipid);
   }
   DEBUG_D("esp hostname=%s\n", esp_hostname.c_str());
 
