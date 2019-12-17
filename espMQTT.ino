@@ -45,17 +45,17 @@
 // #define  ESPMQTT_DUCOBOX
 // #define  ESPMQTT_SONOFFS20 // coffeelamp & sonoffs20_00X
 // #define  ESPMQTT_SONOFFBULB
-// #define  ESPMQTT_SONOFFPOWR2 // tv&washing machine&server
 // #define  ESPMQTT_GARDEN //ESP8285 TUIN & MARIANNE & LUIFEL
 // #define  ESPMQTT_SONOFF_FLOORHEATING
 // #define  ESPMQTT_IRRIGATION
-#define  ESPMQTT_BLITZWOLF
+// #define  ESPMQTT_BLITZWOLF
 //#define  ESPMQTT_QSWIFIDIMMERD01
-//#define  ESPMQTT_QSWIFIDIMMERD02
+#define  ESPMQTT_QSWIFIDIMMERD02
 //#define  ESPMQTT_SONOFF4CH //ESP8285
 //#define  ESPMQTT_SONOFFDUAL
 //#define  ESPMQTT_SONOFFS20_PRINTER
 //#define  ESPMQTT_SONOFFPOW
+//#define  ESPMQTT_SONOFFPOWR2 // tv&washingmachine&server&dishwasher
 
 #define ESPMQTT_VERSION "TEST"
 #endif
@@ -684,7 +684,9 @@ void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
   putdatamap("system/freeram", String(system_get_free_heap_size()), uptime % 60 == 0);
   putdatamap("wifi/state", WiFi.status() == WL_CONNECTED ? "connected" : "disconnected", sendupdate);
   putdatamap("wifi/localip", WiFi.localIP().toString(), sendupdate);
+  putdatamap("wifi/mac", String(WiFi.macAddress()), sendupdate);
   putdatamap("wifi/ssid", String(WiFi.SSID()), sendupdate);
+  putdatamap("wifi/bssid", String(WiFi.BSSIDstr()), sendupdate);
   putdatamap("wifi/rssi", String(WiFi.RSSI()), uptime % 10 == 0);
   putdatamap("wifi/channel", String(wifichannel), sendupdate);
   putdatamap("mqtt/server", String(mqtt_server), sendupdate);
