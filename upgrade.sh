@@ -44,10 +44,10 @@ then
 	upgrade $1 esp_pelletstove ESPMQTT_AMGPELLETSTOVE
 	upgrade $1 sonoff_tv ESPMQTT_SONOFFPOWR2
 	upgrade $1 sonoff_washingmachine ESPMQTT_SONOFFPOWR2
-	upgrade $1 esp_tuin ESPMQTT_GARDEN
+	upgrade $1 sonoff_tuin ESPMQTT_GARDEN
 	upgrade $1 sonoff_luifel ESPMQTT_GARDEN
-	upgrade $1 esp_irrigation ESPMQTT_IRRIGATION
-	upgrade $1 esp_ducobox ESPMQTT_DUCOBOX
+	upgrade $1 sonoff_irrigation ESPMQTT_IRRIGATION
+	upgrade $1 sonoff_ducobox ESPMQTT_DUCOBOX
 	upgrade $1 sonoff_coffeelamp ESPMQTT_SONOFFS20
 	upgrade $1 sonoff_server ESPMQTT_SONOFFPOWR2
 	upgrade $1 sonoff_bulb ESPMQTT_SONOFFBULB
