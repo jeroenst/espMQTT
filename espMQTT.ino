@@ -30,16 +30,16 @@
 // #define  ESPMQTT_BATHROOM
 // #define  ESPMQTT_BEDROOM2
 // #define  ESPMQTT_OPENTHERM
-//#define ESPMQTT_SMARTMETER
+// #define ESPMQTT_SMARTMETER
 // #define  ESPMQTT_GROWATT
 // #define  ESPMQTT_SDM120
 // #define  ESPMQTT_WATERMETER
-//#define  ESPMQTT_DDNS
+// #define  ESPMQTT_DDNS
 // #define  ESPMQTT_GENERIC8266
-//#define  ESPMQTT_MAINPOWERMETER
-//#define  ESPMQTT_NOISE
-//#define  ESPMQTT_SOIL
-//#define  ESPMQTT_DIMMER
+// #define  ESPMQTT_MAINPOWERMETER
+// #define  ESPMQTT_NOISE
+// #define  ESPMQTT_SOIL
+// #define  ESPMQTT_DIMMER
 
 /* ESP8285 */
 // #define  ESPMQTT_DUCOBOX
@@ -48,14 +48,14 @@
 // #define  ESPMQTT_GARDEN //ESP8285 TUIN & MARIANNE & LUIFEL
 // #define  ESPMQTT_SONOFF_FLOORHEATING
 // #define  ESPMQTT_IRRIGATION
-#define  ESPMQTT_BLITZWOLF
-//#define  ESPMQTT_QSWIFIDIMMERD01
-//#define  ESPMQTT_QSWIFIDIMMERD02
-//#define  ESPMQTT_SONOFF4CH //ESP8285
-//#define  ESPMQTT_SONOFFDUAL
-//#define  ESPMQTT_SONOFFS20_PRINTER
-//#define  ESPMQTT_SONOFFPOW
-//#define  ESPMQTT_SONOFFPOWR2 // tv&washingmachine&server&dishwasher
+// #define  ESPMQTT_BLITZWOLF
+// #define  ESPMQTT_QSWIFIDIMMERD01
+// #define  ESPMQTT_QSWIFIDIMMERD02
+// #define  ESPMQTT_SONOFF4CH //ESP8285
+// #define  ESPMQTT_SONOFFDUAL
+// #define  ESPMQTT_SONOFFS20_PRINTER
+// #define  ESPMQTT_SONOFFPOW
+#define  ESPMQTT_SONOFFPOWR2 // tv&washingmachine&server&dishwasher
 
 #define ESPMQTT_VERSION "TEST"
 #endif
@@ -1475,7 +1475,6 @@ void loop()
       {
         uint32_t valueco = 0;
         uint32_t valueca = 0;
-        float value = 0;
         valueco = (uint32_t(serbuffer[0]) << 16) + (uint16_t(serbuffer[1]) << 8) + serbuffer[2];
         valueca = (uint32_t(serbuffer[3]) << 16) + (uint16_t(serbuffer[4]) << 8) + serbuffer[5];
         if (valueca > 0) voltval = double(double(valueco) / double(valueca));
@@ -1627,13 +1626,11 @@ void loop()
 
 
 #ifdef  ESPMQTT_SONOFFPOWR2
-    static uint8_t powr2sec = 0;
-    if (powr2sec++ > 5) // Every 5 seconds send update about power usage
+    if ((uptime % 5) == 0) // Every 5 seconds send update about power usage
     {
       putdatamap("voltage", String(voltval, 1));
-      putdatamap("power", String(powerval, 1));
       putdatamap("current", String(currentval, 3));
-      powr2sec = 0;
+      putdatamap("power", String(powerval, 1));
     }
 #endif
 
