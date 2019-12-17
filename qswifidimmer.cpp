@@ -89,7 +89,7 @@ void qswifidimmer_handle()
 
     if ((Stime[dimchannel] > 0) && (Stime[dimchannel] + 100 < millis()))
     {
-      if (Scounter[dimchannel] < 100)
+      if ((Scounter[dimchannel] > 5) && (Scounter[dimchannel] < 100))
       {
         qswifidimmer_dimstate[dimchannel] = !qswifidimmer_dimstate[dimchannel];
         if (!qswifidimmer_dimenabled[dimchannel])
