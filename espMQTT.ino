@@ -25,37 +25,37 @@
 //#define SERIALLOG
 
 /* ESP8266 */
-// #define  ESPMQTT_WEATHER
-// #define  ESPMQTT_AMGPELLETSTOVE
-// #define  ESPMQTT_BATHROOM
-// #define  ESPMQTT_BEDROOM2
-// #define  ESPMQTT_OPENTHERM
+// #define ESPMQTT_WEATHER
+// #define ESPMQTT_AMGPELLETSTOVE
+// #define ESPMQTT_BATHROOM
+// #define ESPMQTT_BEDROOM2
+// #define ESPMQTT_OPENTHERM
 // #define ESPMQTT_SMARTMETER
-// #define  ESPMQTT_GROWATT
-// #define  ESPMQTT_SDM120
-// #define  ESPMQTT_WATERMETER
-// #define  ESPMQTT_DDNS
-// #define  ESPMQTT_GENERIC8266
-// #define  ESPMQTT_MAINPOWERMETER
-// #define  ESPMQTT_NOISE
-// #define  ESPMQTT_SOIL
-// #define  ESPMQTT_DIMMER
+// #define ESPMQTT_GROWATT
+// #define ESPMQTT_SDM120
+// #define ESPMQTT_WATERMETER
+// #define ESPMQTT_DDNS
+// #define ESPMQTT_GENERIC8266
+// #define ESPMQTT_MAINPOWERMETER
+// #define ESPMQTT_NOISE
+// #define ESPMQTT_SOIL
+// #define ESPMQTT_DIMMER
 
 /* ESP8285 */
-// #define  ESPMQTT_DUCOBOX
-// #define  ESPMQTT_SONOFFS20 // coffeelamp & sonoffs20_00X
-// #define  ESPMQTT_SONOFFBULB
-// #define  ESPMQTT_GARDEN //ESP8285 TUIN & MARIANNE & LUIFEL
-// #define  ESPMQTT_SONOFF_FLOORHEATING
-// #define  ESPMQTT_IRRIGATION
-// #define  ESPMQTT_BLITZWOLF
-// #define  ESPMQTT_QSWIFIDIMMERD01
-// #define  ESPMQTT_QSWIFIDIMMERD02
-// #define  ESPMQTT_SONOFF4CH //ESP8285
-// #define  ESPMQTT_SONOFFDUAL
-// #define  ESPMQTT_SONOFFS20_PRINTER
-// #define  ESPMQTT_SONOFFPOW
-#define  ESPMQTT_SONOFFPOWR2 // tv&washingmachine&server&dishwasher
+// #define ESPMQTT_DUCOBOX
+// #define ESPMQTT_SONOFFS20 // coffeelamp & sonoffs20_00X
+// #define ESPMQTT_SONOFFBULB
+// #define ESPMQTT_GARDEN //ESP8285 TUIN & MARIANNE & LUIFEL
+// #define ESPMQTT_SONOFF_FLOORHEATING
+// #define SPMQTT_IRRIGATION
+// #define ESPMQTT_BLITZWOLF
+// #define ESPMQTT_QSWIFIDIMMERD01
+#define ESPMQTT_QSWIFIDIMMERD02
+// #define ESPMQTT_SONOFF4CH //ESP8285
+// #define ESPMQTT_SONOFFDUAL
+// #define ESPMQTT_SONOFFS20_PRINTER
+// #define ESPMQTT_SONOFFPOW
+// #define ESPMQTT_SONOFFPOWR2 // tv&washingmachine&server&dishwasher
 
 #define ESPMQTT_VERSION "TEST"
 #endif
@@ -580,7 +580,6 @@ bool floorheating_valveon = 0;
 //WiFiClientSecure wifiClientSecure;
 //WiFiClient wifiClient;
 static uint8_t wifiTimer = 0;
-//PubSubClient mqttClient;
 ESP8266WebServer webserver(80);
 #include <WiFiUdp.h>
 
