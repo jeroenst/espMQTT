@@ -30,19 +30,20 @@ void qswifidimmer_init(const uint8_t nrofchannels, void(*callback)(uint8_t, uint
     qswifidimmer_nrofchannels = 2;
   }
   pinMode(4, OUTPUT); // When a led is connected to gpio 4 leaving this gpio as input causes wifi inteference
+  pinMode(3, FUNCTION_0);
+  pinMode(3, OUTPUT);
   pinMode(13, INPUT);
   pinMode(5, INPUT);
 }
 
 void qswifidimmer_send(uint8_t dimchannel)
 {
+  uint16_t calculateddimvalue = (((qswifidimmer_dimvalue[0] * (255 - qswifidimmer_dimoffset[0]))) / 100) + qswifidimmer_dimoffset[0];
   if (qswifidimmer_nrofchannels == 1)
   {
     // Code for QS-WIFI-D01
     Serial.write(0xFF); //Header
     Serial.write(0x55); //Header
-    uint16_t calculateddimvalue = (((qswifidimmer_dimvalue[0] * (255 - qswifidimmer_dimoffset[0]))) / 100) + qswifidimmer_dimoffset[0];
-
     Serial.write(qswifidimmer_dimstate[0] ? calculateddimvalue : 0); //Value CH1
     Serial.write(0x05); //Footer
     Serial.write(0xDC); //Footer
@@ -52,11 +53,9 @@ void qswifidimmer_send(uint8_t dimchannel)
   if (qswifidimmer_nrofchannels == 2)
   {
     // Code for QS-WIFI-D02
-    DEBUG_V("Sending dimstates\n");
     Serial.write(0xFF); //Header
     Serial.write(0x55); //Header
     Serial.write(dimchannel + 1); //Channel
-    uint16_t calculateddimvalue = (((qswifidimmer_dimvalue[0] * (255 - qswifidimmer_dimoffset[0]))) / 100) + qswifidimmer_dimoffset[0];
     Serial.write(qswifidimmer_dimstate[0] ? calculateddimvalue : 0); //Value CH1
     calculateddimvalue = (((qswifidimmer_dimvalue[1] * (255 - qswifidimmer_dimoffset[1]))) / 100) + qswifidimmer_dimoffset[1];
     Serial.write(qswifidimmer_dimstate[1] ? calculateddimvalue : 0); //Value CH2
@@ -103,7 +102,7 @@ void qswifidimmer_handle()
       Stime[dimchannel] = 0;
     }
 
-    if (qswifidimmer_dimenabled[dimchannel])
+    if ((qswifidimmer_dimenabled[dimchannel]) && (qswifidimmer_dimstate[dimchannel]))
     {
       if ((Stimeout[dimchannel] > 0) && (Stimeout[dimchannel] < millis()))
       {
