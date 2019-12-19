@@ -8,3 +8,4 @@ void qswifidimmer_setdimenabled(bool dimenabled, uint8_t dimchannel);
 bool qswifidimmer_getdimenabled(uint8_t dimchannel);
 void qswifidimmer_setdimoffset(uint8_t value, uint8_t dimchannel = 0);
 uint8_t qswifidimmer_getdimoffset(uint8_t dimchannel = 0);
+void qswifidimmer_setswitchcallback(void(*callback)(uint8_t, bool));

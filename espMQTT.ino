@@ -2509,6 +2509,19 @@ void qswifidimmer_callback (uint8_t dimchannel, uint8_t dimvalue, bool dimstate)
 }
 #endif
 
+#if (QSWIFIDIMMERCHANNELS == 1)
+void qswifidimmer_switchcallback(uint8_t , bool switchstate)
+{
+  putdatamap ("switchstate", String(switchstate));
+}
+#endif
+#if (QSWIFIDIMMERCHANNELS == 2)
+void qswifidimmer_switchcallback(uint8_t dimchannel, bool switchstate)
+{
+  putdatamap ("switchstate/"+String(dimchannel), String(switchstate));
+}
+#endif
+
 void ducoboxcallback (String topic, String payload)
 {
   putdatamap(topic, payload);
@@ -2833,6 +2846,7 @@ void setup() {
 
 #ifdef QSWIFIDIMMERCHANNELS
   qswifidimmer_init(QSWIFIDIMMERCHANNELS, qswifidimmer_callback);
+  qswifidimmer_setswitchcallback(qswifidimmer_switchcallback);
 #ifdef ESPMQTT_QSWIFIDIMMERD01
   String dimoffset = "0";
   if (!eeprom_read(&dimoffset, 8))

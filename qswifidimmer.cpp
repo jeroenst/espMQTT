@@ -16,6 +16,7 @@ static bool qswifidimmer_dimstate[2] = {0, 0};
 static bool qswifidimmer_dimenabled[2] = {1, 1};
 
 void(*_qswifidimmer_callback)(uint8_t, uint8_t, bool);
+void(*_qswifidimmer_switchcallback)(uint8_t, bool);
 
 void qswifidimmer_init(const uint8_t nrofchannels, void(*callback)(uint8_t, uint8_t, bool))
 {
@@ -34,6 +35,12 @@ void qswifidimmer_init(const uint8_t nrofchannels, void(*callback)(uint8_t, uint
   pinMode(3, OUTPUT);
   pinMode(13, INPUT);
   pinMode(5, INPUT);
+}
+
+void qswifidimmer_setswitchcallback(void(*callback)(uint8_t, bool))
+{
+  _qswifidimmer_switchcallback = callback;
+  for (int i = 0; i < qswifidimmer_nrofchannels;  i++) _qswifidimmer_switchcallback(i, false);
 }
 
 void qswifidimmer_send(uint8_t dimchannel)
@@ -86,9 +93,14 @@ void qswifidimmer_handle()
       Spulse[dimchannel] = 1;
     }
 
-    if ((Stime[dimchannel] > 0) && (Stime[dimchannel] + 100 < millis()))
+    if (Scounter[dimchannel] == 6)
     {
-      if ((Scounter[dimchannel] > 5) && (Scounter[dimchannel] < 100))
+      _qswifidimmer_switchcallback(dimchannel, true);
+    }
+
+    if ((Scounter[dimchannel] > 5) && (Stime[dimchannel] + 100 < millis())) // When switch was pressed before and released 100ms ago
+    {
+      if (Scounter[dimchannel] < 100)
       {
         qswifidimmer_dimstate[dimchannel] = !qswifidimmer_dimstate[dimchannel];
         if (!qswifidimmer_dimenabled[dimchannel])
@@ -98,8 +110,16 @@ void qswifidimmer_handle()
         qswifidimmer_send(dimchannel);
         _qswifidimmer_callback(dimchannel, qswifidimmer_dimstate[dimchannel] ? qswifidimmer_dimvalue[dimchannel] : 0, qswifidimmer_dimstate[dimchannel]);
       }
+      _qswifidimmer_switchcallback(dimchannel, false);
       Scounter[dimchannel] = 0;
       Stime[dimchannel] = 0;
+    }
+
+    if (!qswifidimmer_dimstate[dimchannel] && Scounter[dimchannel] > 100) // If lamps are off and switch is pressed long enough, put lamps on with full brightness
+    {
+        qswifidimmer_dimstate[dimchannel] = true;
+        qswifidimmer_dimvalue[dimchannel] = 100;
+        qswifidimmer_send(dimchannel);
     }
 
     if ((qswifidimmer_dimenabled[dimchannel]) && (qswifidimmer_dimstate[dimchannel]))
