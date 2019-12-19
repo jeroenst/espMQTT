@@ -10,7 +10,7 @@
    GPIO5  = S2
 */
 static uint8_t qswifidimmer_nrofchannels = 0;
-static uint8_t qswifidimmer_dimvalue[2] = {0, 0};
+static uint8_t qswifidimmer_dimvalue[2] = {1, 1};
 static uint8_t qswifidimmer_dimoffset[2] = {20 , 20};
 static bool qswifidimmer_dimstate[2] = {0, 0};
 static bool qswifidimmer_dimenabled[2] = {1, 1};
@@ -23,18 +23,44 @@ void qswifidimmer_init(const uint8_t nrofchannels, void(*callback)(uint8_t, uint
   _qswifidimmer_callback = callback;
   Serial.begin(9600);  //Init serial 9600 baud
   Serial.setDebugOutput(false);
+
+  // Define all unused GPIO as output to prevent inteference and slow wifi
+  pinMode(0, OUTPUT);
+  digitalWrite(0,0);
+  pinMode(2, OUTPUT);
+  digitalWrite(2,0);
+  pinMode(3, FUNCTION_0); // Change RX pin to GPIO
+  pinMode(3, OUTPUT);
+  digitalWrite(3,0);
+  pinMode(4, OUTPUT);
+  digitalWrite(4,0);
+  // Pin 6 t/m 11 = flash
+  pinMode(12, OUTPUT);
+  digitalWrite(12,0);
+  pinMode(14, OUTPUT);
+  digitalWrite(14,0);
+  pinMode(15, OUTPUT);
+  digitalWrite(15,0);
+  pinMode(16, OUTPUT);
+  digitalWrite(16,0);
+
   qswifidimmer_nrofchannels = nrofchannels;
   qswifidimmer_setdimvalue(0, 0);
-  if (qswifidimmer_nrofchannels > 1)
+  qswifidimmer_setdimstate(0, 0);
+  pinMode(13, INPUT);
+  
+  if (qswifidimmer_nrofchannels == 2)
   {
     qswifidimmer_setdimvalue(0, 1);
+    qswifidimmer_setdimstate(0, 1);
     qswifidimmer_nrofchannels = 2;
+    pinMode(5, INPUT);
   }
-  pinMode(4, OUTPUT); // When a led is connected to gpio 4 leaving this gpio as input causes wifi inteference
-  pinMode(3, FUNCTION_0);
-  pinMode(3, OUTPUT);
-  pinMode(13, INPUT);
-  pinMode(5, INPUT);
+  else 
+  {
+    pinMode(5, OUTPUT);
+    digitalWrite(5,0);
+  }
 }
 
 void qswifidimmer_setswitchcallback(void(*callback)(uint8_t, bool))
@@ -102,7 +128,7 @@ void qswifidimmer_handle()
     {
       if (Scounter[dimchannel] < 100)
       {
-        qswifidimmer_dimstate[dimchannel] = !qswifidimmer_dimstate[dimchannel];
+        qswifidimmer_dimstate[dimchannel] = qswifidimmer_dimstate[dimchannel] ? 0 : 1;
         if (!qswifidimmer_dimenabled[dimchannel])
         {
           qswifidimmer_dimvalue[dimchannel] = qswifidimmer_dimstate[dimchannel] ? 100 : 0;

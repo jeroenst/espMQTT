@@ -49,8 +49,8 @@
 // #define ESPMQTT_SONOFF_FLOORHEATING
 // #define SPMQTT_IRRIGATION
 // #define ESPMQTT_BLITZWOLF
-// #define ESPMQTT_QSWIFIDIMMERD01
-#define ESPMQTT_QSWIFIDIMMERD02
+#define ESPMQTT_QSWIFIDIMMERD01
+// #define ESPMQTT_QSWIFIDIMMERD02
 // #define ESPMQTT_SONOFF4CH //ESP8285
 // #define ESPMQTT_SONOFFDUAL
 // #define ESPMQTT_SONOFFS20_PRINTER
@@ -2855,6 +2855,7 @@ void setup() {
     dimoffset = "20";
   }
   qswifidimmer_setdimoffset(dimoffset.toInt());
+  putdatamap("dimoffset", String(qswifidimmer_getdimoffset()));
 #endif
 #ifdef ESPMQTT_QSWIFIDIMMERD02
   String dimoffset = "0";
@@ -2871,9 +2872,9 @@ void setup() {
     dimoffset = "20";
   }
   qswifidimmer_setdimoffset(dimoffset.toInt(),1);
-#endif
   putdatamap("dimoffset/0", String(qswifidimmer_getdimoffset(0)));
   putdatamap("dimoffset/1", String(qswifidimmer_getdimoffset(1)));
+#endif
 #endif
 }
 
