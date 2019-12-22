@@ -49,8 +49,8 @@
 // #define ESPMQTT_SONOFF_FLOORHEATING
 // #define SPMQTT_IRRIGATION
 // #define ESPMQTT_BLITZWOLF
-#define ESPMQTT_QSWIFIDIMMERD01
-// #define ESPMQTT_QSWIFIDIMMERD02
+// #define ESPMQTT_QSWIFIDIMMERD01
+#define ESPMQTT_QSWIFIDIMMERD02
 // #define ESPMQTT_SONOFF4CH //ESP8285
 // #define ESPMQTT_SONOFFDUAL
 // #define ESPMQTT_SONOFFS20_PRINTER
@@ -686,7 +686,7 @@ void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
   putdatamap("wifi/mac", String(WiFi.macAddress()), sendupdate);
   putdatamap("wifi/ssid", String(WiFi.SSID()), sendupdate);
   putdatamap("wifi/bssid", String(WiFi.BSSIDstr()), sendupdate);
-  putdatamap("wifi/rssi", String(WiFi.RSSI()), uptime % 10 == 0);
+  putdatamap("wifi/rssi", String(WiFi.RSSI()), (((abs(getdatamap("wifi/rssi").toInt() - WiFi.RSSI()) > 5) && (uptime % 10 == 0)) || (uptime % 60 == 0)));
   putdatamap("wifi/channel", String(wifichannel), sendupdate);
   putdatamap("mqtt/server", String(mqtt_server), sendupdate);
   putdatamap("mqtt/port", String(mqtt_port), sendupdate);
@@ -717,6 +717,7 @@ void initWifi()
   WiFi.setAutoReconnect(false); // We handle reconnect our self
   WiFi.setSleepMode(WIFI_NONE_SLEEP); // When sleep is on regular disconnects occur https://github.com/esp8266/Arduino/issues/5083
   WiFi.mode(WIFI_STA);
+  WiFi.setOutputPower(20);        // 10dBm == 10mW, 14dBm = 25mW, 17dBm = 50mW, 20dBm = 100mW
   DEBUG_I("Wifi hostname=%s\n", esp_hostname.c_str());
   WiFi.hostname(esp_hostname);
 }
@@ -727,7 +728,7 @@ void connectToWifi()
   {
     DEBUG_I("Connecting to Wi-Fi...\n");
     wifiReconnectTimer.once(30, connectToWifi); // Retry wifi connection in 30 seconds if it fails to connect
-    WiFi.begin();
+    WiFi.begin();     // Start WiFi.
   }
 }
 
