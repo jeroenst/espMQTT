@@ -1,6 +1,6 @@
 /*
    Version of esp8266 library: 2.6.2
-   
+
    Needed libraries:
     https://github.com/jeroenst/RemoteDebug
     https://github.com/jeroenst/ESPAsyncTCP
@@ -46,11 +46,11 @@
 // #define ESPMQTT_SONOFFS20 // coffeelamp & sonoffs20_00X
 // #define ESPMQTT_SONOFFBULB
 // #define ESPMQTT_GARDEN //ESP8285 TUIN & MARIANNE & LUIFEL
-// #define ESPMQTT_SONOFF_FLOORHEATING
+#define ESPMQTT_SONOFF_FLOORHEATING
 // #define SPMQTT_IRRIGATION
 // #define ESPMQTT_BLITZWOLF
 // #define ESPMQTT_QSWIFIDIMMERD01
-#define ESPMQTT_QSWIFIDIMMERD02
+// #define ESPMQTT_QSWIFIDIMMERD02
 // #define ESPMQTT_SONOFF4CH //ESP8285
 // #define ESPMQTT_SONOFFDUAL
 // #define ESPMQTT_SONOFFS20_PRINTER
@@ -1595,7 +1595,7 @@ void loop()
       {
         static uint32_t wifilastscan = 0;
         // prevent scanning more than once per 10 seconds and wait 2 seconds before first scan
-        if (((uptime > 2) && (wifilastscan == 0)) || ((wifilastscan + 10 < uptime))) 
+        if (((uptime > 2) && (wifilastscan == 0)) || ((wifilastscan + 10 < uptime)))
         {
           WiFi.scanNetworksAsync(wifiScanReady);
           wifilastscan = uptime;
@@ -1705,37 +1705,32 @@ void loop()
 #ifdef  ESPMQTT_SONOFF_FLOORHEATING
       temperature = oneWireSensors.getTempC(onewire_floorWaterAddress);
       DEBUG_I("Floor Water Temperature=%f\n", temperature);
-      bool inverse = false;
+      bool floorheatingrelayon = false;
+      // When temperature exeeds maximum prevent pump from switching on
+      if (temperature < SONOFF_FLOORHEATING_TEMPMAX)
+      {
+        // Every 24 hours run the pump for 1 minute to prevent locking
+        if ((int)(uptime / 60) % 1440 == 0)
+        {
+          floorheatingrelayon = true;
+        }
+        // Only if floorheating temperature as measured correctly put valve on if requested
+        else if (temperature != -127)
+        {
+          putdatamap("temperature", String(temperature, 1));
+          floorheatingrelayon = floorheating_valveon;
+        }
+        else putdatamap("temperature", "-");
+      }
 #ifdef SONOFFCHINVERSE
-      inverse = true;
+      digitalWrite(sonoff_relays[0], floorheatingrelayon ? false : true); // Set floorheating
+#else
+      digitalWrite(sonoff_relays[0], floorheatingrelayon); // Set floorheating
 #endif
-      if (temperature != -127)
-      {
-        putdatamap("temperature", String(temperature, 1));
-        if (temperature > SONOFF_FLOORHEATING_TEMPMAX)
-        {
-          digitalWrite(sonoff_relays[0], inverse ? true : false); // Set floorheating off
 #ifdef SONOFF_LEDS
-          digitalWrite(sonoff_leds[i], sonoff_ledinverse ? 1 : 0);
+      digitalWrite(sonoff_leds[0], sonoff_ledinverse == floorheatingrelayon ? 0 : 1);
 #endif
-        }
-        else
-        {
-          digitalWrite(sonoff_relays[0], inverse == floorheating_valveon ? false : true); // Set floorheating on
-#ifdef SONOFF_LEDS
-          digitalWrite(sonoff_leds[i], sonoff_ledinverse ? 0 : 1);
-#endif
-        }
-      }
-      else
-      {
-        putdatamap("temperature", "-");
-        digitalWrite(sonoff_relays[0], inverse ? true : false); // Set floorheating off
-#ifdef SONOFF_LEDS
-        digitalWrite(sonoff_leds[i], sonoff_ledinverse ? 1 : 0);
-#endif
-        yield();
-      }
+      yield();
 #endif
     }
 #endif
@@ -1980,7 +1975,7 @@ void publishdatamap(int32_t packetId, bool publishall, bool init)
         // Packet succesfull delivered proceed to next item
         String topic = dataMap->getKey(datamappointer);
         dataMapStruct data = dataMap->getData(datamappointer);
-        if (data.onair) 
+        if (data.onair)
         {
           data.send = false;
           data.onair = false;
@@ -2005,7 +2000,7 @@ void publishdatamap(int32_t packetId, bool publishall, bool init)
           {
             String sendtopic = String(mqtt_topicprefix + topic);
             nextpacketId = mqttClient.publish(sendtopic.c_str(), 1, true, data.payload.c_str());
-            if (nextpacketId > 0) 
+            if (nextpacketId > 0)
             {
               waitingforack = true;
               data.onair = true;
@@ -2388,8 +2383,8 @@ void handleWWWSettings()
       if (webserver.argName(i) == "qswifidimoffset") qswifidimmer_setdimoffset((webserver.arg(i)).toInt());
 #endif
 #ifdef  ESPMQTT_QSWIFIDIMMERD02
-      if (webserver.argName(i) == "qswifidimoffset0") qswifidimmer_setdimoffset((webserver.arg(i)).toInt(),0);
-      if (webserver.argName(i) == "qswifidimoffset1") qswifidimmer_setdimoffset((webserver.arg(i)).toInt(),1);
+      if (webserver.argName(i) == "qswifidimoffset0") qswifidimmer_setdimoffset((webserver.arg(i)).toInt(), 0);
+      if (webserver.argName(i) == "qswifidimoffset1") qswifidimmer_setdimoffset((webserver.arg(i)).toInt(), 1);
 #endif
     }
     eeprom_write(mqtt_server, 0);
@@ -2495,18 +2490,18 @@ void handleWWWRoot() {
 }
 
 
-#if (QSWIFIDIMMERCHANNELS == 1) 
+#if (QSWIFIDIMMERCHANNELS == 1)
 void qswifidimmer_callback (uint8_t , uint8_t dimvalue, bool dimstate)
 {
   putdatamap ("dimvalue", String(dimvalue));
   putdatamap ("dimstate", String(dimstate));
 }
 #endif
-#if (QSWIFIDIMMERCHANNELS == 2) 
+#if (QSWIFIDIMMERCHANNELS == 2)
 void qswifidimmer_callback (uint8_t dimchannel, uint8_t dimvalue, bool dimstate)
 {
-  putdatamap ("dimvalue/"+String(dimchannel), String(dimvalue));
-  putdatamap ("dimstate/"+String(dimchannel), String(dimstate));
+  putdatamap ("dimvalue/" + String(dimchannel), String(dimvalue));
+  putdatamap ("dimstate/" + String(dimchannel), String(dimstate));
 }
 #endif
 
@@ -2519,7 +2514,7 @@ void qswifidimmer_switchcallback(uint8_t , bool switchstate)
 #if (QSWIFIDIMMERCHANNELS == 2)
 void qswifidimmer_switchcallback(uint8_t dimchannel, bool switchstate)
 {
-  putdatamap ("switchstate/"+String(dimchannel), String(switchstate));
+  putdatamap ("switchstate/" + String(dimchannel), String(switchstate));
 }
 #endif
 
@@ -2865,14 +2860,14 @@ void setup() {
     DEBUG_E("Error reading dimmer offset 0 from internal eeprom\n");
     dimoffset = "20";
   }
-  qswifidimmer_setdimoffset(dimoffset.toInt(),0);
+  qswifidimmer_setdimoffset(dimoffset.toInt(), 0);
   dimoffset = "0";
   if (!eeprom_read(&dimoffset, 9))
   {
     DEBUG_E("Error reading dimmer offset 1 from internal eeprom\n");
     dimoffset = "20";
   }
-  qswifidimmer_setdimoffset(dimoffset.toInt(),1);
+  qswifidimmer_setdimoffset(dimoffset.toInt(), 1);
   putdatamap("dimoffset/0", String(qswifidimmer_getdimoffset(0)));
   putdatamap("dimoffset/1", String(qswifidimmer_getdimoffset(1)));
 #endif
