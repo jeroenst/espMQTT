@@ -38,8 +38,8 @@ then
 	upgrade $1 esp_smartmeter ESPMQTT_SMARTMETER
 	upgrade $1 esp_sdm120 ESPMQTT_SDM120
 	upgrade $1 esp_growatt ESPMQTT_GROWATT
-	upgrade $1 esp_badkamer ESPMQTT_BATHROOM
-	upgrade $1 esp_slaapkamer2 ESPMQTT_BEDROOM2
+	upgrade $1 esp_bathroom ESPMQTT_BATHROOM
+	upgrade $1 esp_bedroom2 ESPMQTT_BEDROOM2
 	upgrade $1 esp_opentherm ESPMQTT_OPENTHERM
 	upgrade $1 esp_pelletstove ESPMQTT_AMGPELLETSTOVE
 	upgrade $1 sonoff_tv ESPMQTT_SONOFFPOWR2
