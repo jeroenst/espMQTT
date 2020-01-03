@@ -33,7 +33,7 @@
 // #define ESPMQTT_SMARTMETER
 // #define ESPMQTT_GROWATT
 // #define ESPMQTT_SDM120
-// #define ESPMQTT_WATERMETER
+#define ESPMQTT_WATERMETER
 // #define ESPMQTT_DDNS
 // #define ESPMQTT_GENERIC8266
 // #define ESPMQTT_MAINPOWERMETER
@@ -46,7 +46,7 @@
 // #define ESPMQTT_SONOFFS20 // coffeelamp & sonoffs20_00X
 // #define ESPMQTT_SONOFFBULB
 // #define ESPMQTT_GARDEN //ESP8285 TUIN & MARIANNE & LUIFEL
-#define ESPMQTT_SONOFF_FLOORHEATING
+//#define ESPMQTT_SONOFF_FLOORHEATING
 // #define SPMQTT_IRRIGATION
 // #define ESPMQTT_BLITZWOLF
 // #define ESPMQTT_QSWIFIDIMMERD01
@@ -1409,7 +1409,7 @@ void loop()
   static uint32_t watermeter_liters = watermeter_getliters();
   if (watermeter_handle())
   {
-    putdatamap("water/lmin", String(watermeter_getflow()));
+    putdatamap("water/lmin", String(watermeter_getflow(),1));
     putdatamap("water/m3h", String(double(watermeter_getflow()) * 0.06, 3));
 
     if (watermeter_liters != watermeter_getliters())

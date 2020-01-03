@@ -15,7 +15,7 @@ void watermeter_setliters(uint32_t liters)
    _watermeter_liters = liters;
 }
 
-uint32_t watermeter_getflow()
+double watermeter_getflow()
 {
    return _watermeter_lmin;
 }
