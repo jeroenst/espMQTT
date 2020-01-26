@@ -217,10 +217,13 @@ void qswifidimmer_setdimvalue(uint8_t value, uint8_t dimchannel)
 {
   if (dimchannel < qswifidimmer_nrofchannels)
   {
-    if (value != 0) qswifidimmer_dimvalue[dimchannel] = value;
-    qswifidimmer_dimstate[dimchannel] = value > 0 ? true : false;
-    qswifidimmer_send(dimchannel);
-    _qswifidimmer_callback(dimchannel, qswifidimmer_dimstate[dimchannel] ? qswifidimmer_dimvalue[dimchannel] : 0, qswifidimmer_dimstate[dimchannel]);
+    if (qswifidimmer_dimvalue[dimchannel] != value)
+    {
+      if (value != 0) qswifidimmer_dimvalue[dimchannel] = value;
+      qswifidimmer_dimstate[dimchannel] = value > 0 ? true : false;
+      qswifidimmer_send(dimchannel);
+      _qswifidimmer_callback(dimchannel, qswifidimmer_dimstate[dimchannel] ? qswifidimmer_dimvalue[dimchannel] : 0, qswifidimmer_dimstate[dimchannel]);
+    }
   }
 }
 
@@ -233,10 +236,13 @@ void qswifidimmer_setdimstate(bool dimstate, uint8_t dimchannel)
 {
   if (dimchannel < qswifidimmer_nrofchannels)
   {
-    qswifidimmer_dimstate[dimchannel] = dimstate;
-    DEBUG_V("Setting dimstate Channel=%d, Value=%d...\n", dimchannel, dimstate);
-    qswifidimmer_send(dimchannel);
-    _qswifidimmer_callback(dimchannel, qswifidimmer_dimstate[dimchannel] ? qswifidimmer_dimvalue[dimchannel] : 0, qswifidimmer_dimstate[dimchannel]);
+    if (qswifidimmer_dimstate[dimchannel] != dimstate)
+    {
+      qswifidimmer_dimstate[dimchannel] = dimstate;
+      DEBUG_V("Setting dimstate Channel=%d, Value=%d...\n", dimchannel, dimstate);
+      qswifidimmer_send(dimchannel);
+      _qswifidimmer_callback(dimchannel, qswifidimmer_dimstate[dimchannel] ? qswifidimmer_dimvalue[dimchannel] : 0, qswifidimmer_dimstate[dimchannel]);
+    }
   }
 }
 
