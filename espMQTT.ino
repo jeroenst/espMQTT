@@ -20,7 +20,7 @@
 #define DEBUGLEVEL Debug.DEBUG
 //#define SYSLOGDEBUG
 
-#ifndef ESPMQTT_BUILDSCRIPT // Only use defines when we are not compiled from the build script...
+#ifndef ESPMQTT_BUILDSCRIPT // Only use defines when when firmware is not compiled from the build script...
 /* SETTINGS */
 //#define SERIALLOG
 
@@ -32,8 +32,8 @@
 // #define ESPMQTT_OPENTHERM
 // #define ESPMQTT_SMARTMETER
 // #define ESPMQTT_GROWATT
-// #define ESPMQTT_SDM120
-#define ESPMQTT_WATERMETER
+//#define ESPMQTT_SDM120
+// #define ESPMQTT_WATERMETER
 // #define ESPMQTT_DDNS
 // #define ESPMQTT_GENERIC8266
 // #define ESPMQTT_MAINPOWERMETER
@@ -46,11 +46,11 @@
 // #define ESPMQTT_SONOFFS20 // coffeelamp & sonoffs20_00X
 // #define ESPMQTT_SONOFFBULB
 // #define ESPMQTT_GARDEN //ESP8285 TUIN & MARIANNE & LUIFEL
-//#define ESPMQTT_SONOFF_FLOORHEATING
+// #define ESPMQTT_SONOFF_FLOORHEATING
 // #define SPMQTT_IRRIGATION
 // #define ESPMQTT_BLITZWOLF
 // #define ESPMQTT_QSWIFIDIMMERD01
-// #define ESPMQTT_QSWIFIDIMMERD02
+#define ESPMQTT_QSWIFIDIMMERD02
 // #define ESPMQTT_SONOFF4CH //ESP8285
 // #define ESPMQTT_SONOFFDUAL
 // #define ESPMQTT_SONOFFS20_PRINTER
@@ -99,10 +99,11 @@ static bool sonoffch_timeout_enabled[1] = {1};
 #define FIRMWARE_TARGET "SDM120"
 #define FLASHBUTTON D3
 #define ESPLED D4
+#define NODEMCULEDPIN D0
 #undef SERIALLOG
 HardwareSerial serSDM(0);
 #include <SDM.h>
-SDM sdm(serSDM, 2400, NOT_A_PIN);
+SDM sdm(serSDM, 2400);
 #endif
 
 #ifdef  ESPMQTT_QSWIFIDIMMERD01
@@ -1167,6 +1168,12 @@ void wifiScanReady(int networksFound)
 static byte flashbuttonstatus = 0;
 static int8_t previouswifistatus = -1;
 
+String doubletostring (double value, int precision)
+{
+  if (isnan(value)) return "-";
+  else return String(value, precision);
+}
+
 void loop()
 {
   ESP.wdtFeed(); // Prevent HW WD to kick in...
@@ -1410,7 +1417,7 @@ void loop()
   if (watermeter_handle())
   {
     putdatamap("water/lmin", String(watermeter_getflow(),1));
-    putdatamap("water/m3h", String(double(watermeter_getflow()) * 0.06, 3));
+    putdatamap("water/m3h", String(watermeter_getflow() * 0.06, 3));
 
     if (watermeter_liters != watermeter_getliters())
     {
@@ -1520,12 +1527,13 @@ void loop()
   yield();
 #endif
 
-  if (timertick == 1) // Every 0,1 second read next SDM120 register
+  if (timertick == 1) // Every 0.1 second read next SDM120 register
   {
     //    Serial.print(".");
     timertick = 0;
 #ifdef  ESPMQTT_SDM120
     static uint8_t sdmreadcounter = 1;
+    double value = NAN;
 
     switch (sdmreadcounter)
     {
@@ -1567,17 +1575,20 @@ void loop()
         putdatamap("energy/reactive/export", String(sdm.readVal(SDM120CT_EXPORT_REACTIVE_ENERGY), 3));
         break;
       case 13:
-        putdatamap("energy/reactive", String(sdm.readVal(SDM120CT_TOTAL_REACTIVE_ENERGY), 3));
+        value = sdm.readVal(SDM120CT_TOTAL_REACTIVE_ENERGY);
+        putdatamap("energy/reactive", doubletostring(value, 3));
+        if (isnan(value)) putdatamap("status", "commerror");
+        else putdatamap("status", "ready");
         break;
       case 14:
-        putdatamap("status", "ready");
-        if ((uptime % 10) == 0)
-        {
-          sdmreadcounter = 0;
-        }
+        if (uptime % 10) sdmreadcounter = 0;
         break;
     }
-    if (sdmreadcounter < 14) sdmreadcounter++;
+    if (sdmreadcounter < 14) 
+    {
+      digitalWrite(NODEMCULEDPIN, isnan(value) ? 1 : 0);
+      sdmreadcounter++;
+    }
     yield();
 #endif
   }
@@ -1591,7 +1602,7 @@ void loop()
     // try to do this as less as posisble because during scan the esp is unreachable for about a second.
     if ((!mainstate.accesspoint))
     {
-      if (((uptime % 600) == 0) || (WiFi.status() != WL_CONNECTED) || (((uptime % 30) == 0) && WiFi.RSSI() < -70))
+      if (((uptime % 600) == 0) || ((WiFi.status() != WL_CONNECTED) && (uptime % 10)) || (((uptime % 30) == 0) && WiFi.RSSI() < -70))
       {
         static uint32_t wifilastscan = 0;
         // prevent scanning more than once per 10 seconds and wait 2 seconds before first scan
@@ -1931,7 +1942,7 @@ void publishdatamap(int32_t packetId, bool publishall, bool init)
     nextpacketId = -1;
   }
 
-  if ((packetId != -1) || publishall) DEBUG_V("Publishdatamap packetId=%d publishall=%d datamappointer=%d datamapsize=%d nextpacketid=%d waintingforack=%d\n", packetId, publishall, datamappointer, dataMap->size(), nextpacketId, waitingforack);
+  if ((packetId != -1) || publishall) DEBUG_V("Publishdatamap packetId=%d publishall=%d datamappointer=%d datamapsize=%d nextpacketid=%d waitingforack=%d\n", packetId, publishall, datamappointer, dataMap->size(), nextpacketId, waitingforack);
 
   if (publishall)
   {
@@ -2538,7 +2549,6 @@ void growattcallback (String topic, String payload)
 {
   if (topic == "status")
   {
-    pinMode(NODEMCULEDPIN, OUTPUT);
     if (payload == "ready") digitalWrite(NODEMCULEDPIN, 0);
     else digitalWrite(NODEMCULEDPIN, 1);
   }
@@ -2783,8 +2793,13 @@ void setup() {
 #else
   digitalWrite(ESPLED, 0);
 #endif
-
 #endif
+
+#ifdef NODEMCULEDPIN
+  pinMode(NODEMCULEDPIN, OUTPUT);
+  digitalWrite(NODEMCULEDPIN, 1);
+#endif
+
 
 #ifdef FLASHBUTTON
   pinMode(FLASHBUTTON, INPUT_PULLUP);
