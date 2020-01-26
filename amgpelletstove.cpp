@@ -180,6 +180,7 @@ void amgpelletstove_handle()
               break;
             default:
               _amgpelletstove_callback("phase", "unknown");
+              currentpower = 0;
               break;
           }
           _amgpelletstove_callback("phase/value", String(value));
