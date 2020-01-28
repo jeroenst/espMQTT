@@ -60,7 +60,7 @@ then
 	upgrade $1 QSWIFIDIMMER03 ESPMQTT_QSWIFIDIMMERD02
 	upgrade $1 QSWIFIDIMMER04 ESPMQTT_QSWIFIDIMMERD01
 	upgrade $1 sonoff_dishwasher ESPMQTT_SONOFFPOWR2
-	upgrade $1 blitzwolf_001 ESPMQTT_BLITZWOLF
+#	upgrade $1 blitzwolf_001 ESPMQTT_BLITZWOLF
 	exit 0
 fi
 
