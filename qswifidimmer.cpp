@@ -106,9 +106,12 @@ void qswifidimmer_handle()
   static uint32_t Stime[2] = {0, 0};
   static uint32_t Stimeout[2] = {0, 0};
   static bool Sdimup[2] = {1, 1};
+  static bool fullbrightstart[2] = {0,0};
 
+  // Itterate trough dimchannels (D01 or D02 dimmer)
   for (uint8_t dimchannel = 0; dimchannel < qswifidimmer_nrofchannels; dimchannel++)
   {
+    // Count pulses on input (50hz when button is pressed, but 2 pulses per full sine, so 10ms per pulse)
     bool Stemp = (dimchannel == 0 ? digitalRead(13) : digitalRead(5));
     Spulse[dimchannel] = 0;
     if (Stemp != S[dimchannel])
@@ -119,12 +122,14 @@ void qswifidimmer_handle()
       Spulse[dimchannel] = 1;
     }
 
+    // If 6 pulses are counted do a callback to inform switch is pressed
     if (Scounter[dimchannel] == 6)
     {
       _qswifidimmer_switchcallback(dimchannel, true);
     }
 
-    if ((Scounter[dimchannel] > 5) && (Stime[dimchannel] + 100 < millis())) // When switch was pressed before and released 100ms ago
+    // When switch was pressed for 5 pulses and released for about 100ms switch from on to off or from off to on and also reset counters etc.
+    if ((Scounter[dimchannel] > 5) && (Stime[dimchannel] + 100 < millis()))
     {
       if (Scounter[dimchannel] < 100)
       {
@@ -139,16 +144,21 @@ void qswifidimmer_handle()
       _qswifidimmer_switchcallback(dimchannel, false);
       Scounter[dimchannel] = 0;
       Stime[dimchannel] = 0;
+      fullbrightstart[dimchannel] = 0;      
     }
 
-    if (!qswifidimmer_dimstate[dimchannel] && Scounter[dimchannel] > 100) // If lamps are off and switch is pressed long enough, put lamps on with full brightness
+    // If lamps are off and switch is pressed more than 100 pulses (10ms*100=2000ms), put lamps on with full brightness
+    if (!qswifidimmer_dimstate[dimchannel] && Scounter[dimchannel] > 100)
     {
         qswifidimmer_dimstate[dimchannel] = true;
         qswifidimmer_dimvalue[dimchannel] = 100;
         qswifidimmer_send(dimchannel);
+        _qswifidimmer_callback(dimchannel, qswifidimmer_dimstate[dimchannel] ? qswifidimmer_dimvalue[dimchannel] : 0, qswifidimmer_dimstate[dimchannel]);
+        fullbrightstart[dimchannel] = 1;
     }
 
-    if ((qswifidimmer_dimenabled[dimchannel]) && (qswifidimmer_dimstate[dimchannel]))
+    // If dimming for this channel is enabled and the dimstate is on start changing dimlevel while button is pressed longer then 100ms
+    if ((qswifidimmer_dimenabled[dimchannel]) && (qswifidimmer_dimstate[dimchannel]) && !fullbrightstart[dimchannel])
     {
       if ((Stimeout[dimchannel] > 0) && (Stimeout[dimchannel] < millis()))
       {
@@ -217,7 +227,7 @@ void qswifidimmer_setdimvalue(uint8_t value, uint8_t dimchannel)
 {
   if (dimchannel < qswifidimmer_nrofchannels)
   {
-    if (qswifidimmer_dimvalue[dimchannel] != value)
+    if ((qswifidimmer_dimvalue[dimchannel] != value) || !qswifidimmer_dimstate[dimchannel])
     {
       if (value != 0) qswifidimmer_dimvalue[dimchannel] = value;
       qswifidimmer_dimstate[dimchannel] = value > 0 ? true : false;
