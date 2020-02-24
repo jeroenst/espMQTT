@@ -1,0 +1,13 @@
+diff --git a/platform.txt b/platform.txt
+index 678be1ba..2ed51ed5 100644
+--- a/platform.txt
++++ b/platform.txt
+@@ -77,7 +77,7 @@ compiler.elf2hex.flags=
+ compiler.size.cmd=xtensa-lx106-elf-size
+ 
+ # This can be overriden in boards.txt
+-build.extra_flags=-DESP8266
++build.extra_flags=-DESP8266 -DWEBSOCKET_DISABLED=true -DASYNC_TCP_SSL_ENABLED -DUSE_HARDWARESERIAL
+ 
+ # These can be overridden in platform.local.txt
+ compiler.c.extra_flags=
