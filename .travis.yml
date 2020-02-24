@@ -26,7 +26,11 @@ before_install:
    - sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules
    - git submodule update --init --recursive
    - source <(curl -SLs https://raw.githubusercontent.com/adafruit/travis-ci-arduino/master/install.sh)
-   - curl -SLs https://raw.githubusercontent.com/adafruit/travis-ci-arduino/master/run-clang-format.py > run-clang-format.py
+#   - curl -SLs https://raw.githubusercontent.com/adafruit/travis-ci-arduino/master/run-clang-format.py > run-clang-format.py
  
 script:
+    - rm -f ~/Arduino/hardware
+    - rm -f ~/Arduino/libraries
+    - ln -s ~/jeroenst/espMQTT/hardware/esp8266com ~/Arduino/hardware
+    - ln -s ~/jeroenst/espMQTT/libraries ~/Arduino/libraries
     - bash build.sh
