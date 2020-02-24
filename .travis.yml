@@ -1,12 +1,32 @@
-language: bash
-
-# Handle git submodules yourself
+language: c
+sudo: false
+cache:
+  directories:
+    - ~/arduino_ide
+    - ~/.arduino15/packages/
 git:
+  depth: false
+  quiet: true
     submodules: false
-# Use sed to replace the SSH URL with the public URL, then initialize submodules
+addons:
+  apt:
+    sources:
+      - llvm-toolchain-trusty-5.0
+      - key_url: 'http://apt.llvm.org/llvm-snapshot.gpg.key'
+    packages:
+      - clang-format-5.0
+env:
+  global:
+#    - ARDUINO_IDE_VERSION="1.8.10"
+     - PRETTYNAME="Adafruit FT6206 Arduino Library"
+# Optional, will default to "$TRAVIS_BUILD_DIR/Doxyfile"
+#    - DOXYFILE: $TRAVIS_BUILD_DIR/Doxyfile
+ 
 before_install:
-    - sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules
-    - git submodule update --init --recursive
-
+   - sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules
+   - git submodule update --init --recursive
+   - source <(curl -SLs https://raw.githubusercontent.com/adafruit/travis-ci-arduino/master/install.sh)
+   - curl -SLs https://raw.githubusercontent.com/adafruit/travis-ci-arduino/master/run-clang-format.py > run-clang-format.py
+ 
 script:
     - bash build.sh
