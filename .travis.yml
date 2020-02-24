@@ -35,9 +35,10 @@ script:
     - ls ~/
     - rm -rf ~/Arduino/hardware
     - rm -rf ~/Arduino/libraries
-    - ln -s ~/jeroenst/espMQTT/hardware ~/Arduino/hardware
-    - ln -s ~/jeroenst/espMQTT/libraries ~/Arduino/libraries
-    - ln -s ~/jeroenst/espMQTT ~/Arduino/espMQTT
+    - ln -s ~/build/jeroenst/espMQTT/hardware ~/Arduino/hardware
+    - ln -s ~/build/jeroenst/espMQTT/libraries ~/Arduino/libraries
+    - ln -s ~/build/jeroenst/espMQTT ~/Arduino/espMQTT
     - ls ~/Arduino/libraries/*
     - ls ~/Arduino/hardware/*
+    - cd ~/Arduino/espMQTT
     - bash build.sh
