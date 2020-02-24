@@ -29,8 +29,8 @@ before_install:
    - curl -SLs https://raw.githubusercontent.com/adafruit/travis-ci-arduino/master/run-clang-format.py > run-clang-format.py
  
 script:
-    - rm -f ~/arduino_ide/hardware
-    - rm -f ~/arduino_ide/libraries
-    - ln -s ~/jeroenst/espMQTT/hardware/esp8266com ~/arduino_ide/hardware
-    - ln -s ~/jeroenst/espMQTT/libraries ~/arduino_ide/libraries
+    - rm -f ~/Arduino/hardware
+    - rm -f ~/Arduino/libraries
+    - ln -s ~/jeroenst/espMQTT/hardware ~/Arduino/hardware
+    - ln -s ~/jeroenst/espMQTT/libraries ~/Arduino/libraries
     - bash build.sh
