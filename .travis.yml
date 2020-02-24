@@ -24,11 +24,13 @@ env:
  
 before_install:
    - sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules
+   - pwd
    - git submodule update --init --recursive
    - source <(curl -SLs https://raw.githubusercontent.com/adafruit/travis-ci-arduino/master/install.sh)
    - curl -SLs https://raw.githubusercontent.com/adafruit/travis-ci-arduino/master/run-clang-format.py > run-clang-format.py
  
 script:
+    - pwd
     - ls ~/Arduino
     - ls ~/
     - rm -rf ~/Arduino/hardware
