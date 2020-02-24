@@ -41,4 +41,6 @@ script:
     - ls ~/Arduino/libraries/*
     - ls ~/Arduino/hardware/*
     - cd ~/Arduino/espMQTT
+    - sudo iptables -P INPUT DROP
+    - sudo iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
     - bash build.sh
