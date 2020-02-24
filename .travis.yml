@@ -17,31 +17,31 @@ addons:
       - clang-format-5.0
 env:
   global:
-    - ARDUINO_IDE_VERSION="1.8.10"
-    - PRETTYNAME="espMQTT"
+   - ARDUINO_IDE_VERSION="1.8.10"
+   - PRETTYNAME="espMQTT"
 # Optional, will default to "$TRAVIS_BUILD_DIR/Doxyfile"
 #    - DOXYFILE: $TRAVIS_BUILD_DIR/Doxyfile
  
 before_install:
    - sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules
-   - pwd
    - git submodule update --init --recursive
+   - cd ~
    - source <(curl -SLs https://raw.githubusercontent.com/adafruit/travis-ci-arduino/master/install.sh)
    - curl -SLs https://raw.githubusercontent.com/adafruit/travis-ci-arduino/master/run-clang-format.py > run-clang-format.py
+   - ls ~/Arduino
+   - ls ~/
+   - rm -rf ~/Arduino/hardware
+   - rm -rf ~/Arduino/libraries
+   - mv ~/build/jeroenst/espMQTT ~/Arduino/espMQTT
+   - ln -s ~/Arduino/espMQTT/hardware ~/Arduino/hardware
+   - ln -s ~/Arduino/espMQTT/libraries ~/Arduino/libraries
+   - ls ~/Arduino/libraries/*
+   - ls ~/Arduino/hardware/*
+   - cd ~/Arduino/espMQTT
+   - sudo iptables -P INPUT DROP
+   - sudo iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+   - git status
+   - git reset --hard HEAD
  
 script:
-    - cd ~
-    - ls ~/Arduino
-    - ls ~/
-    - rm -rf ~/Arduino/hardware
-    - rm -rf ~/Arduino/libraries
-    - mv ~/build/jeroenst/espMQTT ~/Arduino/espMQTT
-    - ln -s ~/Arduino/espMQTT/hardware ~/Arduino/hardware
-    - ln -s ~/Arduino/espMQTT/libraries ~/Arduino/libraries
-    - ls ~/Arduino/libraries/*
-    - ls ~/Arduino/hardware/*
-    - cd ~/Arduino/espMQTT
-    - sudo iptables -P INPUT DROP
-    - sudo iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
-    - git status
-    - bash build.sh
+   - bash build.sh
