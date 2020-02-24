@@ -7,7 +7,7 @@ cache:
 git:
   depth: false
   quiet: true
-    submodules: false
+  submodules: false
 addons:
   apt:
     sources:
@@ -18,7 +18,7 @@ addons:
 env:
   global:
 #    - ARDUINO_IDE_VERSION="1.8.10"
-     - PRETTYNAME="Adafruit FT6206 Arduino Library"
+#     - PRETTYNAME="Adafruit FT6206 Arduino Library"
 # Optional, will default to "$TRAVIS_BUILD_DIR/Doxyfile"
 #    - DOXYFILE: $TRAVIS_BUILD_DIR/Doxyfile
  
