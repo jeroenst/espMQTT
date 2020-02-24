@@ -31,8 +31,8 @@ before_install:
 script:
     - ls ~/Arduino
     - ls ~/
-    - rm -f ~/Arduino/hardware
-    - rm -f ~/Arduino/libraries
+    - rm -rf ~/Arduino/hardware
+    - rm -rf ~/Arduino/libraries
     - ln -s ~/jeroenst/espMQTT/hardware ~/Arduino/hardware
     - ln -s ~/jeroenst/espMQTT/libraries ~/Arduino/libraries
     - ln -s ~/jeroenst/espMQTT ~/Arduino/espMQTT
