@@ -36,6 +36,6 @@ script:
     - ln -s ~/jeroenst/espMQTT/hardware ~/Arduino/hardware
     - ln -s ~/jeroenst/espMQTT/libraries ~/Arduino/libraries
     - ln -s ~/jeroenst/espMQTT ~/Arduino/espMQTT
-    - ls ~/Arduino/libraries
-    - ls ~/Arduino/hardware
+    - ls ~/Arduino/libraries/*
+    - ls ~/Arduino/hardware/*
     - bash build.sh
