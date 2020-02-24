@@ -53,17 +53,20 @@ build ()
 VERSION=$(git describe --tags)
 DIFFERENCE=$(git diff | wc -w)
 
-if [ $DIFFERENCE -eq 0 ]
+if [ -z "$TRAVISBUILD" ]
 then
-	if [[ $VERSION == *"-"* ]]
+	if [ $DIFFERENCE -eq 0 ]
 	then
-		VERSION=$(echo $VERSION | sed 's/-.*//' | sed 's/v//')
-		VERSION=$(increment_version $VERSION)
-		git tag v$VERSION 
-		git push --tags
+		if [[ $VERSION == *"-"* ]]
+		then
+			VERSION=$(echo $VERSION | sed 's/-.*//' | sed 's/v//')
+			VERSION=$(increment_version $VERSION)
+			git tag v$VERSION 
+			git push --tags
+		fi
+	else
+		VERSION=$VERSION-DIRTY
 	fi
-else
-	VERSION=$VERSION-DIRTY
 fi
 
 mkdir -p /tmp/espMQTT/$VERSION
