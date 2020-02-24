@@ -17,8 +17,8 @@ addons:
       - clang-format-5.0
 env:
   global:
-#    - ARDUINO_IDE_VERSION="1.8.10"
-#     - PRETTYNAME="Adafruit FT6206 Arduino Library"
+    - ARDUINO_IDE_VERSION="1.8.10"
+    - PRETTYNAME="espMQTT"
 # Optional, will default to "$TRAVIS_BUILD_DIR/Doxyfile"
 #    - DOXYFILE: $TRAVIS_BUILD_DIR/Doxyfile
  
