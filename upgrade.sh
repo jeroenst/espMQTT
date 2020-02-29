@@ -29,6 +29,7 @@ VERSION=$(head -n 1 ~/Arduino/espMQTT/version)
 if [ "$1" == "" ] 
 then
 	echo "Please give password as argument..."
+	echo "Or password device firmwarename..."
 	exit 1
 fi
 
