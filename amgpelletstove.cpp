@@ -8,6 +8,8 @@
 static String amgpowercmd = "";
 static String amgtempcmd = "";
 static uint8_t amgcmdnr = 0;
+static bool cooldown_phase_1 = false;
+
 void(*_amgpelletstove_callback)(String, String);
 
 void amgpelletstove_init(void(*callback)(String, String))
@@ -25,16 +27,23 @@ void amgpelletstove_receivemqtt(String topicstring, String payloadstring)
     int powersetpoint = payloadstring.toInt();
     if ((payloadstring == "0") || ((powersetpoint > 0) && (powersetpoint <= 5)))
     {
-      switch (powersetpoint)
+      if (!cooldown_phase_1)
       {
-        case 0: amgpowercmd = "RF000058&"; break;
-        case 1: amgpowercmd = "RF001059&"; break;
-        case 2: amgpowercmd = "RF00205A&"; break;
-        case 3: amgpowercmd = "RF00305B&"; break;
-        case 4: amgpowercmd = "RF00405C&"; break;
-        case 5: amgpowercmd = "RF00505D&"; break;
+        switch (powersetpoint)
+        {
+          case 0: amgpowercmd = "RF000058&"; break;
+          case 1: amgpowercmd = "RF001059&"; break;
+          case 2: amgpowercmd = "RF00205A&"; break;
+          case 3: amgpowercmd = "RF00305B&"; break;
+          case 4: amgpowercmd = "RF00405C&"; break;
+          case 5: amgpowercmd = "RF00505D&"; break;
+        }
+        _amgpelletstove_callback("power/setpoint", String(payloadstring));
       }
-      _amgpelletstove_callback("power/setpoint", String(payloadstring));
+      else
+      {
+        _amgpelletstove_callback("power/setpoint", "0");
+      }
     }
   }
   if (topicstring == String("home/" + WiFi.hostname() + "/settemperature"))
@@ -149,6 +158,7 @@ void amgpelletstove_handle()
       switch (amgcmdnr)
       {
         case 0:
+          cooldown_phase_1 = false;
           switch (value)
           {
             case 0:
@@ -172,6 +182,8 @@ void amgpelletstove_handle()
               break;
             case 2049:
               currentpower = 0;
+              cooldown_phase_1 = true;
+              amgpowercmd = "RF000058&"; // Set power to 0 to prevent unwanted restarting of stove
               _amgpelletstove_callback("phase", "cooling down phase 1");
               break;
             case 2050:
