@@ -599,6 +599,8 @@ String esp_hostname = "";
 String esp_orig_hostname = "";
 //#include "esp8266_peri.h"
 RemoteDebug Debug;
+String postwifissid = "";
+String postwifikey = "";
 
 WiFiEventHandler wifiConnectHandler;
 WiFiEventHandler wifiDisconnectHandler;
@@ -606,8 +608,8 @@ WiFiEventHandler wifiDisconnectHandler;
 Ticker mqttReconnectTimer;
 Ticker wifiReconnectTimer;
 Ticker systemTimer;
-unsigned long reboottimeout = 0;
-
+uint32_t reboottimeout = 0;
+uint32_t wifichangesettingstimeout = 0;
 
 #ifdef HLW8012_CF_PIN
 HLW8012 hlw8012;
@@ -1195,6 +1197,18 @@ void loop()
     ESP.restart();
     delay(1000);
   }
+
+  if ((0 != wifichangesettingstimeout) && (wifichangesettingstimeout > uptime))
+  {
+      if ((postwifissid != "") && (postwifikey != ""))
+      {
+        WiFi.disconnect();
+        WiFi.hostname(esp_hostname);
+        WiFi.begin(postwifissid.c_str(), postwifikey.c_str()); // Save wifi ssid and key and also activate new hostname...
+      }
+      wifichangesettingstimeout = 0;
+  }
+
 
   if (triggers.wificonnected)
   {
@@ -2354,15 +2368,13 @@ void handleWWWSettings()
 
   if (webserver.method() == HTTP_POST)
   {
-    String postwifissid = "";
-    String postwifikey = "";
     for (uint8_t i = 0; i < webserver.args(); i++)
     {
       if (webserver.argName(i) == "rebootdevice")
       {
-        webserver.send(200, "text/html", "<HTML><BODY>Device Rebooting...<BR><A HREF=\"/\">Return to main page</A></BODY></HTML>");
+        webserver.send(200, "text/html", "<HTML><BODY>Device Rebooting...</BODY></HTML>");
         reboottimeout = uptime + 4;
-        ESP.restart();
+        return;
       }
     }
     mqtt_ssl = 0;
@@ -2430,17 +2442,19 @@ void handleWWWSettings()
     WiFi.mode(WIFI_STA); // After saving settings return to wifi client mode and disable AP
     mainstate.accesspoint = false;
 
-    if ((postwifissid != WiFi.SSID()) || (postwifikey != WiFi.psk()) || (esp_hostname != WiFi.hostname()))
+    if (esp_hostname != WiFi.hostname())
+    {
+      WiFi.hostname(esp_hostname);
+      wifichangesettingstimeout = uptime + 4;
+    }
+
+    if ((postwifissid != "") && (postwifikey != "") && (esp_hostname != "") && ((postwifissid != WiFi.SSID()) || (postwifikey != WiFi.psk())))
     {
       webserver.send(200, "text/html", "<HTML><BODY>Settings Saved.<BR>Please connect to proper wifi network and open the page of the saved hostname.</BODY></HTML>");
-      yield();
-      delay(1000);
-      yield();
-      WiFi.disconnect();
-      WiFi.hostname(esp_hostname);
-      WiFi.begin(postwifissid.c_str(), postwifikey.c_str()); // Save wifi ssid and key and also activate new hostname...
       flashbuttonstatus = 0;
       previouswifistatus = -1;
+      wifichangesettingstimeout = uptime + 4;
+      return;
     }
     else webserver.send(200, "text/html", "<HTML><BODY>Settings Saved.<BR><A HREF=\"/\">Return to main page</A></BODY></HTML>");
     initMqtt();
