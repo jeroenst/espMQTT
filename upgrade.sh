@@ -28,16 +28,26 @@ VERSION=$(head -n 1 ~/Arduino/espMQTT/version)
 
 if [ "$1" == "" ] 
 then
-	echo "Please give password as argument..."
+	echo "Please give password or keyword serial for serial flashing as argument..."
 	echo "Or password device firmwarename..."
 	exit 1
+fi
+
+if [ "$1" == "serial" ] 
+then
+	if [ "$2" == "" ] 
+	then
+		echo "Please give firmwarename as second argument..."
+		exit 1
+	fi
+	python3 ~/Arduino/hardware/esp8266com/esp8266/tools/upload.py write_flash 0 $2
 fi
 
 if [ "$2" == "" ] 
 then
 	echo "Upgrading all devices..."
-	upgrade $1 esp_smartmeter ESPMQTT_SMARTMETER
-	upgrade $1 esp_sdm120 ESPMQTT_SDM120
+#	upgrade $1 esp_smartmeter ESPMQTT_SMARTMETER
+#	upgrade $1 esp_sdm120 ESPMQTT_SDM120
 	upgrade $1 esp_growatt ESPMQTT_GROWATT
 	upgrade $1 esp_bathroom ESPMQTT_BATHROOM
 	upgrade $1 esp_bedroom2 ESPMQTT_BEDROOM2
