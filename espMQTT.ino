@@ -1192,13 +1192,13 @@ void loop()
   EasyDDNS.update(10000);
 #endif
 
-  if ((0 != reboottimeout) && (reboottimeout > uptime))
+  if ((0 != reboottimeout) && (uptime > reboottimeout))
   {
     ESP.restart();
     delay(1000);
   }
 
-  if ((0 != wifichangesettingstimeout) && (wifichangesettingstimeout > uptime))
+  if ((0 != wifichangesettingstimeout) && (uptime > wifichangesettingstimeout))
   {
       if ((postwifissid != "") && (postwifikey != ""))
       {
@@ -2372,7 +2372,7 @@ void handleWWWSettings()
     {
       if (webserver.argName(i) == "rebootdevice")
       {
-        webserver.send(200, "text/html", "<HTML><BODY>Device Rebooting...</BODY></HTML>");
+        webserver.send(200, "text/html", "<HTML><HEAD><meta http-equiv=\"refresh\" content=\"5;url=\\\" /></HEAD><BODY>Device Rebooting, Please Wait...</BODY></HTML>");
         reboottimeout = uptime + 4;
         return;
       }
@@ -2431,8 +2431,8 @@ void handleWWWSettings()
     eeprom_commit();
 
 
-    ArduinoOTA.setPassword(esp_password.c_str());
     ArduinoOTA.setHostname(esp_hostname.c_str());
+    ArduinoOTA.setPassword(esp_password.c_str());
     MDNS.begin(esp_hostname.c_str());
     MDNS.notifyAPChange();
     Debug.setPassword(esp_password);
@@ -2450,13 +2450,14 @@ void handleWWWSettings()
 
     if ((postwifissid != "") && (postwifikey != "") && (esp_hostname != "") && ((postwifissid != WiFi.SSID()) || (postwifikey != WiFi.psk())))
     {
-      webserver.send(200, "text/html", "<HTML><BODY>Settings Saved.<BR>Please connect to proper wifi network and open the page of the saved hostname.</BODY></HTML>");
+      webserver.send(200, "text/html", "<HTML><BODY>Settings Saved.<BR>Please wait a moment and connect to proper wifi network and open the page of the saved hostname.</BODY></HTML>");
       flashbuttonstatus = 0;
       previouswifistatus = -1;
       wifichangesettingstimeout = uptime + 4;
       return;
     }
-    else webserver.send(200, "text/html", "<HTML><BODY>Settings Saved.<BR><A HREF=\"/\">Return to main page</A></BODY></HTML>");
+    else webserver.send(200, "text/html", "<HTML><HEAD><meta http-equiv=\"refresh\" content=\"5;url=\\\" /></HEAD><BODY>Settings Saved, Please Wait...</BODY></HTML>");
+
     initMqtt();
     connectToMqtt();
     update_systeminfo(true);
