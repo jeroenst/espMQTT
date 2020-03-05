@@ -117,6 +117,9 @@ void _amgpelletstove_sendserial()
     case 15:
       sendcmd = "RDB00068&"; // Extractor sensorlevel
       break;
+    case 16:
+       if (cooldown_phase_1) sendcmd = "RF000058&"; // Set power to 0 to prevent unwanted restarting of stove
+    break;
     case 253:
       DEBUG_V("Writing to amg pelletstove:%s\n",amgpowercmd.c_str());
       sendcmd = amgpowercmd;
@@ -142,7 +145,7 @@ void amgpelletstove_handle()
 {
   static unsigned long nextupdatetime = millis() + 1000; // Wait 1 second after startup before sending first cmd...
   static String serstr = "";
-  static uint8_t currentpower = 0;
+  static int8_t currentpower = -1;
   static bool commok = 1;
   if (Serial.available() > 0)
   {
@@ -165,6 +168,9 @@ void amgpelletstove_handle()
               currentpower = 0;
               _amgpelletstove_callback("phase", "off");
               break;
+            case 257:
+              _amgpelletstove_callback("phase", "heating ignitor");
+              break;
             case 258:
               _amgpelletstove_callback("phase", "load wood phase 1");
               break;
@@ -182,9 +188,8 @@ void amgpelletstove_handle()
               break;
             case 2049:
               currentpower = 0;
-              cooldown_phase_1 = true;
-              amgpowercmd = "RF000058&"; // Set power to 0 to prevent unwanted restarting of stove
               _amgpelletstove_callback("phase", "cooling down phase 1");
+              cooldown_phase_1 = true;
               break;
             case 2050:
               currentpower = 0;
@@ -192,11 +197,10 @@ void amgpelletstove_handle()
               break;
             default:
               _amgpelletstove_callback("phase", "unknown");
-              currentpower = 0;
               break;
           }
           _amgpelletstove_callback("phase/value", String(value));
-          _amgpelletstove_callback("power/value", String(currentpower));
+          if (currentpower >= 0) _amgpelletstove_callback("power/value", String(currentpower));
           break;
         case 1:
           _amgpelletstove_callback("room/temperature/measured", String(float(value) / 10, 1));
