@@ -28,7 +28,7 @@
 [submodule "hardware/esp8266com/esp8266"]
 	path = hardware/esp8266com/esp8266
 	url = git@github.com:esp8266/Arduino.git
-	ignore = untracked
+	ignore = dirty
 [submodule "libraries/RemoteDebug"]
 	path = libraries/RemoteDebug
 	url = git@github.com:jeroenst/RemoteDebug.git
