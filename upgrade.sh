@@ -46,7 +46,7 @@ fi
 if [ "$2" == "" ] 
 then
 	echo "Upgrading all devices..."
-#	upgrade $1 esp_smartmeter ESPMQTT_SMARTMETER
+	upgrade $1 esp_smartmeter ESPMQTT_SMARTMETER
 #	upgrade $1 esp_sdm120 ESPMQTT_SDM120
 	upgrade $1 esp_growatt ESPMQTT_GROWATT
 	upgrade $1 esp_bathroom ESPMQTT_BATHROOM
@@ -69,7 +69,8 @@ then
 	upgrade $1 QSWIFIDIMMER01 ESPMQTT_QSWIFIDIMMERD02
 	upgrade $1 QSWIFIDIMMER02 ESPMQTT_QSWIFIDIMMERD02
 	upgrade $1 QSWIFIDIMMER03 ESPMQTT_QSWIFIDIMMERD02
-	upgrade $1 QSWIFIDIMMER04 ESPMQTT_QSWIFIDIMMERD01
+#	upgrade $1 QSWIFIDIMMER04 ESPMQTT_QSWIFIDIMMERD01
+	upgrade $1 QSWIFIDIMMER05 ESPMQTT_QSWIFIDIMMERD02
 	upgrade $1 sonoff_dishwasher ESPMQTT_SONOFFPOWR2
 #	upgrade $1 blitzwolf_001 ESPMQTT_BLITZWOLF
 	exit 0
