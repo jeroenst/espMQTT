@@ -25,24 +25,16 @@ env:
  
 before_install:
    - sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules
-   - git submodule update --init --recursive
-   - cd ~
-   - source <(curl -SLs https://raw.githubusercontent.com/adafruit/travis-ci-arduino/master/install.sh)
-   - curl -SLs https://raw.githubusercontent.com/adafruit/travis-ci-arduino/master/run-clang-format.py > run-clang-format.py
-   - ls ~/Arduino
-   - ls ~/
-   - rm -rf ~/Arduino/hardware
-   - rm -rf ~/Arduino/libraries
-   - mv ~/build/jeroenst/espMQTT ~/Arduino/espMQTT
-   - ln -s ~/Arduino/espMQTT/hardware ~/Arduino/hardware
-   - ln -s ~/Arduino/espMQTT/libraries ~/Arduino/libraries
-   - ls ~/Arduino/libraries/*
-   - ls ~/Arduino/hardware/*
-   - cd ~/Arduino/espMQTT
    - sudo iptables -P INPUT DROP
    - sudo iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+   - cd ~/Arduino
+   - source <(curl -SLs https://raw.githubusercontent.com/adafruit/travis-ci-arduino/master/install.sh)
+   - curl -SLs https://raw.githubusercontent.com/adafruit/travis-ci-arduino/master/run-clang-format.py > run-clang-format.py
+   - mv ~/build/jeroenst/espMQTT ~/Arduino/
+   - cd ~/Arduino/espMQTT
    - git status
    - git reset --hard HEAD
+   - ./configure.sh
  
 script:
    - bash build.sh
