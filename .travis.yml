@@ -27,6 +27,7 @@ before_install:
    - sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules
    - sudo iptables -P INPUT DROP
    - sudo iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+   - cd ~
    - source <(curl -SLs https://raw.githubusercontent.com/adafruit/travis-ci-arduino/master/install.sh)
    - curl -SLs https://raw.githubusercontent.com/adafruit/travis-ci-arduino/master/run-clang-format.py > run-clang-format.py
    - mv ~/build/jeroenst/espMQTT ~/Arduino/
