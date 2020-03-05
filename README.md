@@ -25,6 +25,8 @@ Create symbolic links in the Arduino directory to espMQTT/hardware and
 espMQTT/libraries (this is needed because Arduino doesn't support libraries
 and hardware per sketch folder (yet))
 
+Binaries can be found on the releases page (https://github.com/jeroenst/espMQTT/releases)
+
 Features:
 - (First) Setup through wifi access point
 - Debug interface via telnet
@@ -39,6 +41,7 @@ Features:
 - Read fanspeed from a ducobox ventilation unit and control it using a sonoff 2ch
 - Measure sound pressure (not finished yet)
 - Measure soil humidity (not finished yet) (SHT31)
-- Control Wifi Dimmers QS-WIFI-D01 and QS-WIFI-D02 (MOESHOUSE) (https://aliexpress.com/item/33010332202.html) (https://aliexpress.com/item/4000218700204.html)
+- Control Wifi Dimmer QS-WIFI-D01 (MOESHOUSE) (https://aliexpress.com/item/33010332202.html)
+- Control Wifi Dimmer QS-WIFI-D02 (MOESHOUSE)  (https://aliexpress.com/item/4000218700204.html)
 - Read a rainsensor (https://nl.aliexpress.com/item/1000001838878.html)
 - Read a SDM120(CT) kwh meter (https://aliexpress.com/item/32686672714.html)

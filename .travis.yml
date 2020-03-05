@@ -1,5 +1,5 @@
 language: c
-sudo: false
+os: linux
 cache:
   directories:
     - ~/arduino_ide
@@ -41,9 +41,8 @@ script:
 
 deploy:
   provider: releases
-  api_key: $GITHUBAPIKEY
+  token: $GITHUBAPIKEY
   file_glob: true
   file: /tmp/espMQTT/$TRAVIS_TAG/*.bin
-  skip_cleanup: true
   on:
     tags: true
