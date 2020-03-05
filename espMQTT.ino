@@ -17,6 +17,9 @@
    Libraries via Arduino Library Manager:
     (I2C) Wire
 */
+
+#include "espMQTT_buildscript.h"
+
 #define DEBUGLEVEL Debug.DEBUG
 //#define SYSLOGDEBUG
 
