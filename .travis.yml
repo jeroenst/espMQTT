@@ -31,9 +31,9 @@ before_install:
    - curl -SLs https://raw.githubusercontent.com/adafruit/travis-ci-arduino/master/run-clang-format.py > run-clang-format.py
    - mv ~/build/jeroenst/espMQTT ~/Arduino/
    - cd ~/Arduino/espMQTT
+   - ./configure.sh
    - git status
    - git reset --hard HEAD
-   - ./configure.sh
  
 script:
    - bash build.sh
