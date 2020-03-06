@@ -1,1 +1,1 @@
-#define ESPMQTT_BATHROOM
+
