@@ -66,7 +66,7 @@ then
 			git push --tags
 		fi
 	else
-		VERSION=$VERSION-DIRTY
+		VERSION=$VERSION-DIRTY-$(date +%s)
 	fi
 fi
 
