@@ -33,8 +33,6 @@ before_install:
    - mv ~/build/jeroenst/espMQTT ~/Arduino/
    - cd ~/Arduino/espMQTT
    - ./configure.sh
-   - git status
-   - git reset --hard HEAD
  
 script:
    - bash build.sh
@@ -43,6 +41,6 @@ deploy:
   provider: releases
   token: $GITHUBAPIKEY
   file_glob: true
-  file: /tmp/espMQTT/$TRAVIS_TAG/*.bin
+  file: ./builds/$TRAVIS_TAG/*.bin
   on:
     tags: true
