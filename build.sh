@@ -29,7 +29,7 @@ build ()
   echo ''
   
   echo '#define '$targetname > espMQTT_buildscript.h
-  arduino --board $BOARD --verify --pref build.path=/tmp/espMQTT_build/ --pref build.extra_flags=' -DESP8266 -DWEBSOCKET_DISABLED=true -DASYNC_TCP_SSL_ENABLED -DUSE_HARDWARESERIAL -DESPMQTT_BUILDSCRIPT -DESPMQTT_VERSION="'$VERSION'"' --preserve-temp-files ~/Arduino/espMQTT/espMQTT.ino
+  arduino --board $BOARD --verify --pref build.path=./builds/tmp --pref build.extra_flags=' -DESP8266 -DWEBSOCKET_DISABLED=true -DASYNC_TCP_SSL_ENABLED -DUSE_HARDWARESERIAL -DESPMQTT_BUILDSCRIPT -DESPMQTT_VERSION="'$VERSION'"' --preserve-temp-files espMQTT.ino
 
   if [ $? -ne 0 ]
   then 
@@ -41,8 +41,8 @@ build ()
   exit $?
   fi
 
-  echo $VERSION > /tmp/espMQTT/$VERSION/$targetname.version
-  mv /tmp/espMQTT_build/espMQTT.ino.bin '/tmp/espMQTT/'$VERSION'/'$targetname'_'$VERSION.bin
+  echo $VERSION > ./builds/$VERSION/$targetname.version
+  mv ./builds/tmp/espMQTT.ino.bin './builds/'$VERSION'/'$targetname'_'$VERSION.bin
 
   echo ''
   echo '###################################################################################################'
@@ -70,9 +70,9 @@ then
 	fi
 fi
 
-mkdir -p /tmp/espMQTT/$VERSION
-rm -rf /tmp/espMQTT_build
-mkdir /tmp/espMQTT_build
+mkdir -p ./builds/$VERSION
+rm -rf ./builds/tmp
+mkdir ./builds/tmp
 
 echo $VERSION > version
 
@@ -107,5 +107,4 @@ do
 done
 
 
-rm -rf /tmp/espMQTT_build
 
