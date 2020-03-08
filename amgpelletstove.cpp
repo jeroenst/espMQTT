@@ -64,7 +64,8 @@ void amgpelletstove_receivemqtt(String topicstring, String payloadstring)
 void _amgpelletstove_sendserial()
 {
   amgcmdnr++;
-  if (amgpowercmd != "") amgcmdnr = 253;
+  if (cooldown_phase_1) amgcmdnr = 252;
+  else if (amgpowercmd != "") amgcmdnr = 253;
   else if (amgtempcmd != "") amgcmdnr = 254;
   digitalWrite(NODEMCULEDPIN, 0);
   Serial.write (27);
@@ -117,8 +118,8 @@ void _amgpelletstove_sendserial()
     case 15:
       sendcmd = "RDB00068&"; // Extractor sensorlevel
       break;
-    case 16:
-       if (cooldown_phase_1) sendcmd = "RF000058&"; // Set power to 0 to prevent unwanted restarting of stove
+    case 252:
+       sendcmd = "RF000058&"; // Set power to 0 to prevent unwanted restarting of stove
     break;
     case 253:
       DEBUG_V("Writing to amg pelletstove:%s\n",amgpowercmd.c_str());
