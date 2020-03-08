@@ -1,3 +1,5 @@
+![Build Status](https://travis-ci.org/jeroenst/espMQTT.svg?branch=master)
+
 This software for esp8266 can read data from several sensors and send the
 data to an MQTT broker.
 
