@@ -18,8 +18,6 @@
     (I2C) Wire
 */
 
-#include "espMQTT_buildscript.h"
-
 #define DEBUGLEVEL Debug.DEBUG
 //#define SYSLOGDEBUG
 
@@ -29,7 +27,7 @@
 
 /* ESP8266 */
 // #define ESPMQTT_WEATHER
-// #define ESPMQTT_AMGPELLETSTOVE
+#define ESPMQTT_AMGPELLETSTOVE
 // #define ESPMQTT_BATHROOM
 // #define ESPMQTT_BEDROOM2
 // #define ESPMQTT_OPENTHERM
@@ -53,7 +51,7 @@
 // #define SPMQTT_IRRIGATION
 // #define ESPMQTT_BLITZWOLF
 // #define ESPMQTT_QSWIFIDIMMERD01
-#define ESPMQTT_QSWIFIDIMMERD02
+// #define ESPMQTT_QSWIFIDIMMERD02
 // #define ESPMQTT_SONOFF4CH //ESP8285
 // #define ESPMQTT_SONOFFDUAL
 // #define ESPMQTT_SONOFFS20_PRINTER
@@ -61,6 +59,8 @@
 // #define ESPMQTT_SONOFFPOWR2 // tv&washingmachine&server&dishwasher
 
 #define ESPMQTT_VERSION "TEST"
+#else
+#include "espMQTT_buildscript.h"
 #endif
 
 
