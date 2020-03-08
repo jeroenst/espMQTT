@@ -17,7 +17,7 @@ addons:
       - clang-format-5.0
 env:
   global:
-   - ARDUINO_IDE_VERSION="1.8.10"
+   - ARDUINO_IDE_VERSION="1.8.12"
    - PRETTYNAME="espMQTT"
    - TRAVISBUILD="yes"
 # Optional, will default to "$TRAVIS_BUILD_DIR/Doxyfile"
