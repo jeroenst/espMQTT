@@ -63,10 +63,18 @@ void amgpelletstove_receivemqtt(String topicstring, String payloadstring)
 
 void _amgpelletstove_sendserial()
 {
+  static bool old_cooldown_phase_1 = 0;
+
   amgcmdnr++;
-  if (cooldown_phase_1) amgcmdnr = 252;
+  if (cooldown_phase_1) 
+  {
+    amgpowercmd = ""; // Prevent remote power setting during cooldown phase 1
+    if (old_cooldown_phase_1 != cooldown_phase_1) amgcmdnr = 252; // Prevent restarting of stove due race condition
+  }
   else if (amgpowercmd != "") amgcmdnr = 253;
   else if (amgtempcmd != "") amgcmdnr = 254;
+  old_cooldown_phase_1 = cooldown_phase_1;
+
   digitalWrite(NODEMCULEDPIN, 0);
   Serial.write (27);
   static String sendcmd; // needs to be static otherwise debug call fails..
