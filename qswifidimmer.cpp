@@ -50,14 +50,14 @@ void qswifidimmer_init(const uint8_t nrofchannels, void(*callback)(uint8_t, uint
   qswifidimmer_nrofchannels = nrofchannels;
   qswifidimmer_setdimvalue(0, 0);
   qswifidimmer_setdimstate(0, 0);
-  pinMode(13, INPUT);
+  pinMode(13, INPUT_PULLUP);
   
   if (qswifidimmer_nrofchannels == 2)
   {
     qswifidimmer_setdimvalue(0, 1);
     qswifidimmer_setdimstate(0, 1);
     qswifidimmer_nrofchannels = 2;
-    pinMode(5, INPUT);
+    pinMode(5, INPUT_PULLUP);
   }
   else 
   {
