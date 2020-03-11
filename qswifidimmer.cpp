@@ -27,16 +27,19 @@ void qswifidimmer_init(const uint8_t nrofchannels, void(*callback)(uint8_t, uint
   // Define all unused GPIO as output to prevent inteference and slow wifi
   pinMode(0, OUTPUT);
   digitalWrite(0,0);
+  // GPIO 1 is TX
   pinMode(2, OUTPUT);
   digitalWrite(2,0);
   pinMode(3, FUNCTION_0); // Change RX pin to GPIO
   pinMode(3, OUTPUT);
   digitalWrite(3,0);
   pinMode(4, OUTPUT);
+  // Gpio 5 = Switch input 2
   digitalWrite(4,0);
   // Pin 6 t/m 11 = flash
   pinMode(12, OUTPUT);
   digitalWrite(12,0);
+  // Gpio 13 = Switch input 1
   pinMode(14, OUTPUT);
   digitalWrite(14,0);
   pinMode(15, OUTPUT);
