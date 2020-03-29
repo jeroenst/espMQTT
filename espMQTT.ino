@@ -592,7 +592,6 @@ bool floorheating_valveon = 0;
 
 //WiFiClientSecure wifiClientSecure;
 //WiFiClient wifiClient;
-static uint8_t wifiTimer = 0;
 ESP8266WebServer webserver(80);
 #include <WiFiUdp.h>
 
@@ -1347,7 +1346,6 @@ void wifiScanReady(int networksFound)
 }
 
 static byte flashbuttonstatus = 0;
-static int8_t previouswifistatus = -1;
 
 String doubletostring (double value, int precision)
 {
@@ -1899,9 +1897,6 @@ void loop()
     else circuitnr = 0;
 #endif
 
-    if (wifiTimer < 20) wifiTimer++;
-
-
 #ifdef DHTPIN
     if (uptime % 5 == 0) update_dht();
 #endif
@@ -1965,41 +1960,26 @@ void loop()
 
     write_oled_display();
 
-    if (WiFi.status() == WL_CONNECTED)
-    {
-      wifiTimer = 0;
-      if (WiFi.status() != previouswifistatus)
-      {
 #ifdef NEOPIXELPIN
+    if (mainstate.wificonnected)
+    {
+      if (mainstate.mqttconnected)
+      {
+        neopixelleds.setPixelColor(0, neopixelleds.Color(0, 20, 0));
+        neopixelleds.show();
+      }
+      else
+      {
         neopixelleds.setPixelColor(0, neopixelleds.Color(30, 15, 0));
         neopixelleds.show();
-#endif
       }
-
-#ifdef NEOPIXELPIN
-      neopixelleds.setPixelColor(0, neopixelleds.Color(0, 20, 0));
-      neopixelleds.show();
-#endif
     }
     else
     {
-#ifdef NEOPIXELPIN
       neopixelleds.setPixelColor(0, neopixelleds.Color(30, 0, 0));
       neopixelleds.show();
-#endif
-      if (flashbuttonstatus == 0)
-      {
-
-        /*if (wifiTimer >= 30)
-          {
-          WiFi.disconnect(false);
-          delay(10);
-          WiFi.begin();
-          wifiTimer = 0;
-          }*/
-      }
     }
-    previouswifistatus = WiFi.status();
+#endif
   }
 }
 
@@ -2655,7 +2635,6 @@ void handleWWWSettings()
     {
       webserver.send(200, "text/html", "<HTML><BODY>Settings Saved.<BR>Please wait a moment and connect to proper wifi network and open the page of the saved hostname.</BODY></HTML>");
       flashbuttonstatus = 0;
-      previouswifistatus = -1;
       wifichangesettingstimeout = uptime + 4;
       return;
     }
