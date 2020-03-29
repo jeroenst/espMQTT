@@ -27,7 +27,7 @@
 
 /* ESP8266 */
 // #define ESPMQTT_WEATHER
-#define ESPMQTT_AMGPELLETSTOVE
+//#define ESPMQTT_AMGPELLETSTOVE
 // #define ESPMQTT_BATHROOM
 // #define ESPMQTT_BEDROOM2
 // #define ESPMQTT_OPENTHERM
@@ -36,13 +36,15 @@
 // #define ESPMQTT_SDM120
 // #define ESPMQTT_WATERMETER
 // #define ESPMQTT_DDNS
-// #define ESPMQTT_GENERIC8266
+#define ESPMQTT_GENERIC8266
 // #define ESPMQTT_MAINPOWERMETER
+// #define ESPMQTT_OBD2
 // #define ESPMQTT_NOISE
 // #define ESPMQTT_SOIL
 // #define ESPMQTT_DIMMER
 
 /* ESP8285 */
+// #define ESPMQTT_ZMAI90
 // #define ESPMQTT_DUCOBOX
 // #define ESPMQTT_SONOFFS20 // coffeelamp & sonoffs20_00X
 // #define ESPMQTT_SONOFFBULB
@@ -129,6 +131,15 @@ SDM sdm(serSDM, 2400);
 #define FLASHBUTTON D3
 #define ESPLED D4
 #define SERIALLOG
+#endif
+
+#ifdef  ESPMQTT_OBD2
+#define FIRMWARE_TARGET "OBD2"
+#define FLASHBUTTON D3
+#define ESPLED D4
+#undef SERIALLOG
+#include <OBD2UART.h>
+COBD obd;
 #endif
 
 #ifdef  ESPMQTT_AMGPELLETSTOVE
@@ -650,15 +661,194 @@ void putdatamap(String topic, String value, bool sendupdate = true, bool forcese
 {
   dataMapStruct datamapstruct = dataMap->get(topic);
 
-  if (((datamapstruct.payload != value) || forcesend) && sendupdate)
+  if ((datamapstruct.payload != value) || forcesend)
   {
-    DEBUG_D ("DATAMAP %s=%s (sendupdate=%d, oldval=%s oldsend=%d forcesend=%d)\n", topic.c_str(), value.c_str(), sendupdate, datamapstruct.payload.c_str(), datamapstruct.send, forcesend);
+    // Do not output debug for uptime
+    if (topic != "system/uptime") DEBUG_D ("DATAMAP %s=%s (sendupdate=%d, oldval=%s oldsend=%d forcesend=%d)\n", topic.c_str(), value.c_str(), sendupdate, datamapstruct.payload.c_str(), datamapstruct.send, forcesend);
     datamapstruct.onair = false;
-    datamapstruct.send = true;
+    datamapstruct.send = sendupdate;
     datamapstruct.payload = value;
     dataMap->put(topic, datamapstruct);
   }
 }
+
+void obd2_writeserial (String data)
+{
+  DEBUG ("Writing to ODB2:\"%s\"\n", data.c_str());
+  data += "\r";
+  Serial.write(data.c_str());
+}
+
+#ifdef ESPMQTT_OBD2
+void obd2_handle()
+{
+  static unsigned long nextupdatetime = millis() + 10000; // Wait 10 second after startup before sending first cmd...
+  static uint8_t obdcmd = 0;
+  static unsigned long nextsleeptime = millis() + 60000; // wait 60 seconds after statup before entering sleep mode
+
+  if (nextsleeptime < millis())
+  {
+          DEBUG("Entering sleep mode\n");
+          delay(1000);
+          wifi_station_disconnect();
+          wifi_set_opmode(NULL_MODE); // set WiFi mode to null mode.
+          wifi_fpm_open(); // enable force sleep
+          wifi_fpm_set_sleep_type(LIGHT_SLEEP_T); // light sleep
+          //wifi_fpm_set_wakeup_cb(fpm_wakup_cb_func1); // Set wakeup callback
+          wifi_fpm_do_sleep(60000*1000);
+
+          nextsleeptime = millis() + 5000;
+  }
+  
+  byte serdata = 0;
+  if (Serial.available() > 0)
+  {
+    static String serialstring = "";
+    serdata = Serial.read();
+    if (((32 <= serdata) && (126 >= serdata))|| (serdata == 13)) // filter bogus data
+    {
+    //  DEBUG ("%c (%d)\n", serdata, serdata);
+      if ('\r' == serdata) // If \r is received it means new data available (/r is ignored for serialstring;
+      {
+        DEBUG ("Received from OBD2:\"%s\" (obdcmd=%d)\n", serialstring.c_str(), obdcmd);
+        String value = "-";
+        if (serialstring == "UNABLE TO CONNECT") 
+        {
+          putdatamap ("status", "commerror");
+        }
+        switch (obdcmd)
+        {
+          case 0:
+            if (serialstring.indexOf("ELM327") == 0)
+            {
+              serialstring.remove(0, serialstring.indexOf(" v") + 2);
+              serialstring.remove(serialstring.indexOf(13));
+              DEBUG ("\n\n\nOBD2 Connected! Version=%s\n\n\n", serialstring.c_str());
+              putdatamap ("obd/version", serialstring);
+              obdcmd = 1;
+            }
+            break;
+          case 1:
+            if (serialstring.indexOf("OK") == 0) 
+            {
+              obdcmd = 2;
+            }
+            break;
+          default:
+            if (serialstring.indexOf("41 00") == 0)
+            {
+              int A = strtol(serialstring.substring(6, 8).c_str(), NULL, 16);
+              int B = strtol(serialstring.substring(9, 11).c_str(), NULL, 16);
+              int C = strtol(serialstring.substring(12, 14).c_str(), NULL, 16);
+              int D = strtol(serialstring.substring(15, 17).c_str(), NULL, 16);
+              //value = String (A << 24 || B << 16 || C << 8 || D);
+              DEBUG ("Supported PIDS= %d %d %d %d", A, B, C, D);
+              obdcmd++;
+            }
+
+            if (serialstring.indexOf("41 05") == 0)
+            {
+              value = String(strtol(serialstring.substring(6, 8).c_str(), NULL, 16) - 40);
+              putdatamap ("obd/temperature/coolant", value);
+              putdatamap ("status", "connected");
+              obdcmd++;
+            }
+
+            if (serialstring.indexOf("41 0D") == 0)
+            {
+              value = String(strtol(serialstring.substring(6, 8).c_str(), NULL, 16));
+              putdatamap ("obd/speed", value);
+              putdatamap ("status", "connected");
+              nextsleeptime = millis() + 30000;
+              obdcmd++;
+            }
+
+            if (serialstring.indexOf("41 0C") == 0)
+            {
+              int A = strtol(serialstring.substring(6, 8).c_str(), NULL, 16);
+              int B = strtol(serialstring.substring(9, 11).c_str(), NULL, 16);
+              value = String(((A * 256) + B) / 4);
+              putdatamap ("obd/enginerpm", value);
+              putdatamap ("status", "connected");
+              obdcmd++;
+            }
+
+            if (serialstring.indexOf("41 11") == 0)
+            {
+              value = String((strtol(serialstring.substring(6, 8).c_str(), NULL, 16)*100)/255);
+              putdatamap ("obd/throttleposition", value);
+              putdatamap ("status", "connected");
+              obdcmd++;
+            }
+
+            if (serialstring.indexOf("41 0F") == 0)
+            {
+              value = String(strtol(serialstring.substring(6, 8).c_str(), NULL, 16) - 40);
+              putdatamap ("obd/temperature/intake", value);
+              putdatamap ("status", "connected");
+              obdcmd++;
+            }
+
+            if (serialstring.indexOf("41 46") == 0)
+            {
+              value = String(strtol(serialstring.substring(6, 8).c_str(), NULL, 16) - 40);
+              putdatamap ("obd/temperature/ambient", value);
+              putdatamap ("status", "connected" );
+              obdcmd++;
+            }
+            break;
+        }
+        serialstring.clear();
+      }
+      else serialstring += (char)serdata; // filter non ascii bogus and \r
+    }
+  }
+
+  if (('>' == serdata) || (millis() > nextupdatetime)) // If > is received it means odb is ready for new command
+  {
+    if (millis() > nextupdatetime) obdcmd = 0;
+    nextupdatetime = millis() + 10000;
+    switch (obdcmd)
+    {
+      case 0:
+        obd2_writeserial("ATZ");
+        break;
+      case 1:
+        obd2_writeserial("AT SP 0");
+        break;
+      case 2:
+      case 4:
+      case 6:
+      case 8:
+      case 10:
+      case 12:
+        obd2_writeserial("01 0D"); // Request speed in km/h often because it's important to update fast for cruise control
+        break;
+      case 3:
+        obd2_writeserial("01 00"); // Get supported PID's
+        break;
+      case 5:
+        obd2_writeserial("01 05"); // Request coolant temperature
+        break;
+      case 7:
+        obd2_writeserial("01 0C"); // Request engine RPM
+        break;
+      case 9:
+        obd2_writeserial("01 11"); // Request throttle position
+        break;
+      case 11:
+        obd2_writeserial("01 0F"); // Request air intake temperature
+        obdcmd = 2; // next round start with case 2
+        break;
+      default:
+        obd2_writeserial("ATZ");
+        obdcmd = 0;
+        break;
+    }
+  }
+  serdata = 0;
+}
+#endif
 
 void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
 {
@@ -701,25 +891,9 @@ void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
   putdatamap("mqtt/clientid", String(mqttClient.getClientId()), sendupdate);
 }
 
-void onWifiConnect(const WiFiEventStationModeGotIP&)
-{
-  wifichannel = WiFi.channel(); // We can't rely on wifi.channel because while scanning the channel is changed.
-  //wifiReconnectTimer.detach();
-  triggers.wificonnected = true;
-  mainstate.wificonnected = true;
-}
-
-void onWifiDisconnect(const WiFiEventStationModeDisconnected&)
-{
-  wifichannel = 0;
-  triggers.wifidisconnected = true;
-  mainstate.wificonnected = false;
-}
 
 void initWifi()
 {
-  wifiConnectHandler = WiFi.onStationModeGotIP(onWifiConnect);
-  wifiDisconnectHandler = WiFi.onStationModeDisconnected(onWifiDisconnect);
   WiFi.setAutoReconnect(false); // We handle reconnect our self
   WiFi.setSleepMode(WIFI_NONE_SLEEP); // When sleep is on regular disconnects occur https://github.com/esp8266/Arduino/issues/5083
   WiFi.mode(WIFI_STA);
@@ -894,6 +1068,9 @@ void initSerial()
 #elif defined ( ESPMQTT_SDM120)
   Serial.setDebugOutput(false);
   sdm.begin();
+#elif defined ( ESPMQTT_OBD2)
+  Serial.setDebugOutput(false);
+  Serial.begin(38400, SERIAL_8N1);
 #elif defined (ESPMQTT_SMARTMETER) || defined (QSWIFIDIMMERCHANNELS)
   // do nothing, smartmeter initializes serial in init function.
 #else
@@ -1165,7 +1342,7 @@ void handle_noise()
 
 void wifiScanReady(int networksFound)
 {
-  DEBUG_V("WiFiScan finished, %d network(s) found\n", networksFound);
+//  DEBUG_V("WiFiScan finished, %d network(s) found\n", networksFound);
   triggers.wifiscanready = true;
   wifinetworksfound = networksFound;
 }
@@ -1186,6 +1363,20 @@ void loop()
   Debug.handle();
   yield();
 
+  if (WiFi.status() == WL_CONNECTED)
+  {
+    wifichannel = WiFi.channel(); // We can't rely on wifi.channel because while scanning the channel is changed.
+    if (!mainstate.wificonnected) triggers.wificonnected = true;
+    mainstate.wificonnected = true;
+  }
+  else
+  {
+    wifichannel = 0;
+    if (mainstate.wificonnected) triggers.wifidisconnected = true;
+    mainstate.wificonnected = false;
+  }
+
+
 #ifdef QSWIFIDIMMERCHANNELS
   qswifidimmer_handle();
   yield();
@@ -1203,13 +1394,16 @@ void loop()
 
   if ((0 != wifichangesettingstimeout) && (uptime > wifichangesettingstimeout))
   {
-      if ((postwifissid != "") && (postwifikey != ""))
-      {
-        WiFi.disconnect();
-        WiFi.hostname(esp_hostname);
-        WiFi.begin(postwifissid.c_str(), postwifikey.c_str()); // Save wifi ssid and key and also activate new hostname...
-      }
-      wifichangesettingstimeout = 0;
+    mainstate.accesspoint = false;
+    WiFi.mode(WIFI_STA); // After saving settings return to wifi client mode and disable AP
+    if ((postwifissid != ""))
+    {
+      DEBUG_I ("Connecting wifi to %s\n", postwifissid.c_str());
+      WiFi.disconnect();
+      WiFi.hostname(esp_hostname);
+      WiFi.begin(postwifissid.c_str(), postwifikey.c_str()); // Save wifi ssid and key and also activate new hostname...
+    }
+    wifichangesettingstimeout = 0;
   }
 
 
@@ -1235,7 +1429,7 @@ void loop()
     triggers.wifidisconnected = false;
     DEBUG_W("Disconnected from Wi-Fi.\n");
     disconnectMqtt();
-    //if (!mainstate.accesspoint) wifiReconnectTimer.once(2, connectToWifi); // trying to connect to wifi can cause AP to fail
+    if (!mainstate.accesspoint) wifiReconnectTimer.once(2, connectToWifi); // trying to connect to wifi can cause AP to fail
   }
 
   if (triggers.mqttconnected)
@@ -1433,7 +1627,7 @@ void loop()
   static uint32_t watermeter_liters = watermeter_getliters();
   if (watermeter_handle())
   {
-    putdatamap("water/lmin", String(watermeter_getflow(),1));
+    putdatamap("water/lmin", String(watermeter_getflow(), 1));
     putdatamap("water/m3h", String(watermeter_getflow() * 0.06, 3));
 
     if (watermeter_liters != watermeter_getliters())
@@ -1470,6 +1664,11 @@ void loop()
 
 #ifdef  ESPMQTT_AMGPELLETSTOVE
   amgpelletstove_handle();
+  yield();
+#endif
+
+#ifdef ESPMQTT_OBD2
+  obd2_handle();
   yield();
 #endif
 
@@ -1601,7 +1800,7 @@ void loop()
         if (uptime % 10) sdmreadcounter = 0;
         break;
     }
-    if (sdmreadcounter < 14) 
+    if (sdmreadcounter < 14)
     {
       digitalWrite(NODEMCULEDPIN, isnan(value) ? 1 : 0);
       sdmreadcounter++;
@@ -1681,7 +1880,8 @@ void loop()
     }
 #endif
 
-    update_systeminfo();
+    // Every 10 seconds update system info
+    if ((uptime % 10) == 0) update_systeminfo();
 
 #ifdef  ESPMQTT_MAINPOWERMETER
     static uint8_t circuitnr = 0;
@@ -2231,7 +2431,9 @@ void systemTimerCallback()
     ms = 0;
   }
 #ifdef ESPLED
-  static uint8_t ledtimer = 0, ledontime = 1, ledofftime = 1;
+  static uint8_t ledtimer = 0, ledontime, ledofftime;
+  ledontime = 1;
+  ledofftime = 1;
   if (mainstate.accesspoint) {
     ledontime = 1;
     ledofftime = 0;
@@ -2442,8 +2644,6 @@ void handleWWWSettings()
     mainstate.defaultpassword = false;
 
     disconnectMqtt(); // Disconnect mqtt server
-    WiFi.mode(WIFI_STA); // After saving settings return to wifi client mode and disable AP
-    mainstate.accesspoint = false;
 
     if (esp_hostname != WiFi.hostname())
     {
@@ -2459,7 +2659,11 @@ void handleWWWSettings()
       wifichangesettingstimeout = uptime + 4;
       return;
     }
-    else webserver.send(200, "text/html", "<HTML><HEAD><meta http-equiv=\"refresh\" content=\"5;url=\\\" /></HEAD><BODY>Settings Saved, Please Wait...</BODY></HTML>");
+    else
+    {
+      wifichangesettingstimeout = uptime + 4;
+      webserver.send(200, "text/html", "<HTML><HEAD><meta http-equiv=\"refresh\" content=\"5;url=\\\" /></HEAD><BODY>Settings Saved, Please Wait...</BODY></HTML>");
+    }
 
     initMqtt();
     connectToMqtt();
