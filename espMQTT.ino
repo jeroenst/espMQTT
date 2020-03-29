@@ -138,6 +138,8 @@ SDM sdm(serSDM, 2400);
 #define FLASHBUTTON D3
 #define ESPLED D4
 #undef SERIALLOG
+#include <OBD2UART.h>
+COBD obd;
 #endif
 
 #ifdef  ESPMQTT_AMGPELLETSTOVE
@@ -672,7 +674,7 @@ void putdatamap(String topic, String value, bool sendupdate = true, bool forcese
 
 void obd2_writeserial (String data)
 {
-  DEBUG ("Writing to OBD2:\"%s\"\n", data.c_str());
+  DEBUG ("Writing to ODB2:\"%s\"\n", data.c_str());
   data += "\r";
   Serial.write(data.c_str());
 }
@@ -906,7 +908,10 @@ void connectToWifi()
   {
     DEBUG_I("Connecting to Wi-Fi...\n");
     wifiReconnectTimer.once(30, connectToWifi); // Retry wifi connection in 30 seconds if it fails to connect
-    WiFi.begin();     // Start WiFi.
+    String wifissid = WiFi.SSID();
+    String wifipsk =  WiFi.psk();
+    WiFi.disconnect();
+    WiFi.begin(wifissid.c_str(), wifipsk.c_str());
   }
 }
 
@@ -1448,7 +1453,7 @@ void loop()
     syslogN("Disconnected from MQTT Server=%s\n", mqtt_server.c_str());
     yield(); // Prevent crash because of to many debug data to send
     if (WiFi.isConnected()) {
-      mqttReconnectTimer.once(2, connectToMqtt);
+      mqttReconnectTimer.once(5, connectToMqtt);
     }
   }
 
@@ -1816,11 +1821,12 @@ void loop()
     // try to do this as less as posisble because during scan the esp is unreachable for about a second.
     if ((!mainstate.accesspoint))
     {
-      if (((uptime % 600) == 0) || ((WiFi.status() != WL_CONNECTED) && (uptime % 10)) || (((uptime % 30) == 0) && WiFi.RSSI() < -70))
+      if (((uptime % 600) == 0) || ((WiFi.status() != WL_CONNECTED) && (uptime % 30)) || (((uptime % 30) == 0) && WiFi.RSSI() < -70))
       {
+        DEBUG_D("Starting Wifi Scan...\n");
         static uint32_t wifilastscan = 0;
-        // prevent scanning more than once per 10 seconds and wait 2 seconds before first scan
-        if (((uptime > 2) && (wifilastscan == 0)) || ((wifilastscan + 10 < uptime)))
+        // prevent scanning more than once per 30 seconds and wait 2 seconds before first scan
+        if (((uptime > 2) && (wifilastscan == 0)) || ((wifilastscan + 30 < uptime)))
         {
           WiFi.scanNetworksAsync(wifiScanReady);
           wifilastscan = uptime;
