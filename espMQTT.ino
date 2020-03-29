@@ -138,8 +138,6 @@ SDM sdm(serSDM, 2400);
 #define FLASHBUTTON D3
 #define ESPLED D4
 #undef SERIALLOG
-#include <OBD2UART.h>
-COBD obd;
 #endif
 
 #ifdef  ESPMQTT_AMGPELLETSTOVE
@@ -674,7 +672,7 @@ void putdatamap(String topic, String value, bool sendupdate = true, bool forcese
 
 void obd2_writeserial (String data)
 {
-  DEBUG ("Writing to ODB2:\"%s\"\n", data.c_str());
+  DEBUG ("Writing to OBD2:\"%s\"\n", data.c_str());
   data += "\r";
   Serial.write(data.c_str());
 }
