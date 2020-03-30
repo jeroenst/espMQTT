@@ -58,7 +58,7 @@ DIFFERENCE=$(git diff | wc -w)
 
 if [ -z "$TRAVISBUILD" ]
 then
-	if [ $DIFFERENCE -eq 0 ]
+	if [ $DIFFERENCE -eq 0 ] && [ $1 == "release" ]
 	then
 		if [[ $VERSION == *"-"* ]]
 		then
