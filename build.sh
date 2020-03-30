@@ -51,6 +51,8 @@ build ()
   echo ''
 }
 
+git update-index --assume-unchanged espMQTT_buildscript.h
+
 VERSION=$(git describe --tags | sed 's/v//')
 DIFFERENCE=$(git diff | wc -w)
 
