@@ -60,7 +60,7 @@ if [ -z "$TRAVISBUILD" ]
 then
 	if [ $DIFFERENCE -eq 0 ] 
 	then
-		if [ $1 -eq "release" ]
+		if [[ $1 == "release" ]]
 		then
 			if [[ $VERSION == *"-"* ]]
 			then
