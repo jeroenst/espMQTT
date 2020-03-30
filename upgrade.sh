@@ -48,7 +48,7 @@ then
 	echo "Upgrading all devices..."
 #	upgrade $1 esp_odb1 ESPMQTT_OBD2
 	upgrade $1 esp_smartmeter ESPMQTT_SMARTMETER
-#	upgrade $1 esp_sdm120 ESPMQTT_SDM120
+	upgrade $1 esp_sdm120 ESPMQTT_SDM120
 	upgrade $1 esp_growatt ESPMQTT_GROWATT
 	upgrade $1 esp_bathroom ESPMQTT_BATHROOM
 	upgrade $1 esp_bedroom2 ESPMQTT_BEDROOM2
