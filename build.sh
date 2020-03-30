@@ -51,6 +51,7 @@ build ()
   echo ''
 }
 
+git checkout -f espMQTT_buildscript.h
 VERSION=$(git describe --tags)
 DIFFERENCE=$(git diff | wc -w)
 
