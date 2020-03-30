@@ -62,7 +62,7 @@ then
 		then
 			VERSION=$(echo $VERSION | sed 's/-.*//' | sed 's/v//')
 			VERSION=v$(increment_version $VERSION)
-			git tag v$VERSION
+			git tag $VERSION
 			git push --tags
 		fi
 	else
