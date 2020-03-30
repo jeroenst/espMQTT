@@ -62,14 +62,16 @@ then
 		then
 			VERSION=$(echo $VERSION | sed 's/-.*//' | sed 's/v//')
 			VERSION=$(increment_version $VERSION)
-			git push
 			git tag v$VERSION
 			git push --tags
+			VERSION=$VERSION
 		fi
 	else
 		VERSION=$VERSION-DIRTY-$(date +%s)
 	fi
 fi
+
+VERSION=v$VERSION
 
 mkdir -p ./builds/$VERSION
 rm -rf ./builds/tmp
@@ -108,4 +110,5 @@ do
 done
 
 
+git checkout -f espMQTT_buildscript.h
 
