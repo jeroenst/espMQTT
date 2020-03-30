@@ -55,18 +55,23 @@ git update-index --assume-unchanged espMQTT_buildscript.h
 
 VERSION=$(git describe --tags | sed 's/v//')
 DIFFERENCE=$(git diff | wc -w)
+TARGET=$1
 
 if [ -z "$TRAVISBUILD" ]
 then
-	if [ $DIFFERENCE -eq 0 ]
+	if [ $DIFFERENCE -eq 0 ] 
 	then
-		if [[ $VERSION == *"-"* ]]
+		if [[ $1 == "release" ]]
 		then
-			VERSION=$(echo $VERSION | sed 's/-.*//' | sed 's/v//')
-			VERSION=$(increment_version $VERSION)
-			git tag v$VERSION
-			git push --tags
-			VERSION=$VERSION
+			TARGET=$2
+			if [[ $VERSION == *"-"* ]]
+			then
+				VERSION=$(echo $VERSION | sed 's/-.*//' | sed 's/v//')
+				VERSION=$(increment_version $VERSION)
+				git tag v$VERSION
+				git push --tags
+				VERSION=$VERSION
+			fi
 		fi
 	else
 		VERSION=$VERSION-DIRTY-$(date +%s)
@@ -85,11 +90,11 @@ declare -a TARGETS=("ESPMQTT_WEATHER" "ESPMQTT_AMGPELLETSTOVE" "ESPMQTT_BATHROOM
 BOARD=esp8266com:esp8266:nodemcuv2
 for targetname in "${TARGETS[@]}"
 do
-	if [ "$1" == "" ]
+	if [ "$TARGET" == "" ]
 	then
 		build
 	else
-		if [ "$1" == "$targetname" ]
+		if [ "$TARGET" == "$targetname" ]
 		then
 			build
 		fi
@@ -100,11 +105,11 @@ declare -a TARGETS=("ESPMQTT_DUCOBOX" "ESPMQTT_SONOFFS20" "ESPMQTT_SONOFFBULB" "
 BOARD=esp8266com:esp8266:esp8285
 for targetname in "${TARGETS[@]}"
 do
-	if [ "$1" == "" ]
+	if [ "$TARGET" == "" ]
 	then
 		build
 	else
-		if [ "$1" == "$targetname" ]
+		if [ "$TARGET" == "$targetname" ]
 		then
 			build
 		fi
