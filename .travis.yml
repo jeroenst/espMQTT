@@ -38,7 +38,8 @@ before_install:
 
 script:
   - bash build.sh
-  - rm espMQTT_buildscript.h
+  - git reset HEAD espMQTT_buildscript.h
+  - git checkout -f espMQTT_buildscript.h
 
 deploy:
   provider: releases
