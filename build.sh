@@ -64,6 +64,7 @@ then
 		if [[ $1 == "release" ]]
 		then
 			TARGET=$2
+			# IF CURRENT VERSION CONTAINS A - (SO NOT LATEST TAG) CREATE NEW VERSION TAG
 			if [[ $VERSION == *"-"* ]]
 			then
 				VERSION=$(echo $VERSION | sed 's/-.*//' | sed 's/v//')
