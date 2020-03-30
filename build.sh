@@ -70,8 +70,6 @@ then
 				git push --tags
 				VERSION=$VERSION
 			fi
-		else
-			VERSION=$VERSION-$(git rev-parse --short HEAD)
 		fi
 	else
 		VERSION=$VERSION-DIRTY-$(date +%s)
