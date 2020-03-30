@@ -62,6 +62,7 @@ then
 	then
 		if [[ $1 == "release" ]]
 		then
+			$1 = ""
 			if [[ $VERSION == *"-"* ]]
 			then
 				VERSION=$(echo $VERSION | sed 's/-.*//' | sed 's/v//')
