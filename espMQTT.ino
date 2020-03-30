@@ -33,7 +33,7 @@
 // #define ESPMQTT_OPENTHERM
 // #define ESPMQTT_SMARTMETER
 // #define ESPMQTT_GROWATT
-#define ESPMQTT_SDM120
+// #define ESPMQTT_SDM120
 // #define ESPMQTT_WATERMETER
 // #define ESPMQTT_DDNS
 // #define ESPMQTT_GENERIC8266
@@ -52,8 +52,8 @@
 // #define ESPMQTT_SONOFF_FLOORHEATING
 // #define SPMQTT_IRRIGATION
 // #define ESPMQTT_BLITZWOLF
-// #define ESPMQTT_QSWIFIDIMMERD01
-// #define ESPMQTT_QSWIFIDIMMERD02
+//#define ESPMQTT_QSWIFIDIMMERD01
+#define ESPMQTT_QSWIFIDIMMERD02
 // #define ESPMQTT_SONOFF4CH //ESP8285
 // #define ESPMQTT_SONOFFDUAL
 // #define ESPMQTT_SONOFFS20_PRINTER
@@ -845,11 +845,11 @@ void obd2_handle()
 }
 #endif
 
-void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
+void update_systeminfo(bool updateall = false, bool sendupdate = true)
 {
   char uptimestr[20];
   sprintf(uptimestr, "%d:%02d:%02d:%02d", uptime / 86400, (uptime / 3600) % 24, (uptime / 60) % 60, uptime % 60);
-  if (writestaticvalues)
+  if (updateall)
   {
     putdatamap("hostname", WiFi.hostname(), sendupdate);
     String firmwarename = __FILE__;
@@ -870,8 +870,8 @@ void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
     putdatamap("flash/speed", String(ESP.getFlashChipSpeed()), sendupdate);
     putdatamap("system/chipid", String(chipid), sendupdate);
   }
-  putdatamap("system/uptime", String(uptimestr), uptime % 60 == 0);
-  putdatamap("system/freeram", String(system_get_free_heap_size()), uptime % 60 == 0);
+  putdatamap("system/uptime", String(uptimestr), (uptime % 60 == 0) || updateall);
+  putdatamap("system/freeram", String(system_get_free_heap_size()), (uptime % 60 == 0) || updateall);
   putdatamap("wifi/state", WiFi.status() == WL_CONNECTED ? "connected" : "disconnected", sendupdate);
   putdatamap("wifi/localip", WiFi.localIP().toString(), sendupdate);
   putdatamap("wifi/mac", String(WiFi.macAddress()), sendupdate);
@@ -1381,6 +1381,7 @@ void loop()
 
 #ifdef QSWIFIDIMMERCHANNELS
   qswifidimmer_handle();
+  
   yield();
 #endif
 
@@ -1413,13 +1414,13 @@ void loop()
   {
     triggers.wificonnected = false;
     DEBUG_I("Connected to WiFi SSID=%s RSSI=%d\n", WiFi.SSID().c_str(), WiFi.RSSI());
-    syslogN("Connected to WiFi SSID=%s RSSI=%d\n", WiFi.SSID().c_str(), WiFi.RSSI());
+//    syslogN("Connected to WiFi SSID=%s RSSI=%d\n", WiFi.SSID().c_str(), WiFi.RSSI());
     initMqtt();
     connectToMqtt();
 #ifdef SYSLOGDEBUG
     for (int i = 0; i < dataMap->size(); i++)
     {
-      syslogD("%s=%s (%d)\n", dataMap->getKey(i).c_str(), dataMap->getData(i).payload.c_str(), dataMap->getData(i).send);
+      //syslogD("%s=%s (%d)\n", dataMap->getKey(i).c_str(), dataMap->getData(i).payload.c_str(), dataMap->getData(i).send);
       yield();
     }
 #endif
@@ -1440,7 +1441,7 @@ void loop()
     triggers.mqttconnected = false;
     mainstate.mqttsubscribingdone = false;
     DEBUG_I("Connected to MQTT Server=%s\n", mqtt_server.c_str());
-    syslogN("Connected to MQTT Server=%s\n", mqtt_server.c_str());
+    //syslogN("Connected to MQTT Server=%s\n", mqtt_server.c_str());
     yield(); // Prevent crash because of to many debug data to send
     update_systeminfo(true);
     mqttdosubscriptions();
@@ -1452,7 +1453,7 @@ void loop()
     triggers.mqttdisconnected = false;
     mainstate.mqttsubscribingdone = false;
     DEBUG_W("Disconnected from MQTT Server=%s\n", mqtt_server.c_str());
-    syslogN("Disconnected from MQTT Server=%s\n", mqtt_server.c_str());
+    //syslogN("Disconnected from MQTT Server=%s\n", mqtt_server.c_str());
     yield(); // Prevent crash because of to many debug data to send
     if (WiFi.isConnected()) {
       mqttReconnectTimer.once(5, connectToMqtt);
@@ -1534,7 +1535,7 @@ void loop()
         String wifissid = WiFi.SSID();
         String wifipsk =  WiFi.psk();
         WiFi.disconnect();
-        WiFi.begin(wifissid.c_str(), wifipsk.c_str(), WiFi.channel(strongestwifiid), WiFi.BSSID(strongestwifiid));
+        WiFi.begin(wifissid.c_str(), wifipsk.c_str(), 0, WiFi.BSSID(strongestwifiid));
       }
     }
   }
@@ -1639,7 +1640,7 @@ void loop()
     {
       watermeter_liters = watermeter_getliters();
       i2cEeprom_write(watermeter_liters);
-      syslogN("Watermeter Liters Changed=%d\n", watermeter_liters);
+      //syslogN("Watermeter Liters Changed=%d\n", watermeter_liters);
       putdatamap("water/liter", String(watermeter_liters));
       putdatamap("water/m3", String((double(watermeter_liters) / 1000), 3));
     }
@@ -1823,14 +1824,14 @@ void loop()
     // try to do this as less as posisble because during scan the esp is unreachable for about a second.
     if ((!mainstate.accesspoint))
     {
-      if (((uptime % 600) == 0) || ((WiFi.status() != WL_CONNECTED) && (uptime % 30)) || (((uptime % 30) == 0) && WiFi.RSSI() < -70))
+      if (((uptime % 600) == 0) || ((WiFi.status() != WL_CONNECTED) && ((uptime % 30) == 0)) || (((uptime % 30) == 0) && (WiFi.RSSI() < -80)))
       {
         DEBUG_D("Starting Wifi Scan...\n");
         static uint32_t wifilastscan = 0;
         // prevent scanning more than once per 30 seconds and wait 2 seconds before first scan
         if (((uptime > 2) && (wifilastscan == 0)) || ((wifilastscan + 30 < uptime)))
         {
-          WiFi.scanNetworksAsync(wifiScanReady);
+            WiFi.scanNetworksAsync(wifiScanReady);
           wifilastscan = uptime;
         }
       }
@@ -1851,12 +1852,11 @@ void loop()
       strtime.replace("\n", "");
       if (mainstate.wificonnected)
       {
-        syslogI("Uptime=%s DateTime=%s\n", uptimestr, strtime.c_str());
+        //syslogI("Uptime=%s DateTime=%s\n", uptimestr, strtime.c_str());
       }
       DEBUG_I("Uptime=%s DateTime=%s\n", uptimestr, strtime.c_str());
       yield();
     }
-
 
 #ifdef  ESPMQTT_SONOFFPOWR2
     if ((uptime % 5) == 0) // Every 5 seconds send update about power usage
