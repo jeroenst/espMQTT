@@ -52,7 +52,7 @@ build ()
 }
 
 git checkout -f espMQTT_buildscript.h
-VERSION=$(git describe --tags)
+VERSION=$(git describe --tags | sed 's/v//')
 DIFFERENCE=$(git diff | wc -w)
 
 if [ -z "$TRAVISBUILD" ]
@@ -65,12 +65,14 @@ then
 			VERSION=$(increment_version $VERSION)
 			git tag $VERSION
 			git push --tags
-			VERSION=v$VERSION
+			VERSION=$VERSION
 		fi
 	else
 		VERSION=$VERSION-DIRTY-$(date +%s)
 	fi
 fi
+
+VERSION=v$VERSION
 
 mkdir -p ./builds/$VERSION
 rm -rf ./builds/tmp
