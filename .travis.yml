@@ -37,6 +37,7 @@ before_install:
  
 script:
    - bash build.sh
+   - rm espMQTT_buildscript.h
 
 deploy:
   provider: releases
