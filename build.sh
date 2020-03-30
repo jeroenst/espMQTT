@@ -58,15 +58,20 @@ DIFFERENCE=$(git diff | wc -w)
 
 if [ -z "$TRAVISBUILD" ]
 then
-	if [ $DIFFERENCE -eq 0 ] && [ $1 -eq "release" ]
+	if [ $DIFFERENCE -eq 0 ] 
 	then
-		if [[ $VERSION == *"-"* ]]
+		if [ $1 -eq "release" ]
 		then
-			VERSION=$(echo $VERSION | sed 's/-.*//' | sed 's/v//')
-			VERSION=$(increment_version $VERSION)
-			git tag v$VERSION
-			git push --tags
-			VERSION=$VERSION
+			if [[ $VERSION == *"-"* ]]
+			then
+				VERSION=$(echo $VERSION | sed 's/-.*//' | sed 's/v//')
+				VERSION=$(increment_version $VERSION)
+				git tag v$VERSION
+				git push --tags
+				VERSION=$VERSION
+			fi
+		else
+			VERSION=$VERSION-$(git rev-parse --short HEAD)
 		fi
 	else
 		VERSION=$VERSION-DIRTY-$(date +%s)
