@@ -1847,14 +1847,9 @@ void loop()
         // prevent scanning more than once per 30 seconds and wait 2 seconds before first scan
         if (((uptime > 10) && (wifilastscan == 0)) || ((wifilastscan + 30 < uptime)))
         {
-<<<<<<< Updated upstream
-          WiFi.scanNetworksAsync(wifiScanReady);
-          wifilastscan = uptime;
-=======
             DEBUG_D("Starting Wifi Scan...\n");
             WiFi.scanNetworksAsync(wifiScanReady);
             wifilastscan = uptime;
->>>>>>> Stashed changes
         }
       }
     }
