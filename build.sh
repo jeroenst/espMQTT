@@ -30,8 +30,7 @@ build ()
   
   echo '#define '$targetname > espMQTT_buildscript.h
   echo '#define ESPMQTT_VERSION "'$VERSION'"' >> espMQTT_buildscript.h
-  echo '#define ESPMQTT_BUILDSCRIPT' >> espMQTT_buildscript.h
-  arduino --board $BOARD --verify --pref build.path=./builds/tmp --pref build.extra_flags=' -DESP8266 -DWEBSOCKET_DISABLED=true -DASYNC_TCP_SSL_ENABLED -DUSE_HARDWARESERIAL ' --preserve-temp-files espMQTT.ino
+  arduino --board $BOARD --verify --pref build.path=./builds/tmp --pref build.extra_flags=' -DESP8266 -DWEBSOCKET_DISABLED=true -DASYNC_TCP_SSL_ENABLED -DUSE_HARDWARESERIAL -DESPMQTT_BUILDSCRIPT ' --preserve-temp-files espMQTT.ino
   echo '' > espMQTT_buildscript.h
 
   if [ $? -ne 0 ]
