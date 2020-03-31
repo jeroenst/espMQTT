@@ -138,8 +138,6 @@ SDM sdm(serSDM, 2400);
 #define FLASHBUTTON D3
 #define ESPLED D4
 #undef SERIALLOG
-#include <OBD2UART.h>
-COBD obd;
 #endif
 
 #ifdef  ESPMQTT_AMGPELLETSTOVE
