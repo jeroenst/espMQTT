@@ -1,4 +1,6 @@
 #!/bin/sh
+rm -rf ./libraries/*
+rm -rf ./hardware/esp8266com
 git submodule update --init --recursive
 git submodule foreach git reset --hard
 git reset --hard
