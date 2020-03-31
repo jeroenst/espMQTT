@@ -79,9 +79,9 @@ then
 	fi
 fi
 
-VERSION=v$VERSION
+VERSION=$VERSION
 
-mkdir -p ./builds/$VERSION
+mkdir -p ./builds/v$VERSION
 rm -rf ./builds/tmp
 mkdir ./builds/tmp
 
