@@ -7,3 +7,6 @@ mv ../hardware ../hardware_espmqtt_backup
 mv ../libraries ../include_espmqtt_backup
 ln -s ~/Arduino/espMQTT/hardware ~/Arduino/hardware
 ln -s ~/Arduino/espMQTT/libraries ~/Arduino/libraries
+cd hardware/esp8266com/esp8266/tools/
+./get.py
+cd ../../../..
