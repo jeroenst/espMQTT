@@ -1255,7 +1255,7 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties,
     upgradeport = payloadstring.substring(payloadstring.indexOf(":"),payloadstring.indexOf("/") );
     upgradepath = payloadstring.substring(payloadstring.indexOf("/"));
 
-    DEBUG_I ("Received startfirmwareupgrade: upgradeversion=%s, upgradehost=%s, upgradeport=%d, upgradepath=%s",upgradeversion.c_str(), upgradehost.c_str(), upgradeport.c_str(), upgradepath.c_str());
+    DEBUG_I ("Received startfirmwareupgrade: upgradeversion=%s, upgradehost=%s, upgradeport=%d, upgradepath=%s",upgradeversion.c_str(), upgradehost.c_str(), upgradeport.toInt(), upgradepath.c_str());
     
     //ESPhttpUpdate.update("192.168.0.2", upgradeport.toInt(), "/arduino.bin");
   }
