@@ -616,8 +616,6 @@ RemoteDebug Debug;
 String postwifissid = "";
 String postwifikey = "";
 
-WiFiEventHandler wifiConnectHandler;
-WiFiEventHandler wifiDisconnectHandler;
 #include <Ticker.h>
 Ticker mqttReconnectTimer;
 Ticker wifiReconnectTimer;
@@ -899,7 +897,6 @@ void initWifi()
   WiFi.mode(WIFI_STA);
   WiFi.setOutputPower(20);        // 10dBm == 10mW, 14dBm = 25mW, 17dBm = 50mW, 20dBm = 100mW
   WiFi.hostname(esp_hostname);
-  WiFi.disconnect();
   DEBUG_I("Wifi Initialized: Hostname=%s\n", esp_hostname.c_str());
 }
 
@@ -908,12 +905,12 @@ void connectToWifi()
   if (!mainstate.wificonnected && !mainstate.accesspoint)
   {
     DEBUG_I("Connecting to Wi-Fi...\n");
-//    wifiReconnectTimer.once(30, connectToWifi); // Retry wifi connection in 30 seconds if it fails to connect
     String wifissid = WiFi.SSID();
     String wifipsk =  WiFi.psk();
+    DEBUG_I("Connecting to Wi-Fi: SSID=\"%s\"...\n", wifissid.c_str());
     WiFi.mode(WIFI_STA);
     WiFi.disconnect();
-    WiFi.begin(wifissid, wifipsk);
+    WiFi.begin(wifissid.c_str(), wifipsk.c_str(), 0, 0);
   }
 }
 
@@ -1365,7 +1362,6 @@ void handle_noise()
 
 void wifiScanReady(int networksFound)
 {
-//  DEBUG_V("WiFiScan finished, %d network(s) found\n", networksFound);
   triggers.wifiscanready = true;
   wifinetworksfound = networksFound;
 }
@@ -2831,6 +2827,7 @@ void setup() {
 
 #ifdef SERIALLOG
   Debug.setSerialEnabled(true);
+  Serial.setDebugOutput(true);
 #else
   Debug.setSerialEnabled(false);
 #endif
