@@ -27,7 +27,7 @@
 
 /* ESP8266 */
 // #define ESPMQTT_WEATHER
-//#define ESPMQTT_AMGPELLETSTOVE
+// #define ESPMQTT_AMGPELLETSTOVE
 // #define ESPMQTT_BATHROOM
 // #define ESPMQTT_BEDROOM2
 // #define ESPMQTT_OPENTHERM
@@ -36,7 +36,7 @@
 // #define ESPMQTT_SDM120
 // #define ESPMQTT_WATERMETER
 // #define ESPMQTT_DDNS
-// #define ESPMQTT_GENERIC8266
+#define ESPMQTT_GENERIC8266
 // #define ESPMQTT_MAINPOWERMETER
 // #define ESPMQTT_OBD2
 // #define ESPMQTT_NOISE
@@ -52,8 +52,8 @@
 // #define ESPMQTT_SONOFF_FLOORHEATING
 // #define SPMQTT_IRRIGATION
 // #define ESPMQTT_BLITZWOLF
-//#define ESPMQTT_QSWIFIDIMMERD01
-#define ESPMQTT_QSWIFIDIMMERD02
+// #define ESPMQTT_QSWIFIDIMMERD01
+// #define ESPMQTT_QSWIFIDIMMERD02
 // #define ESPMQTT_SONOFF4CH //ESP8285
 // #define ESPMQTT_SONOFFDUAL
 // #define ESPMQTT_SONOFFS20_PRINTER
@@ -138,6 +138,8 @@ SDM sdm(serSDM, 2400);
 #define FLASHBUTTON D3
 #define ESPLED D4
 #undef SERIALLOG
+#include <OBD2UART.h>
+COBD obd;
 #endif
 
 #ifdef  ESPMQTT_AMGPELLETSTOVE
@@ -510,7 +512,7 @@ struct Triggers {
 struct Mainstate {
   bool wificonnected = false;
   bool mqttconnected = false;
-  bool mqttsubscribingdone = false;
+  bool mqttconnectedtrigger = false;
   bool mqttready = false;
   bool mqttsenddatamap = false;
   bool defaultpassword = false;
@@ -592,6 +594,7 @@ bool floorheating_valveon = 0;
 
 //WiFiClientSecure wifiClientSecure;
 //WiFiClient wifiClient;
+static uint8_t wifiTimer = 0;
 ESP8266WebServer webserver(80);
 #include <WiFiUdp.h>
 
@@ -613,6 +616,8 @@ RemoteDebug Debug;
 String postwifissid = "";
 String postwifikey = "";
 
+WiFiEventHandler wifiConnectHandler;
+WiFiEventHandler wifiDisconnectHandler;
 #include <Ticker.h>
 Ticker mqttReconnectTimer;
 Ticker wifiReconnectTimer;
@@ -683,31 +688,31 @@ void obd2_handle()
 
   if (nextsleeptime < millis())
   {
-    DEBUG("Entering sleep mode\n");
-    delay(1000);
-    wifi_station_disconnect();
-    wifi_set_opmode(NULL_MODE); // set WiFi mode to null mode.
-    wifi_fpm_open(); // enable force sleep
-    wifi_fpm_set_sleep_type(LIGHT_SLEEP_T); // light sleep
-    //wifi_fpm_set_wakeup_cb(fpm_wakup_cb_func1); // Set wakeup callback
-    wifi_fpm_do_sleep(60000 * 1000);
+          DEBUG("Entering sleep mode\n");
+          delay(1000);
+          wifi_station_disconnect();
+          wifi_set_opmode(NULL_MODE); // set WiFi mode to null mode.
+          wifi_fpm_open(); // enable force sleep
+          wifi_fpm_set_sleep_type(LIGHT_SLEEP_T); // light sleep
+          //wifi_fpm_set_wakeup_cb(fpm_wakup_cb_func1); // Set wakeup callback
+          wifi_fpm_do_sleep(60000*1000);
 
-    nextsleeptime = millis() + 5000;
+          nextsleeptime = millis() + 5000;
   }
-
+  
   byte serdata = 0;
   if (Serial.available() > 0)
   {
     static String serialstring = "";
     serdata = Serial.read();
-    if (((32 <= serdata) && (126 >= serdata)) || (serdata == 13)) // filter bogus data
+    if (((32 <= serdata) && (126 >= serdata))|| (serdata == 13)) // filter bogus data
     {
-      //  DEBUG ("%c (%d)\n", serdata, serdata);
+    //  DEBUG ("%c (%d)\n", serdata, serdata);
       if ('\r' == serdata) // If \r is received it means new data available (/r is ignored for serialstring;
       {
         DEBUG ("Received from OBD2:\"%s\" (obdcmd=%d)\n", serialstring.c_str(), obdcmd);
         String value = "-";
-        if (serialstring == "UNABLE TO CONNECT")
+        if (serialstring == "UNABLE TO CONNECT") 
         {
           putdatamap ("status", "commerror");
         }
@@ -724,7 +729,7 @@ void obd2_handle()
             }
             break;
           case 1:
-            if (serialstring.indexOf("OK") == 0)
+            if (serialstring.indexOf("OK") == 0) 
             {
               obdcmd = 2;
             }
@@ -770,7 +775,7 @@ void obd2_handle()
 
             if (serialstring.indexOf("41 11") == 0)
             {
-              value = String((strtol(serialstring.substring(6, 8).c_str(), NULL, 16) * 100) / 255);
+              value = String((strtol(serialstring.substring(6, 8).c_str(), NULL, 16)*100)/255);
               putdatamap ("obd/throttleposition", value);
               putdatamap ("status", "connected");
               obdcmd++;
@@ -845,11 +850,11 @@ void obd2_handle()
 }
 #endif
 
-void update_systeminfo(bool updateall = false, bool sendupdate = true)
+void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
 {
   char uptimestr[20];
   sprintf(uptimestr, "%d:%02d:%02d:%02d", uptime / 86400, (uptime / 3600) % 24, (uptime / 60) % 60, uptime % 60);
-  if (updateall)
+  if (writestaticvalues)
   {
     putdatamap("hostname", WiFi.hostname(), sendupdate);
     String firmwarename = __FILE__;
@@ -870,8 +875,8 @@ void update_systeminfo(bool updateall = false, bool sendupdate = true)
     putdatamap("flash/speed", String(ESP.getFlashChipSpeed()), sendupdate);
     putdatamap("system/chipid", String(chipid), sendupdate);
   }
-  putdatamap("system/uptime", String(uptimestr), (uptime % 60 == 0) || updateall);
-  putdatamap("system/freeram", String(system_get_free_heap_size()), (uptime % 60 == 0) || updateall);
+  putdatamap("system/uptime", String(uptimestr), uptime % 60 == 0);
+  putdatamap("system/freeram", String(system_get_free_heap_size()), uptime % 60 == 0);
   putdatamap("wifi/state", WiFi.status() == WL_CONNECTED ? "connected" : "disconnected", sendupdate);
   putdatamap("wifi/localip", WiFi.localIP().toString(), sendupdate);
   putdatamap("wifi/mac", String(WiFi.macAddress()), sendupdate);
@@ -893,8 +898,9 @@ void initWifi()
   WiFi.setSleepMode(WIFI_NONE_SLEEP); // When sleep is on regular disconnects occur https://github.com/esp8266/Arduino/issues/5083
   WiFi.mode(WIFI_STA);
   WiFi.setOutputPower(20);        // 10dBm == 10mW, 14dBm = 25mW, 17dBm = 50mW, 20dBm = 100mW
-  DEBUG_I("Wifi hostname=%s\n", esp_hostname.c_str());
   WiFi.hostname(esp_hostname);
+  WiFi.disconnect();
+  DEBUG_I("Wifi Initialized: Hostname=%s\n", esp_hostname.c_str());
 }
 
 void connectToWifi()
@@ -902,11 +908,12 @@ void connectToWifi()
   if (!mainstate.wificonnected && !mainstate.accesspoint)
   {
     DEBUG_I("Connecting to Wi-Fi...\n");
-    wifiReconnectTimer.once(30, connectToWifi); // Retry wifi connection in 30 seconds if it fails to connect
+//    wifiReconnectTimer.once(30, connectToWifi); // Retry wifi connection in 30 seconds if it fails to connect
     String wifissid = WiFi.SSID();
     String wifipsk =  WiFi.psk();
+    WiFi.mode(WIFI_STA);
     WiFi.disconnect();
-    WiFi.begin(wifissid.c_str(), wifipsk.c_str());
+    WiFi.begin(wifissid, wifipsk);
   }
 }
 
@@ -975,16 +982,15 @@ void onMqttUnsubscribe(uint16_t packetId) {
 }
 
 
-void mqttdosubscriptions(int32_t ACKpacketId = -1)
+void mqttdosubscriptions(int32_t packetId = -1)
 {
-  DEBUG_D("mqttdosubscriptions (ACKpacketId=%d)\n", ACKpacketId);
+  DEBUG_D("mqttdosubscriptions (%d)\n", packetId);
   static int32_t nextpacketid = -1;
   static uint16_t nextsubscribe = 0;
   static String subscribetopic = ""; // We need this static variable because mqttclient.subscribe uses a pointer
-  mainstate.mqttsubscribingdone = false;
 
-  if (ACKpacketId == -1) nextsubscribe = 0;
-  if (ACKpacketId > 0) nextsubscribe++;
+  if (packetId == -1) nextsubscribe = 0;
+  if (packetId > 0) nextsubscribe++;
   nextpacketid = -1;
   subscribetopic = "";
   while ((subscribetopic == "") && (nextsubscribe <= 20))
@@ -1031,17 +1037,14 @@ void mqttdosubscriptions(int32_t ACKpacketId = -1)
       case 19:  subscribetopic = mqtt_topicprefix + "setdimstate/0"; break;
       case 20:  subscribetopic = mqtt_topicprefix + "setdimstate/1"; break;
 #endif
+      case 21:  subscribetopic = mqtt_topicprefix + "startfirmwareupgrade"; break;
     }
     if (subscribetopic == "") nextsubscribe++;
   }
 
-  if (subscribetopic == "")
-  {
-    triggers.mqttpublishall = true; // When subscibtion has finished start publishing of datamap
-    mainstate.mqttsubscribingdone = true;
-  }
+  if (subscribetopic == "") triggers.mqttpublishall = true; // When subscibtion has finished start publishing of datamap
   else nextpacketid = mqttClient.subscribe(subscribetopic.c_str() , 1);
-  DEBUG_V("mqttdosubscriptions end subscribetopic=\"%s\", nextpacketid=%d\n", subscribetopic.c_str(), nextpacketid);
+  DEBUG_V("mqttdosubscriptions end nextpacketid=%d\n", nextpacketid);
 }
 
 void onMqttSubscribe(uint16_t packetId, uint8_t qos)
@@ -1241,6 +1244,23 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties,
   if (topicstring == mqtt_topicprefix + "setdimstate/0") qswifidimmer_setdimstate(payloadstring.toInt(), 0);
   if (topicstring == mqtt_topicprefix + "setdimstate/1") qswifidimmer_setdimstate(payloadstring.toInt(), 1);
 #endif
+  if (topicstring == mqtt_topicprefix + "startfirmwareupgrade") 
+  {
+
+    String upgradeversion = "";
+    String upgradehost = "";
+    String upgradeport = "";
+    String upgradepath = "";
+
+    upgradeversion = payloadstring.substring(0, payloadstring.indexOf("#"));
+    upgradehost = payloadstring.substring(payloadstring.indexOf("#"), payloadstring.indexOf(":"));
+    upgradeport = payloadstring.substring(payloadstring.indexOf(":"),payloadstring.indexOf("/") );
+    upgradepath = payloadstring.substring(payloadstring.indexOf("/"));
+
+    DEBUG_I ("Received startfirmwareupgrade: upgradeversion=%s, upgradehost=%s, upgradeport=%d, upgradepath=%s",upgradeversion.c_str(), upgradehost.c_str(), upgradeport.c_str(), upgradepath.c_str());
+    
+    //ESPhttpUpdate.update("192.168.0.2", upgradeport.toInt(), "/arduino.bin");
+  }
 }
 
 String uint64ToString(uint64_t input) {
@@ -1345,12 +1365,13 @@ void handle_noise()
 
 void wifiScanReady(int networksFound)
 {
-  //  DEBUG_V("WiFiScan finished, %d network(s) found\n", networksFound);
+//  DEBUG_V("WiFiScan finished, %d network(s) found\n", networksFound);
   triggers.wifiscanready = true;
   wifinetworksfound = networksFound;
 }
 
 static byte flashbuttonstatus = 0;
+static int8_t previouswifistatus = -1;
 
 String doubletostring (double value, int precision)
 {
@@ -1381,7 +1402,6 @@ void loop()
 
 #ifdef QSWIFIDIMMERCHANNELS
   qswifidimmer_handle();
-  
   yield();
 #endif
 
@@ -1414,13 +1434,13 @@ void loop()
   {
     triggers.wificonnected = false;
     DEBUG_I("Connected to WiFi SSID=%s RSSI=%d\n", WiFi.SSID().c_str(), WiFi.RSSI());
-//    syslogN("Connected to WiFi SSID=%s RSSI=%d\n", WiFi.SSID().c_str(), WiFi.RSSI());
+    syslogN("Connected to WiFi SSID=%s RSSI=%d\n", WiFi.SSID().c_str(), WiFi.RSSI());
     initMqtt();
     connectToMqtt();
 #ifdef SYSLOGDEBUG
     for (int i = 0; i < dataMap->size(); i++)
     {
-      //syslogD("%s=%s (%d)\n", dataMap->getKey(i).c_str(), dataMap->getData(i).payload.c_str(), dataMap->getData(i).send);
+      syslogD("%s=%s (%d)\n", dataMap->getKey(i).c_str(), dataMap->getData(i).payload.c_str(), dataMap->getData(i).send);
       yield();
     }
 #endif
@@ -1430,7 +1450,6 @@ void loop()
   if (triggers.wifidisconnected)
   {
     triggers.wifidisconnected = false;
-    mainstate.mqttsubscribingdone = false;
     DEBUG_W("Disconnected from Wi-Fi.\n");
     disconnectMqtt();
     if (!mainstate.accesspoint) wifiReconnectTimer.once(2, connectToWifi); // trying to connect to wifi can cause AP to fail
@@ -1439,9 +1458,8 @@ void loop()
   if (triggers.mqttconnected)
   {
     triggers.mqttconnected = false;
-    mainstate.mqttsubscribingdone = false;
     DEBUG_I("Connected to MQTT Server=%s\n", mqtt_server.c_str());
-    //syslogN("Connected to MQTT Server=%s\n", mqtt_server.c_str());
+    syslogN("Connected to MQTT Server=%s\n", mqtt_server.c_str());
     yield(); // Prevent crash because of to many debug data to send
     update_systeminfo(true);
     mqttdosubscriptions();
@@ -1451,9 +1469,8 @@ void loop()
   if (triggers.mqttdisconnected)
   {
     triggers.mqttdisconnected = false;
-    mainstate.mqttsubscribingdone = false;
     DEBUG_W("Disconnected from MQTT Server=%s\n", mqtt_server.c_str());
-    //syslogN("Disconnected from MQTT Server=%s\n", mqtt_server.c_str());
+    syslogN("Disconnected from MQTT Server=%s\n", mqtt_server.c_str());
     yield(); // Prevent crash because of to many debug data to send
     if (WiFi.isConnected()) {
       mqttReconnectTimer.once(5, connectToMqtt);
@@ -1465,6 +1482,7 @@ void loop()
     triggers.mqttpublished = false;
     DEBUG_V ("Publish acknowledged packetid=%d\n", mqttlastpublishedpacketid);
     publishdatamap(mqttlastpublishedpacketid);
+
   }
 
   if (triggers.mqttpublishall)
@@ -1473,7 +1491,7 @@ void loop()
     publishdatamap(-1, true, true);
   }
 
-  if (mainstate.mqttsubscribingdone) publishdatamap();
+  if (mainstate.mqttready) publishdatamap();
 
   if (triggers.wifiscanready)
   {
@@ -1523,8 +1541,7 @@ void loop()
       yield(); // Prevent crash because of to many debug data to send
     }
 
-    DEBUG_D("CurrentAp ID=%d SSID=%s BSSID=%s RSSI=%d(%d)\n", currentwifiid, WiFi.SSID().c_str(), WiFi.BSSIDstr().c_str(), currentwifirssi, WiFi.RSSI());
-    DEBUG_D("Strongest AP ID=%d SSID=%s, BSSID=%s RSSI=%d(%d)\n", strongestwifiid, WiFi.SSID(strongestwifiid).c_str(), WiFi.BSSIDstr(strongestwifiid).c_str(), WiFi.RSSI(strongestwifiid), strongestwifirssi);
+    DEBUG_D("CurrentAp ID=%d SSID=%s BSSID=%s RSSI=%d(%d), Strongest AP ID=%d SSID=%s, BSSID=%s RSSI=%d(%d)\n", currentwifiid, WiFi.SSID().c_str(), WiFi.BSSIDstr().c_str(), currentwifirssi, WiFi.RSSI(), strongestwifiid, WiFi.SSID(strongestwifiid).c_str(), WiFi.BSSIDstr(strongestwifiid).c_str(), WiFi.RSSI(strongestwifiid), strongestwifirssi);
     yield(); // Prevent crash because of to many debug data to send
 
     if (!mainstate.accesspoint)
@@ -1535,7 +1552,7 @@ void loop()
         String wifissid = WiFi.SSID();
         String wifipsk =  WiFi.psk();
         WiFi.disconnect();
-        WiFi.begin(wifissid.c_str(), wifipsk.c_str(), 0, WiFi.BSSID(strongestwifiid));
+        WiFi.begin(wifissid.c_str(), wifipsk.c_str(), WiFi.channel(strongestwifiid), WiFi.BSSID(strongestwifiid));
       }
     }
   }
@@ -1640,7 +1657,7 @@ void loop()
     {
       watermeter_liters = watermeter_getliters();
       i2cEeprom_write(watermeter_liters);
-      //syslogN("Watermeter Liters Changed=%d\n", watermeter_liters);
+      syslogN("Watermeter Liters Changed=%d\n", watermeter_liters);
       putdatamap("water/liter", String(watermeter_liters));
       putdatamap("water/m3", String((double(watermeter_liters) / 1000), 3));
     }
@@ -1824,15 +1841,20 @@ void loop()
     // try to do this as less as posisble because during scan the esp is unreachable for about a second.
     if ((!mainstate.accesspoint))
     {
-      if (((uptime % 600) == 0) || ((WiFi.status() != WL_CONNECTED) && ((uptime % 30) == 0)) || (((uptime % 30) == 0) && (WiFi.RSSI() < -80)))
+      if (((uptime % 600) == 0) || ((WiFi.status() != WL_CONNECTED) && (uptime % 30)) || (((uptime % 30) == 0) && WiFi.RSSI() < -70))
       {
-        DEBUG_D("Starting Wifi Scan...\n");
         static uint32_t wifilastscan = 0;
         // prevent scanning more than once per 30 seconds and wait 2 seconds before first scan
-        if (((uptime > 2) && (wifilastscan == 0)) || ((wifilastscan + 30 < uptime)))
+        if (((uptime > 10) && (wifilastscan == 0)) || ((wifilastscan + 30 < uptime)))
         {
-            WiFi.scanNetworksAsync(wifiScanReady);
+<<<<<<< Updated upstream
+          WiFi.scanNetworksAsync(wifiScanReady);
           wifilastscan = uptime;
+=======
+            DEBUG_D("Starting Wifi Scan...\n");
+            WiFi.scanNetworksAsync(wifiScanReady);
+            wifilastscan = uptime;
+>>>>>>> Stashed changes
         }
       }
     }
@@ -1852,11 +1874,12 @@ void loop()
       strtime.replace("\n", "");
       if (mainstate.wificonnected)
       {
-        //syslogI("Uptime=%s DateTime=%s\n", uptimestr, strtime.c_str());
+        syslogI("Uptime=%s DateTime=%s\n", uptimestr, strtime.c_str());
       }
       DEBUG_I("Uptime=%s DateTime=%s\n", uptimestr, strtime.c_str());
       yield();
     }
+
 
 #ifdef  ESPMQTT_SONOFFPOWR2
     if ((uptime % 5) == 0) // Every 5 seconds send update about power usage
@@ -1904,6 +1927,9 @@ void loop()
     if (circuitnr < 14) circuitnr++;
     else circuitnr = 0;
 #endif
+
+    if (wifiTimer < 20) wifiTimer++;
+
 
 #ifdef DHTPIN
     if (uptime % 5 == 0) update_dht();
@@ -1968,26 +1994,41 @@ void loop()
 
     write_oled_display();
 
-#ifdef NEOPIXELPIN
-    if (mainstate.wificonnected)
+    if (WiFi.status() == WL_CONNECTED)
     {
-      if (mainstate.mqttconnected)
+      wifiTimer = 0;
+      if (WiFi.status() != previouswifistatus)
       {
-        neopixelleds.setPixelColor(0, neopixelleds.Color(0, 20, 0));
-        neopixelleds.show();
-      }
-      else
-      {
+#ifdef NEOPIXELPIN
         neopixelleds.setPixelColor(0, neopixelleds.Color(30, 15, 0));
         neopixelleds.show();
+#endif
       }
+
+#ifdef NEOPIXELPIN
+      neopixelleds.setPixelColor(0, neopixelleds.Color(0, 20, 0));
+      neopixelleds.show();
+#endif
     }
     else
     {
+#ifdef NEOPIXELPIN
       neopixelleds.setPixelColor(0, neopixelleds.Color(30, 0, 0));
       neopixelleds.show();
-    }
 #endif
+      if (flashbuttonstatus == 0)
+      {
+
+        /*if (wifiTimer >= 30)
+          {
+          WiFi.disconnect(false);
+          delay(10);
+          WiFi.begin();
+          wifiTimer = 0;
+          }*/
+      }
+    }
+    previouswifistatus = WiFi.status();
   }
 }
 
@@ -2134,23 +2175,21 @@ void sonoff_handle()
 
 
 // Publish datamap publishes the datamap one by one to mqtt broker to prevent buffer overflow
-void publishdatamap(int32_t ACKpacketId, bool publishall, bool init)
+void publishdatamap(int32_t packetId, bool publishall, bool init)
 {
   static uint16_t datamappointer = 0;
-  static int32_t onAirpacketId = -1;
+  static int32_t nextpacketId = -1;
   static bool waitingforack = false;
 
-  // When initializing set variables to initial values
   if (init)
   {
     waitingforack = false;
     datamappointer = 0;
-    onAirpacketId = -1;
+    nextpacketId = -1;
   }
 
-  if ((ACKpacketId != -1) || publishall) DEBUG_V("Publishdatamap ACKpacketId=%d publishall=%d datamappointer=%d datamapsize=%d onAirpacketid=%d waitingforack=%d\n", ACKpacketId, publishall, datamappointer, dataMap->size(), onAirpacketId, waitingforack);
+  if ((packetId != -1) || publishall) DEBUG_V("Publishdatamap packetId=%d publishall=%d datamappointer=%d datamapsize=%d nextpacketid=%d waitingforack=%d\n", packetId, publishall, datamappointer, dataMap->size(), nextpacketId, waitingforack);
 
-  // If publishall is set, set send bit in all items in dataMap to true
   if (publishall)
   {
     int32_t publishallpointer = 0;
@@ -2167,55 +2206,80 @@ void publishdatamap(int32_t ACKpacketId, bool publishall, bool init)
     datamappointer = 0;
   }
 
-  if (mqttClient.connected() && mainstate.mqttsubscribingdone)
+  if (mqttClient.connected())
   {
-    // If waitingforack is set, wait for ack packet to be received before sending to next item
+
     if (waitingforack)
     {
-      // If ACKpacketId == 0 resend because packet was not acked
-      if (ACKpacketId == 0)
+      if (packetId == 0)
       {
-        waitingforack = false;
+        // If packetId == 0 resend because packet was not acked
+        waitingforack = true;
+        String topic = dataMap->getKey(datamappointer);
+        String sendtopic = String("home/" + esp_hostname + "/" + topic);
+        dataMapStruct data = dataMap->getData(datamappointer);
+        String payload = data.payload;
+        nextpacketId = mqttClient.publish(sendtopic.c_str(), 1, true, payload.c_str());
+        if (nextpacketId == 0) waitingforack = false;
+        else
+        {
+          data.onair = true;
+          dataMap->put(topic, data);
+        }
       }
-      // If ACKpacketId == onAipacketId proceed to next packet
-      if (ACKpacketId == onAirpacketId)
+      if (packetId == nextpacketId)
       {
         // Packet succesfull delivered proceed to next item
         String topic = dataMap->getKey(datamappointer);
         dataMapStruct data = dataMap->getData(datamappointer);
-        data.send = false;
-        data.onair = false;
-        dataMap->put(topic, data);
+        if (data.onair)
+        {
+          data.send = false;
+          data.onair = false;
+          dataMap->put(topic, data);
+        }
         datamappointer++;
         waitingforack = false;
       }
     }
-    else
+
+    if (!waitingforack)
     {
-      if (datamappointer >= dataMap->size()) datamappointer = 0;
-      onAirpacketId = -1; // When not waiting for ack anymore, no packets are in the air so Id is -1;
-      String topic = dataMap->getKey(datamappointer);
-      dataMapStruct data = dataMap->getData(datamappointer);
-      //DEBUG ("datamappointer=%d datamapsize=%d send=%d\n", datamappointer, dataMap->size(), data.send);
-      if (data.send)
+      if (datamappointer < dataMap->size())
       {
-        String sendtopic = String(mqtt_topicprefix + topic);
-        onAirpacketId = mqttClient.publish(sendtopic.c_str(), 1, true, data.payload.c_str());
-        if (onAirpacketId > 0)
+        nextpacketId = -1;
+        while ((datamappointer < dataMap->size()) && (nextpacketId == -1))
         {
-          waitingforack = true;
-          data.onair = true;
-          dataMap->put(topic, data);
+          String topic = dataMap->getKey(datamappointer);
+          dataMapStruct data = dataMap->getData(datamappointer);
+          //DEBUG ("datamappointer=%d datamapsize=%d send=%d\n", datamappointer, dataMap->size(), data.send);
+          if (data.send)
+          {
+            String sendtopic = String(mqtt_topicprefix + topic);
+            nextpacketId = mqttClient.publish(sendtopic.c_str(), 1, true, data.payload.c_str());
+            if (nextpacketId > 0)
+            {
+              waitingforack = true;
+              data.onair = true;
+              dataMap->put(topic, data);
+            }
+            DEBUG_D ("MQTT PUBLISHING DATAMAP %s=%s (nextpacketId=%d)\n", topic.c_str(), data.payload.c_str(), nextpacketId);
+          }
+          else
+          {
+            datamappointer++;
+          }
         }
-        DEBUG_D ("MQTT PUBLISHING DATAMAP %s=%s (onAirpacketId=%d)\n", topic.c_str(), data.payload.c_str(), onAirpacketId);
+        if (nextpacketId == -1)
+        {
+          datamappointer = 0;
+          mainstate.mqttready = true;
+        }
       }
       else
       {
-        datamappointer++;
-      }
-      if (onAirpacketId == -1)
-      {
-         mainstate.mqttready = true;
+        datamappointer = 0;
+        mainstate.mqttready = true;
       }
     }
   }
@@ -2620,6 +2684,7 @@ void handleWWWSettings()
     {
       webserver.send(200, "text/html", "<HTML><BODY>Settings Saved.<BR>Please wait a moment and connect to proper wifi network and open the page of the saved hostname.</BODY></HTML>");
       flashbuttonstatus = 0;
+      previouswifistatus = -1;
       wifichangesettingstimeout = uptime + 4;
       return;
     }
@@ -3091,7 +3156,7 @@ void processCmdRemoteDebug()
     DEBUG("  showdatamap\n");
     DEBUG("  ping [hostname]\n");
     DEBUG("  route\n");
-    DEBUG("  mqttforcereconnect\n");
+    DEBUG("  mqttforceconnect\n");
     DEBUG("  showmainstate\n");
     DEBUG("  factoryreset\n");
   }
@@ -3111,9 +3176,8 @@ void processCmdRemoteDebug()
     DEBUG("%s\n", gw.c_str());
   }
 
-  if (lastCmd == "mqttforcereconnect")
+  if (lastCmd == "mqttforceconnect")
   {
-    disconnectMqtt();
     connectToMqtt();
   }
 
@@ -3122,7 +3186,6 @@ void processCmdRemoteDebug()
     DEBUG("wificonnected=%d\n", mainstate.wificonnected);
     DEBUG("mqttconnected=%d\n", mainstate.mqttconnected);
     DEBUG("mqttready=%d\n", mainstate.mqttready);
-    DEBUG("mqttsubscribingdone=%d\n", mainstate.mqttsubscribingdone);
     DEBUG("mqttsenddatamap=%d\n", mainstate.mqttsenddatamap);
     DEBUG("defaultpassword=%d\n", mainstate.defaultpassword);
     DEBUG("accesspoint=%d\n", mainstate.accesspoint);
