@@ -904,13 +904,12 @@ void connectToWifi()
 {
   if (!mainstate.wificonnected && !mainstate.accesspoint)
   {
-    DEBUG_I("Connecting to Wi-Fi...\n");
     String wifissid = WiFi.SSID();
     String wifipsk =  WiFi.psk();
     DEBUG_I("Connecting to Wi-Fi: SSID=\"%s\"...\n", wifissid.c_str());
     WiFi.mode(WIFI_STA);
     WiFi.disconnect();
-    WiFi.begin(wifissid.c_str(), wifipsk.c_str(), 0, 0);
+    WiFi.begin(wifissid.c_str(), wifipsk.c_str(), 0, 0); // First connect to any available AP, later scan for stronger AP
   }
 }
 
@@ -990,27 +989,27 @@ void mqttdosubscriptions(int32_t packetId = -1)
   if (packetId > 0) nextsubscribe++;
   nextpacketid = -1;
   subscribetopic = "";
-  while ((subscribetopic == "") && (nextsubscribe <= 20))
+  while ((subscribetopic == "") && (nextsubscribe <= 21))
   {
     //DEBUG("mqttdosubscriptions while nextsubscribe=%d\n", nextsubscribe);
     switch (nextsubscribe)
     {
-#if defined( ESPMQTT_OPENTHERM) || defined( ESPMQTT_GENERIC8266)
+#ifdef ESPMQTT_OPENTHERM
       case 0: subscribetopic = mqtt_topicprefix + "setthermostattemporary"; break;
       case 1: subscribetopic = mqtt_topicprefix + "setthermostatcontinue"; break;
       case 2: subscribetopic = mqtt_topicprefix + "setchwatertemperature"; break;
 #endif
-#ifdef  ESPMQTT_DUCOBOX
+#ifdef ESPMQTT_DUCOBOX
       case 3: subscribetopic = mqtt_topicprefix + "setfan"; break;
 #endif
-#ifdef  ESPMQTT_DIMMER
+#ifdef ESPMQTT_DIMMER
       case 4: subscribetopic = mqtt_topicprefix + "setdimvalue"; break;
       case 5: subscribetopic = mqtt_topicprefix + "setdimstate"; break;
 #endif
-#ifdef  ESPMQTT_SONOFFBULB
+#ifdef ESPMQTT_SONOFFBULB
       case 6: subscribetopic = mqtt_topicprefix + "setcolor"; break;
 #endif
-#if defined( ESPMQTT_AMGPELLETSTOVE)
+#ifdef ESPMQTT_AMGPELLETSTOVE
       case 7: subscribetopic = mqtt_topicprefix + "setonoff"; break;
       case 8: subscribetopic = mqtt_topicprefix + "setpower"; break;
       case 9: subscribetopic = mqtt_topicprefix + "settemperature"; break;
@@ -1038,9 +1037,13 @@ void mqttdosubscriptions(int32_t packetId = -1)
     }
     if (subscribetopic == "") nextsubscribe++;
   }
-
+  
   if (subscribetopic == "") triggers.mqttpublishall = true; // When subscibtion has finished start publishing of datamap
-  else nextpacketid = mqttClient.subscribe(subscribetopic.c_str() , 1);
+  else
+  {
+    DEBUG("MQTT Subscribing to: %s\n",subscribetopic.c_str());
+    nextpacketid = mqttClient.subscribe(subscribetopic.c_str() , 1);
+  }
   DEBUG_V("mqttdosubscriptions end nextpacketid=%d\n", nextpacketid);
 }
 
