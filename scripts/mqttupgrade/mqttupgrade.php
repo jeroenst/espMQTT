@@ -51,6 +51,7 @@ function upgrade ($devicetype, $maintopic, $upgradekey)
     global $firmwarepath;
     global $version;
     global $mqtt;
-    echo "Upgrading: ".$maintopic."\n";
-    $mqtt->publish($maintopic."/startfirmwareupgrade", '{"version":"'.$version.'", "url":"'.$firmwarepath."v".$version."/".$devicetype.'_'.$version.'.bin", "key":"'.$upgradekey.'"}', 0);
+    $url = $firmwarepath.'v'.$version.'/'.$devicetype.'_'.$version.'.bin';
+    echo "Upgrading: ".$maintopic." to ".$url."\n";
+    $mqtt->publish($maintopic."/startfirmwareupgrade", '{"version":"'.$version.'", "url":"'.$url.'", "key":"'.$upgradekey.'"}', 0);
 }
