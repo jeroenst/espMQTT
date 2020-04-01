@@ -7,7 +7,7 @@ echo "Upgrading $2..."
 
 ping -c 1 $2 > /dev/null #wakeup device because sometimes it won't respond to espota
 
-until python3 ~/Arduino/hardware/esp8266com/esp8266/tools/espota.py -i $2 -p 8266 --auth=$1 -f ./builds/$VERSION/$3_$VERSION.bin
+until python3 ~/Arduino/hardware/esp8266com/esp8266/tools/espota.py -i $2 -p 8266 --auth=$1 -f ./builds/v$VERSION/$3_$VERSION.bin
 do
 	echo "Uploading failed, trying again...."
 	sleep 2
