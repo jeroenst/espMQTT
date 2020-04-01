@@ -12,6 +12,8 @@ $topics['NL5527HM35/SONOFF_GARAGE/firmware/upgradekey'] = array("qos" => 0, "fun
 $topics['home/GENERIC8266_00068F98/firmware/upgradekey'] = array("qos" => 0, "function" => 'upgrade_device');
 $topics['home/ESP_SMARTMETER/firmware/upgradekey'] = array("qos" => 0, "function" => 'upgrade_device');
 $topics['home/ESP_WATERMETER/firmware/upgradekey'] = array("qos" => 0, "function" => 'upgrade_device');
+$topics['home/ESP_GROWATT/firmware/upgradekey'] = array("qos" => 0, "function" => 'upgrade_device');
+$topics['home/ESP_WEATHER/firmware/upgradekey'] = array("qos" => 0, "function" => 'upgrade_device');
 
 $mqtt->subscribe($topics, 0);
 
@@ -38,6 +40,14 @@ function upgrade_device($topic, $msg)
 
         case "ESP_WATERMETER":
             $devicetype = "ESPMQTT_WATERMETER";
+        break;
+
+        case "ESP_GROWATT":
+            $devicetype = "ESPMQTT_GROWATT";
+        break;
+
+        case "ESP_WEATHER":
+            $devicetype = "ESPMQTT_WEATHER";
         break;
 
         case "SONOFF_GARAGE":
