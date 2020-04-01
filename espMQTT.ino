@@ -664,6 +664,14 @@ void putdatamap(String topic, String value, bool sendupdate = true, bool forcese
   {
     // Do not output debug for uptime
     if (topic != "system/uptime") DEBUG_D ("DATAMAP %s=%s (sendupdate=%d, oldval=%s oldsend=%d forcesend=%d)\n", topic.c_str(), value.c_str(), sendupdate, datamapstruct.payload.c_str(), datamapstruct.send, forcesend);
+    if (topic == "status")
+    {
+      if (datamapstruct.payload == "upgrading")
+      {
+        // When upgrading only accept upgradefailed or upgradedone as value
+        if ((value != "upgradefailed") && (value != "upgradedone")) return;
+      }
+    }
     datamapstruct.onair = false;
     datamapstruct.send = sendupdate;
     datamapstruct.payload = value;
@@ -1535,7 +1543,7 @@ void loop()
               break;
             case HTTP_UPDATE_OK:
               DEBUG_E("Firmware upgrade done!\n"); // may not be called since we reboot the ESP
-              putdatamap("status", "online");
+              putdatamap("status", "upgradedone");
               break;
           }
         }
@@ -2708,8 +2716,6 @@ void handleWWWSettings()
     putdatamap("dimoffset/1", String(qswifidimmer_getdimoffset(1)));
 #endif
     eeprom_commit();
-
-
     ArduinoOTA.setHostname(esp_hostname.c_str());
     ArduinoOTA.setPassword(esp_password.c_str());
     MDNS.begin(esp_hostname.c_str());
