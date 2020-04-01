@@ -1520,6 +1520,7 @@ void loop()
         {
           DEBUG_I ("Upgrade canceled, version is the same\n");
           putdatamap("status", "upgradesameversion");
+          putdatamap("status", "online");
         }
         else if (getdatamap("firmware/upgradekey") != upgradekey)
         {
