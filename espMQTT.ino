@@ -1501,6 +1501,7 @@ void loop()
 
       if (!error)
       {
+        // The upgradekey is mainly to prevent upgrading over and over when a retained upgrade message is retained in mqtt
         String upgradekey = JSONdoc["key"];
         String upgradeurl = JSONdoc["url"];
         String upgradeversion = JSONdoc["version"];
@@ -1510,7 +1511,7 @@ void loop()
         if (upgradeversion == ESPMQTT_VERSION)
         {
           DEBUG_I ("Upgrade canceled, version is the same\n");
-          putdatamap("status", "upgradefailed");
+          putdatamap("status", "online");
         }
         else if (getdatamap("firmware/upgradekey") != upgradekey)
         {
@@ -1534,6 +1535,7 @@ void loop()
               break;
             case HTTP_UPDATE_OK:
               DEBUG_E("Firmware upgrade done!\n"); // may not be called since we reboot the ESP
+              putdatamap("status", "online");
               break;
           }
         }

@@ -50,3 +50,6 @@
 [submodule "libraries/ArduinoJson"]
 	path = libraries/ArduinoJson
 	url = https://github.com/bblanchon/ArduinoJson.git
+[submodule "scripts/mqttupgrade/phpMQTT"]
+	path = scripts/mqttupgrade/phpMQTT
+	url = git@github.com:jeroenst/phpMQTT.git

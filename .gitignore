@@ -2,3 +2,4 @@ version
 *~
 espMQTT_buildscript.h
 builds/
+scripts/mqttupgrade/mqttupgradesettings.php
