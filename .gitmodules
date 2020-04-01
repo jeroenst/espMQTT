@@ -47,3 +47,6 @@
 [submodule "libraries/my92xx"]
 	path = libraries/my92xx
 	url = git@github.com:xoseperez/my92xx.git
+[submodule "libraries/ArduinoJson"]
+	path = libraries/ArduinoJson
+	url = https://github.com/bblanchon/ArduinoJson.git
