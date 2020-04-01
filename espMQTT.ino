@@ -2876,7 +2876,7 @@ String getRandomString(int len) {
   String returnstring = "";
 
   for (int i = 0; i < len; ++i) {
-    returnstring += alphanum[rand() % (sizeof(alphanum) - 1)];
+    returnstring += alphanum[random(sizeof(alphanum) - 1)];
   }
 
   return returnstring;
