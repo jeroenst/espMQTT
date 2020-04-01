@@ -1487,9 +1487,9 @@ void loop()
     static uint64_t waitbeforeupgrade = 0;
     if (waitbeforeupgrade == 0)
     {
-        DEBUG_I ("Received startfirmwareupgrade, upgrade pending...\n");
-        putdatamap("status", "upgrading");
-        waitbeforeupgrade = uptime + 5;
+      DEBUG_I ("Received startfirmwareupgrade, upgrade pending...\n");
+      putdatamap("status", "upgrading");
+      waitbeforeupgrade = uptime + 5;
     }
     else if (waitbeforeupgrade < uptime)
     {
@@ -1510,10 +1510,12 @@ void loop()
         if (upgradeversion == ESPMQTT_VERSION)
         {
           DEBUG_I ("Upgrade canceled, version is the same\n");
+          putdatamap("status", "upgradefailed");
         }
         else if (getdatamap("firmware/upgradekey") != upgradekey)
         {
           DEBUG_I ("Upgrade canceled, upgradekey is incorrect\n");
+          putdatamap("status", "upgradefailed");
         }
         else
         {
@@ -1524,15 +1526,16 @@ void loop()
           {
             case HTTP_UPDATE_FAILED:
               DEBUG_E("Firmware upgrade failed: %s.\n", ESPhttpUpdate.getLastErrorString().c_str());
+              putdatamap("status", "upgradefailed");
               break;
             case HTTP_UPDATE_NO_UPDATES:
               DEBUG_E("Firmware upgrade check finished, no new version available.");
+              putdatamap("status", "upgradefailed");
               break;
             case HTTP_UPDATE_OK:
               DEBUG_E("Firmware upgrade done!\n"); // may not be called since we reboot the ESP
               break;
           }
-          putdatamap("status", "upgradefailed");
         }
       }
     }
