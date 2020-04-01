@@ -464,7 +464,9 @@ Adafruit_NeoPixel neopixelleds = Adafruit_NeoPixel(2, NEOPIXELPIN, NEO_RGB + NEO
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>        // Include the mDNS library
-
+#include <ESP8266HTTPClient.h>
+#include <ESP8266httpUpdate.h>
+#include <ArduinoJson.h>
 
 #include <EEPROM.h>
 #include "espMQTT.h"
@@ -505,6 +507,7 @@ struct Triggers {
   bool wifiscanready = false;
   bool mqttpublished = false;
   bool mqttpublishall = false;
+  String firmwareupgrade = "";
 } triggers;
 
 struct Mainstate {
@@ -862,6 +865,7 @@ void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
     putdatamap("firmware/sourcefile", String(__FILE__).substring(String(__FILE__).lastIndexOf('/') + 1), sendupdate);
     putdatamap("firmware/version", ESPMQTT_VERSION, sendupdate);
     putdatamap("firmware/compiletime", String(__DATE__) + " " + __TIME__, sendupdate);
+    putdatamap("firmware/upgradekey", getRandomString(10));
     putdatamap("status", "online", sendupdate);
     putdatamap("flash/id", String(ESP.getFlashChipId()), sendupdate);
     putdatamap("flash/size/real", String(ESP.getFlashChipRealSize()), sendupdate);
@@ -1244,20 +1248,7 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties,
 #endif
   if (topicstring == mqtt_topicprefix + "startfirmwareupgrade") 
   {
-
-    String upgradeversion = "";
-    String upgradehost = "";
-    String upgradeport = "";
-    String upgradepath = "";
-
-    upgradeversion = payloadstring.substring(0, payloadstring.indexOf("#"));
-    upgradehost = payloadstring.substring(payloadstring.indexOf("#"), payloadstring.indexOf(":"));
-    upgradeport = payloadstring.substring(payloadstring.indexOf(":"),payloadstring.indexOf("/") );
-    upgradepath = payloadstring.substring(payloadstring.indexOf("/"));
-
-    DEBUG_I ("Received startfirmwareupgrade: upgradeversion=%s, upgradehost=%s, upgradeport=%d, upgradepath=%s",upgradeversion.c_str(), upgradehost.c_str(), (int)upgradeport.toInt(), upgradepath.c_str());
-    
-    //ESPhttpUpdate.update("192.168.0.2", upgradeport.toInt(), "/arduino.bin");
+    triggers.firmwareupgrade = payloadstring;
   }
 }
 
@@ -1489,6 +1480,41 @@ void loop()
   }
 
   if (mainstate.mqttready) publishdatamap();
+
+  if (triggers.firmwareupgrade != "")
+  {
+     WiFiClient upgradeclient;
+
+    StaticJsonDocument<300> JSONdoc;
+    auto error = deserializeJson(JSONdoc, triggers.firmwareupgrade.c_str());
+    triggers.firmwareupgrade = "";
+
+    if (!error)
+    {
+    String upgradekey = JSONdoc["key"];
+    String upgradeurl = JSONdoc["url"];
+    String upgradeversion = JSONdoc["version"];
+
+    DEBUG_I ("Received startfirmwareupgrade: upgradeversion=%s, upgradeurl=%s, upgradekey=%s\n",upgradeversion.c_str(), upgradeurl.c_str(), upgradekey.c_str());
+
+    if ((upgradeversion != ESPMQTT_VERSION) && (getdatamap("firmware/upgradekey") == upgradekey))
+    {
+      t_httpUpdate_return ret = ESPhttpUpdate.update(upgradeclient, upgradeurl, ESPMQTT_VERSION);
+      switch(ret) 
+      {
+        case HTTP_UPDATE_FAILED:
+          DEBUG_E("Firmware upgrade failed: %s.\n", ESPhttpUpdate.getLastErrorString().c_str());
+        break;
+        case HTTP_UPDATE_NO_UPDATES:
+          DEBUG_E("Firmware upgrade check finished, no new version available.");
+        break;
+        case HTTP_UPDATE_OK:
+          DEBUG_E("Firmware upgrade done!\n"); // may not be called since we reboot the ESP
+        break;
+      }    
+    }
+    }
+  }
 
   if (triggers.wifiscanready)
   {
@@ -2819,6 +2845,21 @@ void smartmetercallback (String topic, String payload)
 }
 #endif
 
+String getRandomString(int len) {
+    static const char alphanum[] =
+        "0123456789"
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        "abcdefghijklmnopqrstuvwxyz";
+    
+    String returnstring = "";
+
+    for (int i = 0; i < len; ++i) {
+      returnstring += alphanum[rand() % (sizeof(alphanum) - 1)];
+    }
+
+    return returnstring;
+}
+
 void setup() {
 
   ESP.wdtDisable(); // Use hardware watchdog of 6 seconds to prevent auto reboot when function takes more time..
@@ -2834,7 +2875,7 @@ void setup() {
 #endif
 
   Debug.begin("");
-  DEBUG_I("\n\nInitializing ESP8266...\n\n");
+  DEBUG_I("\n\nInitializing ESP8266 %s %s...\n\n",FIRMWARE_TARGET,ESPMQTT_VERSION);
 
   char buffer[25];
   snprintf(buffer, 25, "%08X", ESP.getChipId());
@@ -2870,9 +2911,9 @@ void setup() {
   if (!eeprom_read(&esp_hostname, 4))
   {
     DEBUG_E("Error reading hostname from internal eeprom\n");
-    esp_hostname = String(FIRMWARE_TARGET) + "_" + String(chipid);
+    esp_hostname = String(FIRMWARE_TARGET) + "-" + String(chipid);
   }
-  DEBUG_D("esp hostname=%s\n", esp_hostname.c_str());
+  DEBUG_I("Hostname=%s\n", esp_hostname.c_str());
 
   String mqttportstr = "";
   if (!eeprom_read(&mqttportstr, 5))
