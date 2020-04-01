@@ -687,31 +687,31 @@ void obd2_handle()
 
   if (nextsleeptime < millis())
   {
-          DEBUG("Entering sleep mode\n");
-          delay(1000);
-          wifi_station_disconnect();
-          wifi_set_opmode(NULL_MODE); // set WiFi mode to null mode.
-          wifi_fpm_open(); // enable force sleep
-          wifi_fpm_set_sleep_type(LIGHT_SLEEP_T); // light sleep
-          //wifi_fpm_set_wakeup_cb(fpm_wakup_cb_func1); // Set wakeup callback
-          wifi_fpm_do_sleep(60000*1000);
+    DEBUG("Entering sleep mode\n");
+    delay(1000);
+    wifi_station_disconnect();
+    wifi_set_opmode(NULL_MODE); // set WiFi mode to null mode.
+    wifi_fpm_open(); // enable force sleep
+    wifi_fpm_set_sleep_type(LIGHT_SLEEP_T); // light sleep
+    //wifi_fpm_set_wakeup_cb(fpm_wakup_cb_func1); // Set wakeup callback
+    wifi_fpm_do_sleep(60000 * 1000);
 
-          nextsleeptime = millis() + 5000;
+    nextsleeptime = millis() + 5000;
   }
-  
+
   byte serdata = 0;
   if (Serial.available() > 0)
   {
     static String serialstring = "";
     serdata = Serial.read();
-    if (((32 <= serdata) && (126 >= serdata))|| (serdata == 13)) // filter bogus data
+    if (((32 <= serdata) && (126 >= serdata)) || (serdata == 13)) // filter bogus data
     {
-    //  DEBUG ("%c (%d)\n", serdata, serdata);
+      //  DEBUG ("%c (%d)\n", serdata, serdata);
       if ('\r' == serdata) // If \r is received it means new data available (/r is ignored for serialstring;
       {
         DEBUG ("Received from OBD2:\"%s\" (obdcmd=%d)\n", serialstring.c_str(), obdcmd);
         String value = "-";
-        if (serialstring == "UNABLE TO CONNECT") 
+        if (serialstring == "UNABLE TO CONNECT")
         {
           putdatamap ("status", "commerror");
         }
@@ -728,7 +728,7 @@ void obd2_handle()
             }
             break;
           case 1:
-            if (serialstring.indexOf("OK") == 0) 
+            if (serialstring.indexOf("OK") == 0)
             {
               obdcmd = 2;
             }
@@ -774,7 +774,7 @@ void obd2_handle()
 
             if (serialstring.indexOf("41 11") == 0)
             {
-              value = String((strtol(serialstring.substring(6, 8).c_str(), NULL, 16)*100)/255);
+              value = String((strtol(serialstring.substring(6, 8).c_str(), NULL, 16) * 100) / 255);
               putdatamap ("obd/throttleposition", value);
               putdatamap ("status", "connected");
               obdcmd++;
@@ -1039,11 +1039,11 @@ void mqttdosubscriptions(int32_t packetId = -1)
     }
     if (subscribetopic == "") nextsubscribe++;
   }
-  
+
   if (subscribetopic == "") triggers.mqttpublishall = true; // When subscibtion has finished start publishing of datamap
   else
   {
-    DEBUG("MQTT Subscribing to: %s\n",subscribetopic.c_str());
+    DEBUG("MQTT Subscribing to: %s\n", subscribetopic.c_str());
     nextpacketid = mqttClient.subscribe(subscribetopic.c_str() , 1);
   }
   DEBUG_V("mqttdosubscriptions end nextpacketid=%d\n", nextpacketid);
@@ -1246,7 +1246,7 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties,
   if (topicstring == mqtt_topicprefix + "setdimstate/0") qswifidimmer_setdimstate(payloadstring.toInt(), 0);
   if (topicstring == mqtt_topicprefix + "setdimstate/1") qswifidimmer_setdimstate(payloadstring.toInt(), 1);
 #endif
-  if (topicstring == mqtt_topicprefix + "startfirmwareupgrade") 
+  if (topicstring == mqtt_topicprefix + "startfirmwareupgrade")
   {
     triggers.firmwareupgrade = payloadstring;
   }
@@ -1483,44 +1483,58 @@ void loop()
 
   if (triggers.firmwareupgrade != "")
   {
-     WiFiClient upgradeclient;
-
-    StaticJsonDocument<300> JSONdoc;
-    auto error = deserializeJson(JSONdoc, triggers.firmwareupgrade.c_str());
-    triggers.firmwareupgrade = "";
-
-    if (!error)
+    // wait 5 seconds before upgrading
+    static uint64_t waitbeforeupgrade = 0;
+    if (waitbeforeupgrade == 0)
     {
-    String upgradekey = JSONdoc["key"];
-    String upgradeurl = JSONdoc["url"];
-    String upgradeversion = JSONdoc["version"];
-
-    DEBUG_I ("Received startfirmwareupgrade\n upgradeversion=%s\n upgradeurl=%s\n upgradekey=%s\n",upgradeversion.c_str(), upgradeurl.c_str(), upgradekey.c_str());
-
-    if (upgradeversion == ESPMQTT_VERSION)
-    {
-      DEBUG_I ("Upgrade canceled, version is the same\n");
+        DEBUG_I ("Received startfirmwareupgrade, upgrade pending...\n");
+        putdatamap("status", "upgrading");
+        waitbeforeupgrade = uptime + 5;
     }
-    else if (getdatamap("firmware/upgradekey") != upgradekey)
+    else if (waitbeforeupgrade < uptime)
     {
-      DEBUG_I ("Upgrade canceled, upgradekey is incorrect\n");
-    }
-    else
-    {
-      t_httpUpdate_return ret = ESPhttpUpdate.update(upgradeclient, upgradeurl, ESPMQTT_VERSION);
-      switch(ret) 
+      waitbeforeupgrade = 0;
+
+      StaticJsonDocument<300> JSONdoc;
+      auto error = deserializeJson(JSONdoc, triggers.firmwareupgrade.c_str());
+      triggers.firmwareupgrade = "";
+
+      if (!error)
       {
-        case HTTP_UPDATE_FAILED:
-          DEBUG_E("Firmware upgrade failed: %s.\n", ESPhttpUpdate.getLastErrorString().c_str());
-        break;
-        case HTTP_UPDATE_NO_UPDATES:
-          DEBUG_E("Firmware upgrade check finished, no new version available.");
-        break;
-        case HTTP_UPDATE_OK:
-          DEBUG_E("Firmware upgrade done!\n"); // may not be called since we reboot the ESP
-        break;
-      }    
-    }
+        String upgradekey = JSONdoc["key"];
+        String upgradeurl = JSONdoc["url"];
+        String upgradeversion = JSONdoc["version"];
+
+        DEBUG_I ("Starting firmware upgrade\n upgradeversion=%s\n upgradeurl=%s\n upgradekey=%s\n", upgradeversion.c_str(), upgradeurl.c_str(), upgradekey.c_str());
+
+        if (upgradeversion == ESPMQTT_VERSION)
+        {
+          DEBUG_I ("Upgrade canceled, version is the same\n");
+        }
+        else if (getdatamap("firmware/upgradekey") != upgradekey)
+        {
+          DEBUG_I ("Upgrade canceled, upgradekey is incorrect\n");
+        }
+        else
+        {
+          DEBUG_I ("Starting upgrade from:%s\n", upgradeurl.c_str());
+          WiFiClient upgradeclient;
+          t_httpUpdate_return ret = ESPhttpUpdate.update(upgradeclient, upgradeurl, ESPMQTT_VERSION);
+          switch (ret)
+          {
+            case HTTP_UPDATE_FAILED:
+              DEBUG_E("Firmware upgrade failed: %s.\n", ESPhttpUpdate.getLastErrorString().c_str());
+              break;
+            case HTTP_UPDATE_NO_UPDATES:
+              DEBUG_E("Firmware upgrade check finished, no new version available.");
+              break;
+            case HTTP_UPDATE_OK:
+              DEBUG_E("Firmware upgrade done!\n"); // may not be called since we reboot the ESP
+              break;
+          }
+          putdatamap("status", "upgradefailed");
+        }
+      }
     }
   }
 
@@ -1878,9 +1892,9 @@ void loop()
         // prevent scanning more than once per 30 seconds and wait 2 seconds before first scan
         if (((uptime > 10) && (wifilastscan == 0)) || ((wifilastscan + 30 < uptime)))
         {
-            DEBUG_D("Starting Wifi Scan...\n");
-            WiFi.scanNetworksAsync(wifiScanReady);
-            wifilastscan = uptime;
+          DEBUG_D("Starting Wifi Scan...\n");
+          WiFi.scanNetworksAsync(wifiScanReady);
+          wifilastscan = uptime;
         }
       }
     }
@@ -2854,18 +2868,18 @@ void smartmetercallback (String topic, String payload)
 #endif
 
 String getRandomString(int len) {
-    static const char alphanum[] =
-        "0123456789"
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-        "abcdefghijklmnopqrstuvwxyz";
-    
-    String returnstring = "";
+  static const char alphanum[] =
+    "0123456789"
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    "abcdefghijklmnopqrstuvwxyz";
 
-    for (int i = 0; i < len; ++i) {
-      returnstring += alphanum[rand() % (sizeof(alphanum) - 1)];
-    }
+  String returnstring = "";
 
-    return returnstring;
+  for (int i = 0; i < len; ++i) {
+    returnstring += alphanum[rand() % (sizeof(alphanum) - 1)];
+  }
+
+  return returnstring;
 }
 
 void setup() {
@@ -2877,13 +2891,12 @@ void setup() {
 
 #ifdef SERIALLOG
   Debug.setSerialEnabled(true);
-  Serial.setDebugOutput(true);
 #else
   Debug.setSerialEnabled(false);
 #endif
 
   Debug.begin("");
-  DEBUG_I("\n\nInitializing ESP8266 %s %s...\n\n",FIRMWARE_TARGET,ESPMQTT_VERSION);
+  DEBUG_I("\n\nInitializing ESP8266 %s %s...\n\n", FIRMWARE_TARGET, ESPMQTT_VERSION);
 
   char buffer[25];
   snprintf(buffer, 25, "%08X", ESP.getChipId());
