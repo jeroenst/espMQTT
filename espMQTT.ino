@@ -1495,9 +1495,17 @@ void loop()
     String upgradeurl = JSONdoc["url"];
     String upgradeversion = JSONdoc["version"];
 
-    DEBUG_I ("Received startfirmwareupgrade: upgradeversion=%s, upgradeurl=%s, upgradekey=%s\n",upgradeversion.c_str(), upgradeurl.c_str(), upgradekey.c_str());
+    DEBUG_I ("Received startfirmwareupgrade\n upgradeversion=%s\n upgradeurl=%s\n upgradekey=%s\n",upgradeversion.c_str(), upgradeurl.c_str(), upgradekey.c_str());
 
-    if ((upgradeversion != ESPMQTT_VERSION) && (getdatamap("firmware/upgradekey") == upgradekey))
+    if (upgradeversion == ESPMQTT_VERSION)
+    {
+      DEBUG_I ("Upgrade canceled, version is the same\n");
+    }
+    else if (getdatamap("firmware/upgradekey") != upgradekey)
+    {
+      DEBUG_I ("Upgrade canceled, upgradekey is incorrect\n");
+    }
+    else
     {
       t_httpUpdate_return ret = ESPhttpUpdate.update(upgradeclient, upgradeurl, ESPMQTT_VERSION);
       switch(ret) 
