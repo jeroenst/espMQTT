@@ -669,7 +669,7 @@ void putdatamap(String topic, String value, bool sendupdate = true, bool forcese
       if (datamapstruct.payload == "upgrading")
       {
         // When upgrading only accept upgradefailed or upgradedone as value
-        if ((value != "upgradefailed") && (value != "upgradedone")) return;
+        if ((value != "upgradefailed") && (value != "upgradedone") && (value != "upgradesameversion")) return;
       }
     }
     datamapstruct.onair = false;
@@ -1519,7 +1519,7 @@ void loop()
         if (upgradeversion == ESPMQTT_VERSION)
         {
           DEBUG_I ("Upgrade canceled, version is the same\n");
-          putdatamap("status", "online");
+          putdatamap("status", "upgradesameversion");
         }
         else if (getdatamap("firmware/upgradekey") != upgradekey)
         {
