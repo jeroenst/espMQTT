@@ -36,7 +36,7 @@
 // #define ESPMQTT_SDM120
 // #define ESPMQTT_WATERMETER
 // #define ESPMQTT_DDNS
-#define ESPMQTT_GENERIC8266
+// #define ESPMQTT_GENERIC8266
 // #define ESPMQTT_MAINPOWERMETER
 // #define ESPMQTT_OBD2
 // #define ESPMQTT_NOISE
@@ -57,7 +57,7 @@
 // #define ESPMQTT_SONOFF4CH //ESP8285
 // #define ESPMQTT_SONOFFDUAL
 // #define ESPMQTT_SONOFFS20_PRINTER
-// #define ESPMQTT_SONOFFPOW
+#define ESPMQTT_SONOFFPOW
 // #define ESPMQTT_SONOFFPOWR2 // tv&washingmachine&server&dishwasher
 
 #define ESPMQTT_VERSION "TEST"
@@ -2220,7 +2220,7 @@ void sonoff_handle()
     putdatamap("power/factor", String(hlw8012.getPowerFactor(), 2));
     putdatamap("power/multiplier", String(hlw8012.getPowerMultiplier()));
     putdatamap("energy/ws", String(hlw8012.getEnergy()));
-    putdatamap("energy/kwh", String(hlw8012.getEnergy() / 3600000, 3));
+    putdatamap("energy/kwh", String((double)hlw8012.getEnergy() / 3600000, 3));
     nextupdatetime = millis() + 5000;
   }
 #endif
