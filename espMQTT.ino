@@ -57,8 +57,8 @@
 // #define ESPMQTT_SONOFF4CH //ESP8285
 // #define ESPMQTT_SONOFFDUAL
 // #define ESPMQTT_SONOFFS20_PRINTER
-#define ESPMQTT_SONOFFPOW
-// #define ESPMQTT_SONOFFPOWR2 // tv&washingmachine&server&dishwasher
+// #define ESPMQTT_SONOFFPOW
+#define ESPMQTT_SONOFFPOWR2 // tv&washingmachine&server&dishwasher
 
 #define ESPMQTT_VERSION "TEST"
 #else
@@ -1936,11 +1936,23 @@ void loop()
 
 
 #ifdef  ESPMQTT_SONOFFPOWR2
+    static uint64_t deciwattsec = 0;
+    deciwattsec += (powerval * 10);
     if ((uptime % 5) == 0) // Every 5 seconds send update about power usage
     {
       putdatamap("voltage", String(voltval, 1));
       putdatamap("current", String(currentval, 3));
       putdatamap("power", String(powerval, 1));
+      // Convert deciwattsec to watt per second (ws) string
+      uint32_t lowws = (deciwattsec/10) % 0xFFFFFFFF;
+      uint32_t highws = ((deciwattsec/10) >> 32) % 0xFFFFFFFF;
+      String ws = (highws > 0 ? String(highws) : "") + String(lowws);
+      putdatamap("energy/ws", ws);
+      // Convert watt per second to kwh
+      String wh = (highws > 0 ? String(highws / 3600) : "") + String(lowws / 3600);
+      wh = String(wh.length() < 4 ? "0" : "") + String(wh.length() < 3 ? "0" : "") + String(wh.length() < 2 ? "0" : "") + wh; // Add leading zeros to wh before converting to kwh
+      String kwh = wh.substring(0,wh.length()-3) + "." +wh.substring(wh.length()-3); // Add decimal for wh to kwh conversion;
+      putdatamap("energy/kwh", kwh);
     }
 #endif
 
