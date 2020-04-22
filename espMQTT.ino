@@ -51,7 +51,7 @@
 // #define ESPMQTT_GARDEN //ESP8285 TUIN & MARIANNE & LUIFEL
 // #define ESPMQTT_SONOFF_FLOORHEATING
 // #define SPMQTT_IRRIGATION
-// #define ESPMQTT_BLITZWOLF
+#define ESPMQTT_BLITZWOLF
 // #define ESPMQTT_QSWIFIDIMMERD01
 // #define ESPMQTT_QSWIFIDIMMERD02
 // #define ESPMQTT_SONOFF4CH //ESP8285
@@ -1943,6 +1943,7 @@ void loop()
       putdatamap("voltage", String(voltval, 1));
       putdatamap("current", String(currentval, 3));
       putdatamap("power", String(powerval, 1));
+      putdatamap("power/apparent", String(voltval*currentval, 1));
       // Convert deciwattsec to watt per second (ws) string
       uint32_t lowws = (deciwattsec/10) % 0xFFFFFFFF;
       uint32_t highws = ((deciwattsec/10) >> 32) % 0xFFFFFFFF;
@@ -2220,15 +2221,30 @@ void sonoff_handle()
 
 #ifdef HLW8012_CF_PIN
   static unsigned long nextupdatetime = 0;
+  static unsigned long nextfiltertime = 0;
+  static unsigned int filtered_power = hlw8012.getActivePower()*10;
+  static unsigned int filtered_apparent_power = hlw8012.getApparentPower()*10;
+  static unsigned int filtered_reactive_power = hlw8012.getReactivePower()*10;
+  static unsigned int filtered_current = hlw8012.getCurrent()*1000;
+  static unsigned int filtered_voltage = hlw8012.getVoltage()*10;
+  if (millis() > nextfiltertime)
+  {
+    nextfiltertime = millis() + 100;
+    filtered_power = ((filtered_power * 4) + (hlw8012.getActivePower()*10)) / 5;
+    filtered_apparent_power = ((filtered_apparent_power * 4) + (hlw8012.getApparentPower()*10)) / 5;
+    filtered_reactive_power = ((filtered_reactive_power * 4) + (hlw8012.getReactivePower()*10)) / 5;
+    filtered_current = ((filtered_current * 4) + (hlw8012.getCurrent()*1000)) / 5;
+    filtered_voltage = ((filtered_voltage * 4) + (hlw8012.getVoltage()*10)) / 5;
+  }
   if (millis() > nextupdatetime)
   {
-    putdatamap("voltage", String(hlw8012.getVoltage()));
+    putdatamap("voltage", String(((double)filtered_voltage/10), 0));
     putdatamap("voltage/multiplier", String(hlw8012.getVoltageMultiplier()));
-    putdatamap("current", String(hlw8012.getCurrent(), 3));
+    putdatamap("current", String(((double)filtered_current/1000), 3));
     putdatamap("current/multiplier", String(hlw8012.getCurrentMultiplier()));
-    putdatamap("power", String(hlw8012.getActivePower()));
-    putdatamap("power/apparent", String(hlw8012.getApparentPower()));
-    putdatamap("power/reactive", String(hlw8012.getReactivePower()));
+    putdatamap("power", String(((double)filtered_power/10),1));
+    putdatamap("power/apparent", String(((double)filtered_apparent_power/10),1));
+    putdatamap("power/reactive", String(((double)filtered_reactive_power/10),1));
     putdatamap("power/factor", String(hlw8012.getPowerFactor(), 2));
     putdatamap("power/multiplier", String(hlw8012.getPowerMultiplier()));
     putdatamap("energy/ws", String(hlw8012.getEnergy()));
