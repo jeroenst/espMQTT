@@ -44,27 +44,35 @@
 // #define ESPMQTT_DIMMER
 
 /* ESP8285 */
-// #define ESPMQTT_ZMAI90
+#define ESPMQTT_ZMAI90
 // #define ESPMQTT_DUCOBOX
 // #define ESPMQTT_SONOFFS20 // coffeelamp & sonoffs20_00X
 // #define ESPMQTT_SONOFFBULB
 // #define ESPMQTT_GARDEN //ESP8285 TUIN & MARIANNE & LUIFEL
 // #define ESPMQTT_SONOFF_FLOORHEATING
 // #define SPMQTT_IRRIGATION
-#define ESPMQTT_BLITZWOLF
+// #define ESPMQTT_BLITZWOLF
 // #define ESPMQTT_QSWIFIDIMMERD01
 // #define ESPMQTT_QSWIFIDIMMERD02
 // #define ESPMQTT_SONOFF4CH //ESP8285
 // #define ESPMQTT_SONOFFDUAL
 // #define ESPMQTT_SONOFFS20_PRINTER
 // #define ESPMQTT_SONOFFPOW
-#define ESPMQTT_SONOFFPOWR2 // tv&washingmachine&server&dishwasher
+// #define ESPMQTT_SONOFFPOWR2 // tv&washingmachine&server&dishwasher
 
 #define ESPMQTT_VERSION "TEST"
 #else
 #include "espMQTT_buildscript.h"
 #endif
 
+#ifdef ESPMQTT_ZMAI90
+#define FIRMWARE_TARGET "ZMAI90"
+#define FLASHBUTTON 13
+#define RELAY 12
+#define ESPLED 4
+#undef SERIALLOG
+uint8_t zmai90pointer = 255;
+#endif
 
 #ifdef  ESPMQTT_SONOFFS20_PRINTER
 #define FIRMWARE_TARGET "SONOFFS20_PRINTER"
@@ -131,6 +139,7 @@ SDM sdm(serSDM, 2400);
 #define FLASHBUTTON D3
 #define ESPLED D4
 #define SERIALLOG
+#define APONBOOT
 #endif
 
 #ifdef  ESPMQTT_OBD2
@@ -1087,6 +1096,9 @@ void initSerial()
 #elif defined ( ESPMQTT_OBD2)
   Serial.setDebugOutput(false);
   Serial.begin(38400, SERIAL_8N1);
+#elif defined ( ESPMQTT_ZMAI90)
+  Serial.setDebugOutput(false);
+  Serial.begin(9600, SERIAL_8E1);  
 #elif defined (ESPMQTT_SMARTMETER) || defined (QSWIFIDIMMERCHANNELS)
   // do nothing, smartmeter initializes serial in init function.
 #else
@@ -1729,6 +1741,113 @@ void loop()
   yield();
 #endif
 
+#ifdef ESPMQTT_ZMAI90
+  if (Serial.available() > 0) {
+    uint8_t zmai90data = Serial.read();
+    DEBUG ("ZMAI90DATA=%d:%02X\n", zmai90pointer, zmai90data);
+    char str[3];
+    sprintf(str, "%02X", zmai90data);
+    zmai90data = atoi(str);
+    static uint32_t zmai90value = 0;
+    switch (zmai90pointer)
+    {
+      case 3:
+        zmai90value = zmai90data;
+      break;
+      case 4:
+        zmai90value += zmai90data * 100;
+      break;
+      case 5:
+        zmai90value += zmai90data * 10000;
+      break;
+      case 6:
+        zmai90value += zmai90data * 1000000;
+        putdatamap ("energy/kwh", String((double)zmai90value/100, 2));
+      break;
+
+      case 7:
+        zmai90value = zmai90data;
+      break;
+      case 8:
+        zmai90value += zmai90data * 100;
+      break;
+      case 9:
+        zmai90value += zmai90data * 10000;
+      break;
+      case 10:
+        zmai90value += zmai90data * 1000000;
+        putdatamap ("voltage", String((double)zmai90value/10, 1));
+      break;
+
+      case 11:
+        zmai90value = zmai90data;
+      break;
+      case 12:
+        zmai90value += zmai90data * 100;
+      break;
+      case 13:
+        zmai90value += zmai90data * 10000;
+      break;
+      case 14:
+        zmai90value += zmai90data * 1000000;
+        putdatamap ("current", String((double)zmai90value/10000, 4));
+      break;
+
+      case 15:
+        zmai90value = zmai90data;
+      break;
+      case 16:
+        zmai90value += zmai90data * 100;
+        putdatamap ("frequency", String((double)zmai90value/100, 2));
+      break;
+
+
+      case 19:
+        zmai90value = zmai90data;
+      break;
+      case 20:
+        zmai90value += zmai90data * 100;
+      break;
+      case 21:
+        zmai90value += zmai90data * 10000;
+      break;
+      case 22:
+        zmai90value += zmai90data * 1000000;
+        putdatamap ("power/active", String((double)zmai90value/100, 2));
+      break;
+
+      case 23:
+        zmai90value = zmai90data;
+      break;
+      case 24:
+        zmai90value += zmai90data * 100;
+      break;
+      case 25:
+        zmai90value += zmai90data * 10000;
+      break;
+      case 26:
+        zmai90value += zmai90data * 1000000;
+        putdatamap ("power/reactive", String((double)zmai90value/100, 2));
+      break;
+
+      case 27:
+        zmai90value = zmai90data;
+      break;
+      case 28:
+        zmai90value += zmai90data * 100;
+      break;
+      case 29:
+        zmai90value += zmai90data * 10000;
+      break;
+      case 30:
+        zmai90value += zmai90data * 1000000;
+        putdatamap ("power/apparent", String((double)zmai90value/100, 2));
+      break;
+    }
+    zmai90pointer++;
+  } 
+#endif
+
 #ifdef  ESPMQTT_SMARTMETER
   smartmeter_handle();
   yield();
@@ -1997,6 +2116,20 @@ void loop()
 
     if (wifiTimer < 20) wifiTimer++;
 
+
+#ifdef ESPMQTT_ZMAI90
+    if (uptime % 10 == 0) 
+    {
+      uint8_t cmd[9] = {0xFE, 0x01, 0x0F, 0x08, 0x00, 0x00, 0x00, 0x1C};
+      // command to ask for data
+  
+      DEBUG_V("Sending ZMAI request packet...\n");
+
+      Serial.flush();
+      Serial.write(cmd, 9); //request PPM CO2
+      zmai90pointer = 0;
+    }
+#endif
 
 #ifdef DHTPIN
     if (uptime % 5 == 0) update_dht();
