@@ -6,7 +6,7 @@
 	url = git@github.com:me-no-dev/ESPAsyncTCP.git
 [submodule "libraries/SDM_Energy_Meter"]
 	path = libraries/SDM_Energy_Meter
-	url = git@github.com:reaper7/SDM_Energy_Meter.git
+	url = git@github.com:jeroenst/SDM_Energy_Meter.git
 [submodule "libraries/OneWire"]
 	path = libraries/OneWire
 	url = git@github.com:PaulStoffregen/OneWire.git
