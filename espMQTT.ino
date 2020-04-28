@@ -68,7 +68,7 @@
 #ifdef ESPMQTT_ZMAI90
 #define FIRMWARE_TARGET "ZMAI90"
 #define FLASHBUTTON 13
-#define RELAY 12
+#define ZMAI90RELAY 12
 #define ESPLED 4
 #undef SERIALLOG
 uint8_t zmai90pointer = 255;
@@ -3264,6 +3264,12 @@ void setup() {
   MDNS.addService("http", "tcp", 80);
 
   systemTimer.attach_ms(100, systemTimerCallback);
+// In my case the ZMAI90 is always on because it is the main power feed of the house
+#ifdef ESPMQTT_ZMAI90
+  digitalWrite(ZMAI90RELAY, 1);
+  pinMode(ZMAI90RELAY, OUTPUT);
+#endif
+
 
 #ifdef ESPLED
   pinMode(ESPLED, OUTPUT);
