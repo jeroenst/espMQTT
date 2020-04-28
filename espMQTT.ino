@@ -34,6 +34,7 @@
 // #define ESPMQTT_SMARTMETER
 // #define ESPMQTT_GROWATT
 // #define ESPMQTT_SDM120
+// #define ESPMQTT_DDM18SD
 // #define ESPMQTT_WATERMETER
 // #define ESPMQTT_DDNS
 // #define ESPMQTT_GENERIC8266
@@ -110,6 +111,17 @@ static bool sonoffch_timeout_enabled[1] = {1};
 
 #ifdef  ESPMQTT_SDM120
 #define FIRMWARE_TARGET "SDM120"
+#define FLASHBUTTON D3
+#define ESPLED D4
+#define NODEMCULEDPIN D0
+#undef SERIALLOG
+HardwareSerial serSDM(0);
+#include <SDM.h>
+SDM sdm(serSDM, 2400);
+#endif
+
+#ifdef  ESPMQTT_DDM18SD
+#define FIRMWARE_TARGET "DDM18SD"
 #define FLASHBUTTON D3
 #define ESPLED D4
 #define NODEMCULEDPIN D0
@@ -1090,7 +1102,7 @@ void initSerial()
   Serial.begin(4800, SERIAL_8E1);
 #elif defined ( ESPMQTT_AMGPELLETSTOVE)
   Serial.setDebugOutput(false);
-#elif defined ( ESPMQTT_SDM120)
+#elif defined ( ESPMQTT_SDM120) || defined (ESPMQTT_DDM18SD)
   Serial.setDebugOutput(false);
   sdm.begin();
 #elif defined ( ESPMQTT_OBD2)
@@ -2002,6 +2014,50 @@ void loop()
         break;
     }
     if (sdmreadcounter < 14)
+    {
+      digitalWrite(NODEMCULEDPIN, isnan(value) ? 1 : 0);
+      sdmreadcounter++;
+    }
+    yield();
+#endif
+#ifdef  ESPMQTT_DDM18SD
+    static uint8_t sdmreadcounter = 1;
+    double value = NAN;
+
+    switch (sdmreadcounter)
+    {
+      case 1:
+        putdatamap("status", "querying");
+        putdatamap("voltage", String(sdm.readVal(DDM18SD_VOLTAGE), 2));
+        break;
+      case 2:
+        putdatamap("current", String(sdm.readVal(DDM18SD_CURRENT), 2));
+        break;
+      case 3:
+        putdatamap("power", String(sdm.readVal(DDM18SD_POWER), 2));
+        break;
+      case 4:
+        putdatamap("power/reactive", String(sdm.readVal(DDM18SD_REACTIVE_POWER), 2));
+        break;
+      case 5:
+        putdatamap("frequency", String(sdm.readVal(DDM18SD_FREQUENCY), 2));
+        break;
+      case 6:
+        putdatamap("powerfactor", String(sdm.readVal(DDM18SD_POWER_FACTOR), 2));
+        break;
+      case 7:
+        putdatamap("energy/active", String(sdm.readVal(DDM18SD_IMPORT_ACTIVE_ENERGY), 3));
+        break;
+      case 8:
+        putdatamap("energy/reactive", String(sdm.readVal(DDM18SD_IMPORT_REACTIVE_ENERGY), 3));
+        if (isnan(value)) putdatamap("status", "commerror");
+        else putdatamap("status", "ready");
+        break;
+      case 9:
+        if (uptime % 10) sdmreadcounter = 0;
+        break;
+    }
+    if (sdmreadcounter < 9)
     {
       digitalWrite(NODEMCULEDPIN, isnan(value) ? 1 : 0);
       sdmreadcounter++;
