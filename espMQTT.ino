@@ -45,7 +45,7 @@
 // #define ESPMQTT_DIMMER
 
 /* ESP8285 */
-// #define ESPMQTT_ZMAI90
+#define ESPMQTT_ZMAI90
 // #define ESPMQTT_DUCOBOX
 // #define ESPMQTT_SONOFFS20 // coffeelamp & sonoffs20_00X
 // #define ESPMQTT_SONOFFBULB
@@ -59,7 +59,7 @@
 // #define ESPMQTT_SONOFFDUAL
 // #define ESPMQTT_SONOFFS20_PRINTER
 // #define ESPMQTT_SONOFFPOW
-#define ESPMQTT_SONOFFPOWR2 // tv&washingmachine&server&dishwasher
+// #define ESPMQTT_SONOFFPOWR2 // tv&washingmachine&server&dishwasher
 
 #define ESPMQTT_VERSION "TEST"
 #else
@@ -1825,7 +1825,7 @@ void loop()
       break;
       case 22:
         zmai90value += zmai90data * 1000000;
-        putdatamap ("power/active", String((double)zmai90value/100, 2));
+        putdatamap ("power/active", String((double)zmai90value/100, 1));
       break;
 
       case 23:
@@ -1839,7 +1839,7 @@ void loop()
       break;
       case 26:
         zmai90value += zmai90data * 1000000;
-        putdatamap ("power/reactive", String((double)zmai90value/100, 2));
+        putdatamap ("power/reactive", String((double)zmai90value/100, 1));
       break;
 
       case 27:
@@ -1853,7 +1853,7 @@ void loop()
       break;
       case 30:
         zmai90value += zmai90data * 1000000;
-        putdatamap ("power/apparent", String((double)zmai90value/100, 2));
+        putdatamap ("power/apparent", String((double)zmai90value/100, 1));
       break;
     }
     zmai90pointer++;
