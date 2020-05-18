@@ -45,7 +45,7 @@
 // #define ESPMQTT_DIMMER
 
 /* ESP8285 */
-#define ESPMQTT_ZMAI90
+// #define ESPMQTT_ZMAI90
 // #define ESPMQTT_DUCOBOX
 // #define ESPMQTT_SONOFFS20 // coffeelamp & sonoffs20_00X
 // #define ESPMQTT_SONOFFBULB
@@ -59,7 +59,7 @@
 // #define ESPMQTT_SONOFFDUAL
 // #define ESPMQTT_SONOFFS20_PRINTER
 // #define ESPMQTT_SONOFFPOW
-// #define ESPMQTT_SONOFFPOWR2 // tv&washingmachine&server&dishwasher
+#define ESPMQTT_SONOFFPOWR2 // tv&washingmachine&server&dishwasher
 
 #define ESPMQTT_VERSION "TEST"
 #else
@@ -326,9 +326,9 @@ static bool sonoff_oldbuttons[1] = {1};
 const byte sonoff_relays[1] = {12};
 const byte sonoff_buttons[1] = {0};
 static bool sonoff_oldbuttons[1] = {1};
-double voltval = 0;
-double currentval = 0;
-double powerval = 0;
+double voltval = -1;
+double currentval = -1;
+double powerval = -1;
 #endif
 
 #ifdef  ESPMQTT_SONOFFBULB
@@ -1886,53 +1886,66 @@ void loop()
 #endif
 
 #ifdef  ESPMQTT_SONOFFPOWR2
-  static char serbuffer[100];
-  static int serpointer = -1;
-  static char oldserval = 0;
+  static char serbuffer[24];
+  static int serpointer = 0;
   if (Serial.available() > 0)
   {
     int serval = Serial.read();
-    if ((serpointer >= 0) && (serpointer < 100))
+    if ((serpointer >= 0) && (serpointer < 24))
     {
       serbuffer[serpointer] = serval;
       serpointer++;
     }
-    if (serpointer >= 100)
+    if ((((serbuffer[0] == 0x55) || (serbuffer[0] & 0xfc) == 0xf0)) && (serbuffer[1] == 0x5A))
     {
-      Serial.flush();
-      serpointer = -1;
-    }
-    if (((oldserval == 0x55) || ((oldserval & 0xf0) == 0xf0) || (oldserval == 0xAA)) && (serval == 0x5A))
-    {
-      static uint8_t statusbyte = 0;
-      if ((oldserval & 0xf0) == 0xf0) statusbyte = (oldserval & 0x0f);
-      else statusbyte = 0;
       if (serpointer == 24)
       {
         uint32_t valueco = 0;
         uint32_t valueca = 0;
-        valueco = (uint32_t(serbuffer[0]) << 16) + (uint16_t(serbuffer[1]) << 8) + serbuffer[2];
-        valueca = (uint32_t(serbuffer[3]) << 16) + (uint16_t(serbuffer[4]) << 8) + serbuffer[5];
-        if (valueca > 0) voltval = double(double(valueco) / double(valueca));
-        else voltval = 0;
+        uint8_t statusbyte = 0;
 
-        valueco = (uint32_t(serbuffer[6]) << 16) + (uint16_t(serbuffer[7]) << 8) + serbuffer[8];
-        valueca = (uint32_t(serbuffer[9]) << 16) + (uint16_t(serbuffer[10]) << 8) + serbuffer[11];
-        if (valueca > 0) currentval = double(double(valueco) / double(valueca));
-        else currentval = 0;
-        if (statusbyte & 0x02) currentval = 0;
+        if ((serbuffer[0] & 0xf0) == 0xf0) statusbyte = (serbuffer[0]  & 0x0f);
+        else statusbyte = 0;
 
-        valueco = (uint32_t(serbuffer[12]) << 16) + (uint16_t(serbuffer[13]) << 8) + serbuffer[14];
-        valueca = (uint32_t(serbuffer[15]) << 16) + (uint16_t(serbuffer[16]) << 8) + serbuffer[17];
-        if (valueca > 0) powerval = double(double(valueco) / double(valueca));
-        else powerval = 0;
-        if (statusbyte & 0x02) powerval = 0;
-        Serial.flush();
-        serpointer = -1;
+        if (serbuffer[20] && 7)
+        {
+          valueco = (uint32_t(serbuffer[2]) << 16) + (uint16_t(serbuffer[3]) << 8) + serbuffer[4];
+          valueca = (uint32_t(serbuffer[5]) << 16) + (uint16_t(serbuffer[6]) << 8) + serbuffer[7];
+          if (valueca > 0) voltval = double(double(valueco) / double(valueca));
+          else voltval = 0;
+        }
+
+        if (serbuffer[20] && 6)
+        {
+          valueco = (uint32_t(serbuffer[8]) << 16) + (uint16_t(serbuffer[9]) << 8) + serbuffer[10];
+          valueca = (uint32_t(serbuffer[11]) << 16) + (uint16_t(serbuffer[12]) << 8) + serbuffer[13];
+          if (valueca > 0) currentval = double(double(valueco) / double(valueca));
+          else currentval = 0;
+          if (statusbyte & 0x02) currentval = 0;
+        }
+
+        if (serbuffer[20] && 5)
+        {
+          valueco = (uint32_t(serbuffer[14]) << 16) + (uint16_t(serbuffer[15]) << 8) + serbuffer[16];
+          valueca = (uint32_t(serbuffer[17]) << 16) + (uint16_t(serbuffer[18]) << 8) + serbuffer[19];
+          if (valueca > 0) powerval = double(double(valueco) / double(valueca));
+          else powerval = 0;
+          if (statusbyte & 0x02) powerval = 0;
+        }
+        serpointer = 1;
       }
+    }
+    else
+    {
+      serbuffer[0] = serbuffer[1];
+      serpointer = 1;
+    }
+    if (serpointer == 24)
+    {
+      Serial.flush();
       serpointer = 0;
     }
-    oldserval = serval;
+
   }
   yield();
 #endif
@@ -2112,13 +2125,13 @@ void loop()
 
 #ifdef  ESPMQTT_SONOFFPOWR2
     static uint64_t deciwattsec = 0;
-    deciwattsec += (powerval * 10);
+    deciwattsec += powerval >= 0 ? (powerval * 10) : 0;
     if ((uptime % 5) == 0) // Every 5 seconds send update about power usage
     {
-      putdatamap("voltage", String(voltval, 1));
-      putdatamap("current", String(currentval, 3));
-      putdatamap("power", String(powerval, 1));
-      putdatamap("power/apparent", String(voltval*currentval, 1));
+      putdatamap("voltage", voltval >= 0 ? String(voltval, 1) : "-");
+      putdatamap("current", currentval >= 0 ? String(currentval, 3) : "-");
+      putdatamap("power", powerval >= 0 ? String(powerval, 1) : "-");
+      putdatamap("power/apparent", currentval >=0 ? String(voltval*currentval, 1) : "-");
       // Convert deciwattsec to watt per second (ws) string
       uint32_t lowws = (deciwattsec/10) % 0xFFFFFFFF;
       uint32_t highws = ((deciwattsec/10) >> 32) % 0xFFFFFFFF;
