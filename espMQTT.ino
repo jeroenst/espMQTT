@@ -45,7 +45,7 @@
 // #define ESPMQTT_DIMMER
 
 /* ESP8285 */
-#define ESPMQTT_ZMAI90
+// #define ESPMQTT_ZMAI90
 // #define ESPMQTT_DUCOBOX
 // #define ESPMQTT_SONOFFS20 // coffeelamp & sonoffs20_00X
 // #define ESPMQTT_SONOFFBULB
@@ -59,7 +59,7 @@
 // #define ESPMQTT_SONOFFDUAL
 // #define ESPMQTT_SONOFFS20_PRINTER
 // #define ESPMQTT_SONOFFPOW
-// #define ESPMQTT_SONOFFPOWR2 // tv&washingmachine&server&dishwasher
+#define ESPMQTT_SONOFFPOWR2 // tv&washingmachine&server&dishwasher
 
 #define ESPMQTT_VERSION "TEST"
 #else
@@ -1903,36 +1903,42 @@ void loop()
         uint32_t valueco = 0;
         uint32_t valueca = 0;
         uint8_t statusbyte = 0;
+        uint8_t checksum = 0;
 
         if ((serbuffer[0] & 0xf0) == 0xf0) statusbyte = (serbuffer[0]  & 0x0f);
         else statusbyte = 0;
 
-        if (serbuffer[20] && 7)
-        {
-          valueco = (uint32_t(serbuffer[2]) << 16) + (uint16_t(serbuffer[3]) << 8) + serbuffer[4];
-          valueca = (uint32_t(serbuffer[5]) << 16) + (uint16_t(serbuffer[6]) << 8) + serbuffer[7];
-          if (valueca > 0) voltval = double(double(valueco) / double(valueca));
-          else voltval = 0;
-        }
+        for (int i = 2; i < 23; i++) checksum += serbuffer[i];
 
-        if (serbuffer[20] && 6)
+        if (checksum == serbuffer[23]) // If calculated checksum matches the received checksum calculate values
         {
-          valueco = (uint32_t(serbuffer[8]) << 16) + (uint16_t(serbuffer[9]) << 8) + serbuffer[10];
-          valueca = (uint32_t(serbuffer[11]) << 16) + (uint16_t(serbuffer[12]) << 8) + serbuffer[13];
-          if (valueca > 0) currentval = double(double(valueco) / double(valueca));
-          else currentval = 0;
-          if (statusbyte & 0x02) currentval = 0;
-        }
+          if (serbuffer[20] && 7)
+          {
+            valueco = (uint32_t(serbuffer[2]) << 16) + (uint16_t(serbuffer[3]) << 8) + serbuffer[4];
+            valueca = (uint32_t(serbuffer[5]) << 16) + (uint16_t(serbuffer[6]) << 8) + serbuffer[7];
+            if (valueca > 0) voltval = double(double(valueco) / double(valueca));
+            else voltval = 0;
+          }
 
-        if (serbuffer[20] && 5)
-        {
-          valueco = (uint32_t(serbuffer[14]) << 16) + (uint16_t(serbuffer[15]) << 8) + serbuffer[16];
-          valueca = (uint32_t(serbuffer[17]) << 16) + (uint16_t(serbuffer[18]) << 8) + serbuffer[19];
-          if (valueca > 0) powerval = double(double(valueco) / double(valueca));
-          else powerval = 0;
-          if (statusbyte & 0x02) powerval = 0;
+          if (serbuffer[20] && 6)
+          {
+            valueco = (uint32_t(serbuffer[8]) << 16) + (uint16_t(serbuffer[9]) << 8) + serbuffer[10];
+            valueca = (uint32_t(serbuffer[11]) << 16) + (uint16_t(serbuffer[12]) << 8) + serbuffer[13];
+            if (valueca > 0) currentval = double(double(valueco) / double(valueca));
+            else currentval = 0;
+            if (statusbyte & 0x02) currentval = 0;
+          }
+
+          if (serbuffer[20] && 5)
+          {
+            valueco = (uint32_t(serbuffer[14]) << 16) + (uint16_t(serbuffer[15]) << 8) + serbuffer[16];
+            valueca = (uint32_t(serbuffer[17]) << 16) + (uint16_t(serbuffer[18]) << 8) + serbuffer[19];
+            if (valueca > 0) powerval = double(double(valueco) / double(valueca));
+            else powerval = 0;
+            if (statusbyte & 0x02) powerval = 0;
+          }
         }
-        serpointer = 1;
+        serpointer = 0;
       }
     }
     else
