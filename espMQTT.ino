@@ -1886,72 +1886,73 @@ void loop()
 #endif
 
 #ifdef  ESPMQTT_SONOFFPOWR2
-  static char serbuffer[24];
-  static int serpointer = 0;
+  static uint8_t serbuffer[24];
+  static uint8_t serpointer = 0;
   if (Serial.available() > 0)
   {
-    int serval = Serial.read();
+    uint8_t serval = Serial.read();
     if ((serpointer >= 0) && (serpointer < 24))
     {
       serbuffer[serpointer] = serval;
       serpointer++;
     }
-    if ((((serbuffer[0] == 0x55) || (serbuffer[0] & 0xfc) == 0xf0)) && (serbuffer[1] == 0x5A))
+    if ((((serbuffer[0] == 0x55) || ((serbuffer[0] & 0xfc) == 0xf0))) && (serbuffer[1] == 0x5A)) // Search for header and check if current and voltage cycle do not exceed range
     {
-      if (serpointer == 24)
+      if (serpointer == 24) // If all 24 bytes are received process message
       {
         uint32_t valueco = 0;
         uint32_t valueca = 0;
         uint8_t statusbyte = 0;
         uint8_t checksum = 0;
 
-        if ((serbuffer[0] & 0xf0) == 0xf0) statusbyte = (serbuffer[0]  & 0x0f);
-        else statusbyte = 0;
+        if ((serbuffer[0] & 0xf0) == 0xf0) statusbyte = (serbuffer[0]  & 0x0f); // Extract statusbits from packet header if packetheader starts with 0xF0
 
-        for (int i = 2; i < 23; i++) checksum += serbuffer[i];
+        for (serpointer = 2; serpointer < 23; serpointer++) checksum += serbuffer[serpointer]; // calculate checksum
 
         if (checksum == serbuffer[23]) // If calculated checksum matches the received checksum calculate values
         {
-          if (serbuffer[20] && 7)
+          if (serbuffer[20] & 0x30) // Check if voltage cycle is completed
           {
+            // Calculate voltage
             valueco = (uint32_t(serbuffer[2]) << 16) + (uint16_t(serbuffer[3]) << 8) + serbuffer[4];
             valueca = (uint32_t(serbuffer[5]) << 16) + (uint16_t(serbuffer[6]) << 8) + serbuffer[7];
             if (valueca > 0) voltval = double(double(valueco) / double(valueca));
             else voltval = 0;
           }
 
-          if (serbuffer[20] && 6)
+          if (serbuffer[20] & 0x10) // Check if power cycle is completed
           {
-            valueco = (uint32_t(serbuffer[8]) << 16) + (uint16_t(serbuffer[9]) << 8) + serbuffer[10];
-            valueca = (uint32_t(serbuffer[11]) << 16) + (uint16_t(serbuffer[12]) << 8) + serbuffer[13];
-            if (valueca > 0) currentval = double(double(valueco) / double(valueca));
-            else currentval = 0;
-            if (statusbyte & 0x02) currentval = 0;
-          }
-
-          if (serbuffer[20] && 5)
-          {
+            // Calculate power
             valueco = (uint32_t(serbuffer[14]) << 16) + (uint16_t(serbuffer[15]) << 8) + serbuffer[16];
             valueca = (uint32_t(serbuffer[17]) << 16) + (uint16_t(serbuffer[18]) << 8) + serbuffer[19];
             if (valueca > 0) powerval = double(double(valueco) / double(valueca));
             else powerval = 0;
-            if (statusbyte & 0x02) powerval = 0;
+            if (statusbyte & 0x02) powerval = 0; // When bit 1 of statusbyte is 1 powercycle exeeds range and power is 0
+          }
+
+          if (serbuffer[20] & 0x20)// Check if current cycle is completed
+          {
+            // Calculate Current
+            valueco = (uint32_t(serbuffer[8]) << 16) + (uint16_t(serbuffer[9]) << 8) + serbuffer[10];
+            valueca = (uint32_t(serbuffer[11]) << 16) + (uint16_t(serbuffer[12]) << 8) + serbuffer[13];
+            if (valueca > 0) currentval = double(double(valueco) / double(valueca));
+            else currentval = 0;
+            if (powerval == 0) currentval = 0; // If power is 0, current is also 0
           }
         }
         serpointer = 0;
       }
     }
-    else
+    else // When header not found move second byte to first byte and fill second byte with byte from serial on next round
     {
       serbuffer[0] = serbuffer[1];
       serpointer = 1;
     }
-    if (serpointer == 24)
+    if (serpointer == 24) // If serbuffer is full flush serial and reset serpointer
     {
       Serial.flush();
       serpointer = 0;
     }
-
   }
   yield();
 #endif
