@@ -103,6 +103,17 @@ int8_t smartmeter_handle()
         sprintf(gasdatetime, "%02d-%02d-%02d %d:%02d:%02d", day, month, year, hour, minute, second);
         _smartmeter_callback("gas/datetime", String(gasdatetime));
         returnvalue += 2;
+
+        static uint8_t oldhour = 255;
+        static float oldgas = 0;
+        if (oldhour != hour)
+        {
+            oldhour = hour;
+            float gasm3h = value - oldgas;
+            if (oldgas == 0) _smartmeter_callback("gas/m3h", "-");
+            else _smartmeter_callback("gas/m3h", String(gasm3h, 3));
+            oldgas = value;
+        }
       }
 
       buffer[0] = 0;
