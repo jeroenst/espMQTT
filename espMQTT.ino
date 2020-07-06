@@ -59,7 +59,8 @@
 // #define ESPMQTT_SONOFFDUAL
 // #define ESPMQTT_SONOFFS20_PRINTER
 // #define ESPMQTT_SONOFFPOW
-#define ESPMQTT_SONOFFPOWR2 // tv&washingmachine&server&dishwasher
+// #define ESPMQTT_SONOFFPOWR2 // tv&washingmachine&server&dishwasher
+#define ESPMQTT_SONOFFTH
 
 #define ESPMQTT_VERSION "TEST"
 #else
@@ -314,7 +315,7 @@ static bool sonoff_oldbuttons[1] = {1};
 
 
 #ifdef  ESPMQTT_SONOFFPOWR2
-#undef SERIALLOG
+undef SERIALLOG
 #define FIRMWARE_TARGET "SONOFFPOWR2"
 #ifndef ARDUINO_ESP8266_ESP01
 #error "Wrong board selected! Select Generic ESP8285 module"
@@ -329,6 +330,22 @@ static bool sonoff_oldbuttons[1] = {1};
 double voltval = -1;
 double currentval = -1;
 double powerval = -1;
+#endif
+
+#ifdef  ESPMQTT_SONOFFTH
+#define FIRMWARE_TARGET "SONOFFTH"
+#ifndef ARDUINO_ESP8266_ESP01
+#error "Wrong board selected! Select Generic ESP8285 module"
+#endif
+
+#define FLASHBUTTON 0
+#define ESPLED 13
+#define SONOFFCH 1
+#define ONEWIREPIN 14
+
+const byte sonoff_relays[1] = {12};
+const byte sonoff_buttons[1] = {0};
+static bool sonoff_oldbuttons[1] = {1};
 #endif
 
 #ifdef  ESPMQTT_SONOFFBULB
@@ -606,6 +623,11 @@ DeviceAddress onewire_OutsideAddress;
 float onewire_chOutsideTemperature = -127;
 float oldonewire_chOutsideTemperature = -127;
 #endif
+
+#ifdef  ESPMQTT_SONOFFTH
+DeviceAddress onewire_address;
+#endif
+
 
 #ifdef  ESPMQTT_SONOFF_FLOORHEATING
 DeviceAddress onewire_floorWaterAddress;
@@ -2217,6 +2239,12 @@ void loop()
       DEBUG_V("Requesting DS18B20 temperatures...\n");
       oneWireSensors.requestTemperatures();
       float temperature;
+#ifdef  ESPMQTT_SONOFFTH
+      temperature = oneWireSensors.getTempC(onewire_address);
+      DEBUG_I("temperature=%f\n", temperature);
+      if (temperature != -127) putdatamap("temperature", String(temperature, 1));
+      else putdatamap("temperature", "-");
+#endif
 #ifdef  ESPMQTT_OPENTHERM
       temperature = oneWireSensors.getTempC(onewire_chReturnWaterThermometer);
       DEBUG_I("chreturnwatertemp=%f\n", temperature);
@@ -3320,6 +3348,12 @@ void setup() {
 #ifdef  ESPMQTT_WEATHER
   if (!oneWireSensors.getAddress(onewire_OutsideAddress, 0)) {
     DEBUG_E("Unable to find address for onewire_outsidetemp\n");
+  }
+#endif
+
+#ifdef  ESPMQTT_SONOFFTH
+  if (!oneWireSensors.getAddress(onewire_address, 0)) {
+    DEBUG_E("Unable to find address for onewire temperature sensor\n");
   }
 #endif
 
