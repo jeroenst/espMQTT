@@ -315,7 +315,7 @@ static bool sonoff_oldbuttons[1] = {1};
 
 
 #ifdef  ESPMQTT_SONOFFPOWR2
-undef SERIALLOG
+#undef SERIALLOG
 #define FIRMWARE_TARGET "SONOFFPOWR2"
 #ifndef ARDUINO_ESP8266_ESP01
 #error "Wrong board selected! Select Generic ESP8285 module"
