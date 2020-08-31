@@ -2010,40 +2010,40 @@ void loop()
     {
       case 1:
         putdatamap("status", "querying");
-        putdatamap("voltage", String(sdm.readVal(SDM120CT_VOLTAGE), 2));
+        putdatamap("voltage", doubletostring(sdm.readVal(SDM120CT_VOLTAGE), 2));
         break;
       case 2:
-        putdatamap("current", String(sdm.readVal(SDM120CT_CURRENT), 2));
+        putdatamap("current", doubletostring(sdm.readVal(SDM120CT_CURRENT), 2));
         break;
       case 3:
-        putdatamap("power", String(sdm.readVal(SDM120CT_POWER), 2));
+        putdatamap("power", doubletostring(sdm.readVal(SDM120CT_POWER), 2));
         break;
       case 4:
-        putdatamap("power/apparant", String(sdm.readVal(SDM120CT_APPARENT_POWER), 2));
+        putdatamap("power/apparant", doubletostring(sdm.readVal(SDM120CT_APPARENT_POWER), 2));
         break;
       case 5:
-        putdatamap("power/reactive", String(sdm.readVal(SDM120CT_REACTIVE_POWER), 2));
+        putdatamap("power/reactive", doubletostring(sdm.readVal(SDM120CT_REACTIVE_POWER), 2));
         break;
       case 6:
-        putdatamap("frequency", String(sdm.readVal(SDM120CT_FREQUENCY), 2));
+        putdatamap("frequency", doubletostring(sdm.readVal(SDM120CT_FREQUENCY), 2));
         break;
       case 7:
-        putdatamap("powerfactor", String(sdm.readVal(SDM120CT_POWER_FACTOR), 2));
+        putdatamap("powerfactor", doubletostring(sdm.readVal(SDM120CT_POWER_FACTOR), 2));
         break;
       case 8:
-        putdatamap("energy/active/import", String(sdm.readVal(SDM120CT_IMPORT_ACTIVE_ENERGY), 3));
+        putdatamap("energy/active/import", doubletostring(sdm.readVal(SDM120CT_IMPORT_ACTIVE_ENERGY), 3));
         break;
       case 9:
-        putdatamap("energy/active/export", String(sdm.readVal(SDM120CT_EXPORT_ACTIVE_ENERGY), 3));
+        putdatamap("energy/active/export", doubletostring(sdm.readVal(SDM120CT_EXPORT_ACTIVE_ENERGY), 3));
         break;
       case 10:
-        putdatamap("energy/active", String(sdm.readVal(SDM120CT_TOTAL_ACTIVE_ENERGY), 3));
+        putdatamap("energy/active", doubletostring(sdm.readVal(SDM120CT_TOTAL_ACTIVE_ENERGY), 3));
         break;
       case 11:
-        putdatamap("energy/reactive/import", String(sdm.readVal(SDM120CT_IMPORT_REACTIVE_ENERGY), 3));
+        putdatamap("energy/reactive/import", doubletostring(sdm.readVal(SDM120CT_IMPORT_REACTIVE_ENERGY), 3));
         break;
       case 12:
-        putdatamap("energy/reactive/export", String(sdm.readVal(SDM120CT_EXPORT_REACTIVE_ENERGY), 3));
+        putdatamap("energy/reactive/export", doubletostring(sdm.readVal(SDM120CT_EXPORT_REACTIVE_ENERGY), 3));
         break;
       case 13:
         value = sdm.readVal(SDM120CT_TOTAL_REACTIVE_ENERGY);
