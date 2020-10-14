@@ -113,7 +113,7 @@ void _ducobox_handleserial(String ducomessage)
           tempretry++;
           if (tempretry == 0) tempretry--;
         }
-        if (tempretry == 10) _ducobox_callback("2/temperature", "-");
+        if (tempretry == 30) _ducobox_callback("2/temperature", "-");
         _ducobox_callback("2/temperature/retries", String(tempretry));
 
         ducocmd = 3;
