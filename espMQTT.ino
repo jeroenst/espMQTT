@@ -5,7 +5,7 @@
     https://github.com/jeroenst/RemoteDebug
     https://github.com/jeroenst/ESPAsyncTCP
     https://github.com/jeroenst/async-mqtt-client
-    https://github.com/jeroenst/Syslog
+    https://github.com/jeroenst///syslog
 
    Optional libraries depending on defines:
     (Sonoff POW) https://github.com/jeroenst/hlw8012
@@ -19,7 +19,7 @@
 */
 
 #define DEBUGLEVEL Debug.DEBUG
-//#define SYSLOGDEBUG
+//#define //syslogDEBUG
 
 #ifndef ESPMQTT_BUILDSCRIPT // Only use defines when when firmware is not compiled from the build script...
 /* SETTINGS */
@@ -60,7 +60,9 @@
 // #define ESPMQTT_SONOFFS20_PRINTER
 // #define ESPMQTT_SONOFFPOW
 // #define ESPMQTT_SONOFFPOWR2 // tv&washingmachine&server&dishwasher
-#define ESPMQTT_SONOFFTH
+// #define ESPMQTT_SONOFFTH
+// #define ESPMQTT_GENERIC8255
+#define ESPMQTT_BHT002
 
 #define ESPMQTT_VERSION "TEST"
 #else
@@ -146,6 +148,18 @@ SDM sdm(serSDM, 2400);
 #include "qswifidimmer.h"
 #endif
 
+#ifdef  ESPMQTT_BHT002
+#define FIRMWARE_TARGET "BHT002"
+#define APONBOOT
+#include "bht002.h"
+#endif
+
+
+#ifdef  ESPMQTT_GENERIC8255
+#define FIRMWARE_TARGET "GENERIC8266"
+#define SERIALLOG
+#define APONBOOT
+#endif
 
 #ifdef  ESPMQTT_GENERIC8266
 #define FIRMWARE_TARGET "GENERIC8266"
@@ -513,24 +527,24 @@ AsyncMqttClient mqttClient;
 #include <ArduinoOTA.h>
 //#include <user_interface.h>
 #include "SimpleMap.h"
-#include <Syslog.h>
-#define syslogD(fmt, ...) if (WiFi.status() == WL_CONNECTED) syslog.logf(LOG_DEBUG,"(%s) " fmt, __func__, ##__VA_ARGS__)
-#define syslogI(fmt, ...) if (WiFi.status() == WL_CONNECTED) syslog.logf(LOG_INFO,"(%s) " fmt, __func__, ##__VA_ARGS__)
-#define syslogN(fmt, ...) if (WiFi.status() == WL_CONNECTED) syslog.logf(LOG_NOTICE,"(%s) " fmt, __func__, ##__VA_ARGS__)
-#define syslogW(fmt, ...) if (WiFi.status() == WL_CONNECTED) syslog.logf(LOG_WARNING,"(%s) " fmt, __func__, ##__VA_ARGS__)
-#define syslogE(fmt, ...) if (WiFi.status() == WL_CONNECTED) syslog.logf(LOG_ERR,"(%s) " fmt, __func__, ##__VA_ARGS__)
-#define syslogC(fmt, ...) if (WiFi.status() == WL_CONNECTED) syslog.logf(LOG_CRIT,"(%s) " fmt, __func__, ##__VA_ARGS__)
-#define syslogA(fmt, ...) if (WiFi.status() == WL_CONNECTED) syslog.logf(LOG_ALERT,"(%s) " fmt, __func__, ##__VA_ARGS__)
-#define syslogEM(fmt, ...) if (WiFi.status() == WL_CONNECTED) syslog.logf(LOG_EMERG,"(%s) " fmt, __func__, ##__VA_ARGS__)
+//#include <//syslog.h>
+//#define //syslogD(fmt, ...) if (WiFi.status() == WL_CONNECTED) //syslog.logf(LOG_DEBUG,"(%s) " fmt, __func__, ##__VA_ARGS__)
+//#define //syslogI(fmt, ...) if (WiFi.status() == WL_CONNECTED) //syslog.logf(LOG_INFO,"(%s) " fmt, __func__, ##__VA_ARGS__)
+//#define //syslogN(fmt, ...) if (WiFi.status() == WL_CONNECTED) //syslog.logf(LOG_NOTICE,"(%s) " fmt, __func__, ##__VA_ARGS__)
+//#define //syslogW(fmt, ...) if (WiFi.status() == WL_CONNECTED) //syslog.logf(LOG_WARNING,"(%s) " fmt, __func__, ##__VA_ARGS__)
+//#define //syslogE(fmt, ...) if (WiFi.status() == WL_CONNECTED) //syslog.logf(LOG_ERR,"(%s) " fmt, __func__, ##__VA_ARGS__)
+//#define //syslogC(fmt, ...) if (WiFi.status() == WL_CONNECTED) //syslog.logf(LOG_CRIT,"(%s) " fmt, __func__, ##__VA_ARGS__)
+//#define //syslogA(fmt, ...) if (WiFi.status() == WL_CONNECTED) //syslog.logf(LOG_ALERT,"(%s) " fmt, __func__, ##__VA_ARGS__)
+//#define //syslogEM(fmt, ...) if (WiFi.status() == WL_CONNECTED) //syslog.logf(LOG_EMERG,"(%s) " fmt, __func__, ##__VA_ARGS__)
 
 #include <ESP8266Ping.h>
 
 // A UDP instance to let us send and receive packets over UDP
-WiFiUDP udpClientSyslog;
-WiFiUDP udpClient;
+//WiFiUDP udpClient//syslog;
+//WiFiUDP udpClient;
 
-// Create a new empty syslog instance
-Syslog syslog(udpClientSyslog, SYSLOG_PROTO_IETF);
+// Create a new empty //syslog instance
+////syslog //syslog(udpClient//syslog, //syslog_PROTO_IETF);
 
 
 #ifdef HLW8012_CF_PIN
@@ -1033,6 +1047,8 @@ void onMqttUnsubscribe(uint16_t packetId) {
 
 void mqttdosubscriptions(int32_t packetId = -1)
 {
+  const uint8_t nr_of_subsribe_topics = 22;
+
   DEBUG_D("mqttdosubscriptions (%d)\n", packetId);
   static int32_t nextpacketid = -1;
   static uint16_t nextsubscribe = 0;
@@ -1042,7 +1058,7 @@ void mqttdosubscriptions(int32_t packetId = -1)
   if (packetId > 0) nextsubscribe++;
   nextpacketid = -1;
   subscribetopic = "";
-  while ((subscribetopic == "") && (nextsubscribe <= 21))
+  while ((subscribetopic == "") && (nr_of_subsribe_topics <= 22))
   {
     //DEBUG("mqttdosubscriptions while nextsubscribe=%d\n", nextsubscribe);
     switch (nextsubscribe)
@@ -1087,6 +1103,9 @@ void mqttdosubscriptions(int32_t packetId = -1)
       case 20:  subscribetopic = mqtt_topicprefix + "setdimstate/1"; break;
 #endif
       case 21:  subscribetopic = mqtt_topicprefix + "startfirmwareupgrade"; break;
+#ifdef ESPMQTT_BHT002
+      case 22: subscribetopic = mqtt_topicprefix + "setsetpoint"; break;
+#endif
     }
     if (subscribetopic == "") nextsubscribe++;
   }
@@ -1132,8 +1151,8 @@ void initSerial()
   Serial.begin(38400, SERIAL_8N1);
 #elif defined ( ESPMQTT_ZMAI90)
   Serial.setDebugOutput(false);
-  Serial.begin(9600, SERIAL_8E1);  
-#elif defined (ESPMQTT_SMARTMETER) || defined (QSWIFIDIMMERCHANNELS)
+  Serial.begin(9600, SERIAL_8E1);
+#elif defined (ESPMQTT_SMARTMETER) || defined (QSWIFIDIMMERCHANNELS) || defined (ESPMQTT_BHT002)
   // do nothing, smartmeter initializes serial in init function.
 #else
   Serial.begin(115200); //Init serial 115200 baud
@@ -1304,6 +1323,9 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties,
   {
     triggers.firmwareupgrade = payloadstring;
   }
+#ifdef ESPMQTT_BHT002
+  if (topicstring == mqtt_topicprefix + "setsetpoint") bht002_setsetpoint(payloadstring.toInt());
+#endif
 }
 
 String uint64ToString(uint64_t input) {
@@ -1476,17 +1498,21 @@ void loop()
   {
     triggers.wificonnected = false;
     DEBUG_I("Connected to WiFi SSID=%s RSSI=%d\n", WiFi.SSID().c_str(), WiFi.RSSI());
-    syslogN("Connected to WiFi SSID=%s RSSI=%d\n", WiFi.SSID().c_str(), WiFi.RSSI());
+    //syslogN("Connected to WiFi SSID=%s RSSI=%d\n", WiFi.SSID().c_str(), WiFi.RSSI());
     initMqtt();
     connectToMqtt();
-#ifdef SYSLOGDEBUG
-    for (int i = 0; i < dataMap->size(); i++)
-    {
-      syslogD("%s=%s (%d)\n", dataMap->getKey(i).c_str(), dataMap->getData(i).payload.c_str(), dataMap->getData(i).send);
-      yield();
-    }
-#endif
+
+    /*#ifdef syslogDEBUG
+        for (int i = 0; i < dataMap->size(); i++)
+        {
+          //syslogD("%s=%s (%d)\n", dataMap->getKey(i).c_str(), dataMap->getData(i).payload.c_str(), dataMap->getData(i).send);
+          yield();
+        }
+      #endif*/
     MDNS.begin(esp_hostname.c_str());
+#ifdef ESPMQTT_BHT002
+    bht002_connected();
+#endif
   }
 
   if (triggers.wifidisconnected)
@@ -1495,13 +1521,16 @@ void loop()
     DEBUG_W("Disconnected from Wi-Fi.\n");
     disconnectMqtt();
     if (!mainstate.accesspoint) wifiReconnectTimer.once(2, connectToWifi); // trying to connect to wifi can cause AP to fail
+#ifdef ESPMQTT_BHT002
+    bht002_disconnected();
+#endif
   }
 
   if (triggers.mqttconnected)
   {
     triggers.mqttconnected = false;
     DEBUG_I("Connected to MQTT Server=%s\n", mqtt_server.c_str());
-    syslogN("Connected to MQTT Server=%s\n", mqtt_server.c_str());
+    //syslogN("Connected to MQTT Server=%s\n", mqtt_server.c_str());
     yield(); // Prevent crash because of to many debug data to send
     update_systeminfo(true);
     mqttdosubscriptions();
@@ -1512,7 +1541,7 @@ void loop()
   {
     triggers.mqttdisconnected = false;
     DEBUG_W("Disconnected from MQTT Server=%s\n", mqtt_server.c_str());
-    syslogN("Disconnected from MQTT Server=%s\n", mqtt_server.c_str());
+    //syslogN("Disconnected from MQTT Server=%s\n", mqtt_server.c_str());
     yield(); // Prevent crash because of to many debug data to send
     if (WiFi.isConnected()) {
       mqttReconnectTimer.once(5, connectToMqtt);
@@ -1687,6 +1716,11 @@ void loop()
 #ifdef  ESPMQTT_GENERIC8266
 #endif
 
+#ifdef  ESPMQTT_BHT002
+  bht002_handle();
+  yield();
+#endif
+
 #ifdef RAINMETERPIN
   static uint32_t rainpinmillis = 0;
   static uint32_t rainpulses = 0;
@@ -1762,7 +1796,7 @@ void loop()
     {
       watermeter_liters = watermeter_getliters();
       i2cEeprom_write(watermeter_liters);
-      syslogN("Watermeter Liters Changed=%d\n", watermeter_liters);
+      //syslogN("Watermeter Liters Changed=%d\n", watermeter_liters);
       putdatamap("water/liter", String(watermeter_liters));
       putdatamap("water/m3", String((double(watermeter_liters) / 1000), 3));
     }
@@ -1787,99 +1821,99 @@ void loop()
     {
       case 3:
         zmai90value = zmai90data;
-      break;
+        break;
       case 4:
         zmai90value += zmai90data * 100;
-      break;
+        break;
       case 5:
         zmai90value += zmai90data * 10000;
-      break;
+        break;
       case 6:
         zmai90value += zmai90data * 1000000;
-        putdatamap ("energy/kwh", String((double)zmai90value/100, 2));
-      break;
+        putdatamap ("energy/kwh", String((double)zmai90value / 100, 2));
+        break;
 
       case 7:
         zmai90value = zmai90data;
-      break;
+        break;
       case 8:
         zmai90value += zmai90data * 100;
-      break;
+        break;
       case 9:
         zmai90value += zmai90data * 10000;
-      break;
+        break;
       case 10:
         zmai90value += zmai90data * 1000000;
-        putdatamap ("voltage", String((double)zmai90value/10, 1));
-      break;
+        putdatamap ("voltage", String((double)zmai90value / 10, 1));
+        break;
 
       case 11:
         zmai90value = zmai90data;
-      break;
+        break;
       case 12:
         zmai90value += zmai90data * 100;
-      break;
+        break;
       case 13:
         zmai90value += zmai90data * 10000;
-      break;
+        break;
       case 14:
         zmai90value += zmai90data * 1000000;
-        putdatamap ("current", String((double)zmai90value/10000, 4));
-      break;
+        putdatamap ("current", String((double)zmai90value / 10000, 4));
+        break;
 
       case 15:
         zmai90value = zmai90data;
-      break;
+        break;
       case 16:
         zmai90value += zmai90data * 100;
-        putdatamap ("frequency", String((double)zmai90value/100, 2));
-      break;
+        putdatamap ("frequency", String((double)zmai90value / 100, 2));
+        break;
 
 
       case 19:
         zmai90value = zmai90data;
-      break;
+        break;
       case 20:
         zmai90value += zmai90data * 100;
-      break;
+        break;
       case 21:
         zmai90value += zmai90data * 10000;
-      break;
+        break;
       case 22:
         zmai90value += zmai90data * 1000000;
-        putdatamap ("power/active", String((double)zmai90value/100, 1));
-      break;
+        putdatamap ("power/active", String((double)zmai90value / 100, 1));
+        break;
 
       case 23:
         zmai90value = zmai90data;
-      break;
+        break;
       case 24:
         zmai90value += zmai90data * 100;
-      break;
+        break;
       case 25:
         zmai90value += zmai90data * 10000;
-      break;
+        break;
       case 26:
         zmai90value += zmai90data * 1000000;
-        putdatamap ("power/reactive", String((double)zmai90value/100, 1));
-      break;
+        putdatamap ("power/reactive", String((double)zmai90value / 100, 1));
+        break;
 
       case 27:
         zmai90value = zmai90data;
-      break;
+        break;
       case 28:
         zmai90value += zmai90data * 100;
-      break;
+        break;
       case 29:
         zmai90value += zmai90data * 10000;
-      break;
+        break;
       case 30:
         zmai90value += zmai90data * 1000000;
-        putdatamap ("power/apparent", String((double)zmai90value/100, 1));
-      break;
+        putdatamap ("power/apparent", String((double)zmai90value / 100, 1));
+        break;
     }
     zmai90pointer++;
-  } 
+  }
 #endif
 
 #ifdef  ESPMQTT_SMARTMETER
@@ -2145,7 +2179,7 @@ void loop()
       strtime.replace("\n", "");
       if (mainstate.wificonnected)
       {
-        syslogI("Uptime=%s DateTime=%s\n", uptimestr, strtime.c_str());
+        //syslogI("Uptime=%s DateTime=%s\n", uptimestr, strtime.c_str());
       }
       DEBUG_I("Uptime=%s DateTime=%s\n", uptimestr, strtime.c_str());
       yield();
@@ -2160,16 +2194,16 @@ void loop()
       putdatamap("voltage", voltval >= 0 ? String(voltval, 1) : "-");
       putdatamap("current", currentval >= 0 ? String(currentval, 3) : "-");
       putdatamap("power", powerval >= 0 ? String(powerval, 1) : "-");
-      putdatamap("power/apparent", currentval >=0 ? String(voltval*currentval, 1) : "-");
+      putdatamap("power/apparent", currentval >= 0 ? String(voltval * currentval, 1) : "-");
       // Convert deciwattsec to watt per second (ws) string
-      uint32_t lowws = (deciwattsec/10) % 0xFFFFFFFF;
-      uint32_t highws = ((deciwattsec/10) >> 32) % 0xFFFFFFFF;
+      uint32_t lowws = (deciwattsec / 10) % 0xFFFFFFFF;
+      uint32_t highws = ((deciwattsec / 10) >> 32) % 0xFFFFFFFF;
       String ws = (highws > 0 ? String(highws) : "") + String(lowws);
       putdatamap("energy/ws", ws);
       // Convert watt per second to kwh
       String wh = (highws > 0 ? String(highws / 3600) : "") + String(lowws / 3600);
       wh = String(wh.length() < 4 ? "0" : "") + String(wh.length() < 3 ? "0" : "") + String(wh.length() < 2 ? "0" : "") + wh; // Add leading zeros to wh before converting to kwh
-      String kwh = wh.substring(0,wh.length()-3) + "." +wh.substring(wh.length()-3); // Add decimal for wh to kwh conversion;
+      String kwh = wh.substring(0, wh.length() - 3) + "." + wh.substring(wh.length() - 3); // Add decimal for wh to kwh conversion;
       putdatamap("energy/kwh", kwh);
     }
 #endif
@@ -2216,11 +2250,11 @@ void loop()
 
 
 #ifdef ESPMQTT_ZMAI90
-    if (uptime % 10 == 0) 
+    if (uptime % 10 == 0)
     {
       uint8_t cmd[9] = {0xFE, 0x01, 0x0F, 0x08, 0x00, 0x00, 0x00, 0x1C};
       // command to ask for data
-  
+
       DEBUG_V("Sending ZMAI request packet...\n");
 
       Serial.flush();
@@ -2459,29 +2493,29 @@ void sonoff_handle()
 #ifdef HLW8012_CF_PIN
   static unsigned long nextupdatetime = 0;
   static unsigned long nextfiltertime = 0;
-  static unsigned int filtered_power = hlw8012.getActivePower()*10;
-  static unsigned int filtered_apparent_power = hlw8012.getApparentPower()*10;
-  static unsigned int filtered_reactive_power = hlw8012.getReactivePower()*10;
-  static unsigned int filtered_current = hlw8012.getCurrent()*1000;
-  static unsigned int filtered_voltage = hlw8012.getVoltage()*10;
+  static unsigned int filtered_power = hlw8012.getActivePower() * 10;
+  static unsigned int filtered_apparent_power = hlw8012.getApparentPower() * 10;
+  static unsigned int filtered_reactive_power = hlw8012.getReactivePower() * 10;
+  static unsigned int filtered_current = hlw8012.getCurrent() * 1000;
+  static unsigned int filtered_voltage = hlw8012.getVoltage() * 10;
   if (millis() > nextfiltertime)
   {
     nextfiltertime = millis() + 100;
-    filtered_power = ((filtered_power * 4) + (hlw8012.getActivePower()*10)) / 5;
-    filtered_apparent_power = ((filtered_apparent_power * 4) + (hlw8012.getApparentPower()*10)) / 5;
-    filtered_reactive_power = ((filtered_reactive_power * 4) + (hlw8012.getReactivePower()*10)) / 5;
-    filtered_current = ((filtered_current * 4) + (hlw8012.getCurrent()*1000)) / 5;
-    filtered_voltage = ((filtered_voltage * 4) + (hlw8012.getVoltage()*10)) / 5;
+    filtered_power = ((filtered_power * 4) + (hlw8012.getActivePower() * 10)) / 5;
+    filtered_apparent_power = ((filtered_apparent_power * 4) + (hlw8012.getApparentPower() * 10)) / 5;
+    filtered_reactive_power = ((filtered_reactive_power * 4) + (hlw8012.getReactivePower() * 10)) / 5;
+    filtered_current = ((filtered_current * 4) + (hlw8012.getCurrent() * 1000)) / 5;
+    filtered_voltage = ((filtered_voltage * 4) + (hlw8012.getVoltage() * 10)) / 5;
   }
   if (millis() > nextupdatetime)
   {
-    putdatamap("voltage", String(((double)filtered_voltage/10), 0));
+    putdatamap("voltage", String(((double)filtered_voltage / 10), 0));
     putdatamap("voltage/multiplier", String(hlw8012.getVoltageMultiplier()));
-    putdatamap("current", String(((double)filtered_current/1000), 3));
+    putdatamap("current", String(((double)filtered_current / 1000), 3));
     putdatamap("current/multiplier", String(hlw8012.getCurrentMultiplier()));
-    putdatamap("power", String(((double)filtered_power/10),1));
-    putdatamap("power/apparent", String(((double)filtered_apparent_power/10),1));
-    putdatamap("power/reactive", String(((double)filtered_reactive_power/10),1));
+    putdatamap("power", String(((double)filtered_power / 10), 1));
+    putdatamap("power/apparent", String(((double)filtered_apparent_power / 10), 1));
+    putdatamap("power/reactive", String(((double)filtered_reactive_power / 10), 1));
     putdatamap("power/factor", String(hlw8012.getPowerFactor(), 2));
     putdatamap("power/multiplier", String(hlw8012.getPowerMultiplier()));
     putdatamap("energy/ws", String(hlw8012.getEnergy()));
@@ -3107,6 +3141,12 @@ void amgpelletstovecallback (String topic, String payload)
   putdatamap(topic, payload);
 }
 
+void bht002callback (String topic, String payload)
+{
+  putdatamap(topic, payload);
+  yield();
+}
+
 void openthermcallback (String topic, String payload)
 {
   putdatamap(topic, payload);
@@ -3249,6 +3289,11 @@ void setup() {
 #endif
 
 
+#ifdef ESPMQTT_BHT002
+  bht002_init(bht002callback);
+#endif
+
+
 #ifdef SONOFFCH
   sonoff_init();
 #endif
@@ -3263,10 +3308,10 @@ void setup() {
   Debug.setResetCmdEnabled(true);
   Debug.setCallBackProjectCmds(&processCmdRemoteDebug);
 
-  syslog.server(mqtt_server.c_str(), 514);
-  syslog.deviceHostname(esp_hostname.c_str());
-  syslog.appName(FIRMWARE_TARGET);
-  syslog.defaultPriority(LOG_KERN);
+  //syslog.server(mqtt_server.c_str(), 514);
+  //syslog.deviceHostname(esp_hostname.c_str());
+  //syslog.appName(FIRMWARE_TARGET);
+  //syslog.defaultPriority(LOG_KERN);
 
   DEBUG_I("ESP8266 Started...\n");
   DEBUG_I("Hostname=%s\n", WiFi.hostname().c_str());
@@ -3374,7 +3419,7 @@ void setup() {
   MDNS.addService("http", "tcp", 80);
 
   systemTimer.attach_ms(100, systemTimerCallback);
-// In my case the ZMAI90 is always on because it is the main power feed of the house
+  // In my case the ZMAI90 is always on because it is the main power feed of the house
 #ifdef ESPMQTT_ZMAI90
   digitalWrite(ZMAI90RELAY, 1);
   pinMode(ZMAI90RELAY, OUTPUT);
@@ -3559,6 +3604,14 @@ void processCmdRemoteDebug()
     i2cEeprom_write(watermeter_getliters());
   }
 #endif
+
+#ifdef ESPMQTT_BHT002
+  if (lastCmd == "b")
+  {
+    bht002_senddebug(atoi(lastArg.c_str()));
+  }
+#endif
+
 }
 
 static void handleDataExternalIpServer(void*, AsyncClient* client, void *data, size_t len) {
