@@ -18,6 +18,7 @@ void smartmeter_init(void(*callback)(String,String))
 int8_t smartmeter_handle()
 {
   float value = 0;
+  static double kwh = 0;
   int8_t returnvalue = 0;
   int day, month, year, hour, minute, second;
   char summerwinter;
@@ -40,12 +41,14 @@ int8_t smartmeter_handle()
 //      }
       if (buffer[0] == '/')
       {
+        kwh = 0;
         _smartmeter_callback("status", "receiving");
       }
 
       if (buffer[0] == '!')
       {
         _smartmeter_callback("electricity/watt", String(watt));
+        _smartmeter_callback("electricity/kwh_total", String(kwh,3));
         watt = 0;
         _smartmeter_callback("status", "ready");
       }
@@ -54,6 +57,7 @@ int8_t smartmeter_handle()
       // 1-0:1.8.1 = Electricity low tarif used
       if (sscanf(buffer, "1-0:1.8.1(%f" , &value) == 1)
       {
+        kwh += value;
         _smartmeter_callback("electricity/kwh_used1", String(value, 3));
         returnvalue++;
       }
@@ -61,6 +65,7 @@ int8_t smartmeter_handle()
       // 1-0:1.8.2 = Electricity high tarif used (DSMR v4.0)
       if (sscanf(buffer, "1-0:1.8.2(%f" , &value) == 1)
       {
+        kwh += value;
         _smartmeter_callback("electricity/kwh_used2", String(value, 3));
         returnvalue++;
       }
@@ -68,6 +73,7 @@ int8_t smartmeter_handle()
       // 1-0:2.8.1 = Electricity low tarif provided
       if (sscanf(buffer, "1-0:2.8.1(%f" , &value) == 1)
       {
+        kwh -= value;
         _smartmeter_callback("electricity/kwh_provided1", String(value, 3));
         returnvalue++;
       }
@@ -75,6 +81,7 @@ int8_t smartmeter_handle()
       // 1-0:2.8.2 = Electricity high tarif provided (DSMR v4.0)
       if (sscanf(buffer, "1-0:2.8.2(%f" , &value) == 1)
       {
+        kwh -= value;
         _smartmeter_callback("electricity/kwh_provided2", String(value, 3));
         returnvalue++;
       }
