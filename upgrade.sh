@@ -54,7 +54,7 @@ then
 	upgrade $1 esp_bedroom2 ESPMQTT_BEDROOM2
 	upgrade $1 esp_opentherm ESPMQTT_OPENTHERM
 	upgrade $1 esp_pelletstove ESPMQTT_AMGPELLETSTOVE
-	upgrade $1 sonoff_tv ESPMQTT_SONOFFPOWR2
+	upgrade $1 sonoff_tv ESPMQTT_SONOFFPOW
 	upgrade $1 sonoff_washingmachine ESPMQTT_SONOFFPOWR2
 	upgrade $1 sonoff_pond ESPMQTT_GARDEN
 	upgrade $1 sonoff_shelter ESPMQTT_GARDEN
@@ -73,7 +73,7 @@ then
 	upgrade $1 QSWIFIDIMMER04 ESPMQTT_QSWIFIDIMMERD01
 	upgrade $1 QSWIFIDIMMER05 ESPMQTT_QSWIFIDIMMERD02
 	upgrade $1 sonoff_dishwasher ESPMQTT_SONOFFPOWR2
-#	upgrade $1 blitzwolf_001 ESPMQTT_BLITZWOLF
+	upgrade $1 blitzwolf_coffee ESPMQTT_BLITZWOLF
 	exit 0
 fi
 
