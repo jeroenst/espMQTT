@@ -21,7 +21,7 @@ void _ducobox_writeserialqueue()
     if (_serialsendqueue.length() > 0)
     {
       Serial.print (_serialsendqueue[0]);
-      _serialsendqueue.remove(0,1); 
+      _serialsendqueue.remove(0, 1);
     }
     nextsend = millis() + 50;
   }
@@ -65,7 +65,7 @@ void _ducobox_handleserial(String ducomessage)
   static uint8_t ducocmd = 0;
   String topic = "";
   String ducovalue = "";
-  
+
   DEBUG_V ("ducomessage='%s'\n", ducomessage.c_str());
 
   if (ducomessage.indexOf("  FanSpeed:") == 0)
@@ -101,7 +101,7 @@ void _ducobox_handleserial(String ducomessage)
     {
       case 2:
         // Read node 2 temperature
-        static uint8_t tempretry = 0;
+        static uint8_t texmpretry = 0;
         if (ducomessage != "")
         {
           ducovalue = String(float(ducomessage.substring(6).toInt()) / 10, 1);
@@ -133,7 +133,7 @@ void _ducobox_handleserial(String ducomessage)
           co2retry++;
           if (co2retry == 0) co2retry--;
         }
-        if (co2retry == 10)
+        if (co2retry == 30)
         {
           _ducobox_callback("2/co2", "-");
           _ducobox_co2 = 0;
@@ -225,7 +225,7 @@ void ducobox_handle()
   }
   else
   {
-    if (Serial.available() > 0) 
+    if (Serial.available() > 0)
     {
       char ducochar = char(Serial.read());
       if (ducochar != '\r') serialmessage += ducochar;
