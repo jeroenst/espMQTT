@@ -101,7 +101,7 @@ void _ducobox_handleserial(String ducomessage)
     {
       case 2:
         // Read node 2 temperature
-        static uint8_t texmpretry = 0;
+        static uint8_t tempretry = 0;
         if (ducomessage != "")
         {
           ducovalue = String(float(ducomessage.substring(6).toInt()) / 10, 1);
