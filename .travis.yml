@@ -1,7 +1,9 @@
 ---
-if: tag IS present
+#if: tag IS present
 language: c
+arch: amd64
 os: linux
+dist: xenial
 cache:
   directories:
     - ~/arduino_ide
@@ -19,7 +21,7 @@ addons:
       - clang-format-5.0
 env:
   global:
-    - ARDUINO_IDE_VERSION="1.8.12"
+    - ARDUINO_IDE_VERSION="1.8.13"
     - PRETTYNAME="espMQTT"
     - TRAVISBUILD="yes"
 # Optional, will default to "$TRAVIS_BUILD_DIR/Doxyfile"
@@ -45,7 +47,13 @@ deploy:
   provider: releases
   token: $GITHUBAPIKEY
   file_glob: true
-  skip_cleanup: true
   file: ./builds/$TRAVIS_TAG/*.bin
   on:
     tags: true
+
+notifications:
+  email:
+    recipients:
+      - $EMAILADDRESS
+    on_success: always # default: change
+    on_failure: always # default: always

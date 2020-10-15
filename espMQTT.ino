@@ -697,6 +697,23 @@ void ICACHE_RAM_ATTR hlw8012_cf_interrupt() {
 
 
 void publishdatamap(int32_t packetId = -1, bool publishall = false, bool init = false);
+
+
+String getRandomString(int len) {
+  static const char alphanum[] =
+    "0123456789"
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    "abcdefghijklmnopqrstuvwxyz";
+
+  String returnstring = "";
+
+  for (int i = 0; i < len; ++i) {
+    returnstring += alphanum[random(sizeof(alphanum) - 1)];
+  }
+
+  return returnstring;
+}
+
 void updateexternalip();
 
 String getdatamap(String topic)
@@ -980,46 +997,6 @@ void connectToWifi()
   }
 }
 
-void initMqtt()
-{
-  // Because mqtt lib uses a pointer to const char[], we have to make a static variables
-  static String willtopic = String(mqtt_topicprefix) + "status";
-
-  mqttClient.onMessage(onMqttMessage);
-  mqttClient.onDisconnect(onMqttDisconnect);
-  mqttClient.onConnect(onMqttConnect);
-  mqttClient.onSubscribe(onMqttSubscribe);
-  mqttClient.onUnsubscribe(onMqttUnsubscribe);
-  mqttClient.onPublish(onMqttPublish);
-  mqttClient.setCredentials(mqtt_username.c_str(), mqtt_password.c_str());
-  mqttClient.setServer(mqtt_server.c_str(), mqtt_port);
-  mqttClient.setWill(willtopic.c_str(), 0, 1, "offline");
-  mqttClient.setSecure(mqtt_ssl);
-  //#define MQTT_SERVER_FINGERPRINT {0x3F, 0x80, 0xCF, 0x16, 0xD9, 0x43, 0x3B, 0x92, 0xB6, 0x3A, 0x0A, 0x02, 0xFE, 0x27, 0x0B, 0x60, 0xC1, 0x9A, 0x8B, 0xB1}
-  //mqttClient.addServerFingerprint((const uint8_t[])MQTT_SERVER_FINGERPRINT);
-}
-
-void connectToMqtt()
-{
-  DEBUG_I("Connecting to Mqtt\n");
-  if (!mainstate.mqttconnected)
-  {
-    mqttClient.disconnect();
-    mqttClient.connect();
-    mqttReconnectTimer.once(30, connectToMqtt); // retry over 30 seconds if connection can not be established
-  }
-}
-
-void disconnectMqtt()
-{
-  DEBUG_W("Disconnecting Mqtt\n");
-  mqttReconnectTimer.detach();
-  mqttClient.disconnect();
-  mainstate.mqttconnected = false;
-  mainstate.mqttready = false;
-  triggers.mqttdisconnected = true;
-}
-
 void onMqttConnect(bool sessionPresent) {
   DEBUG_I("Connected to MQTT sessionPresent=%d\n", sessionPresent);
   mqttReconnectTimer.detach();
@@ -1132,85 +1109,6 @@ void onMqttPublish(uint16_t packetId)
   triggers.mqttpublished = true;
   mqttlastpublishedpacketid = packetId;
 }
-
-void initSerial()
-{
-  Serial.setRxBufferSize(2048);
-#if defined(MH_Z19) || defined( ESPMQTT_OPENTHERM) || defined( ESPMQTT_GROWATT)
-  Serial.setDebugOutput(false);
-  Serial.begin(9600);  //Init serial 9600 baud
-#elif defined ( ESPMQTT_SONOFFPOWR2)
-  Serial.setDebugOutput(false);
-  Serial.begin(4800, SERIAL_8E1);
-#elif defined ( ESPMQTT_AMGPELLETSTOVE)
-  Serial.setDebugOutput(false);
-#elif defined ( ESPMQTT_SDM120) || defined (ESPMQTT_DDM18SD)
-  Serial.setDebugOutput(false);
-  sdm.begin();
-#elif defined ( ESPMQTT_OBD2)
-  Serial.setDebugOutput(false);
-  Serial.begin(38400, SERIAL_8N1);
-#elif defined ( ESPMQTT_ZMAI90)
-  Serial.setDebugOutput(false);
-  Serial.begin(9600, SERIAL_8E1);
-#elif defined (ESPMQTT_SMARTMETER) || defined (QSWIFIDIMMERCHANNELS) || defined (ESPMQTT_BHT002)
-  // do nothing, smartmeter initializes serial in init function.
-#else
-  Serial.begin(115200); //Init serial 115200 baud
-#endif
-
-#if defined(MH_Z19)
-  //  Serial.swap();
-  putdatamap ("mhz19/co2", "-");
-  putdatamap ("mhz19/temperature", "-");
-#endif
-}
-#ifdef DHTPIN
-void update_dht()
-{
-  static uint8 errors = 4;
-  float rh = dht.readHumidity();
-  // Read temperature as Celsius (the default)
-  float temp = dht.readTemperature();
-#ifdef DHTTEMPOFFSET
-  temp += DHTTEMPOFFSET;
-#endif
-
-  float hi = dht.computeHeatIndex(temp, rh, false);
-
-  // Check if any reads failed and exit early (to try again).
-  if (isnan(temp) || isnan(rh))
-  {
-    DEBUG_E("Reading DHT22 failed!\n");
-    if (errors < 255) errors++;
-  }
-  else errors = 0;
-
-  DEBUG_I("%s", ("DHT22 temp=" + String(temp, 1) + " rh=" + String(rh, 1) + " hi=" + String(hi, 1) + "\n").c_str());
-
-  if (errors == 0)
-  {
-    putdatamap("dht22/temperature", String(temp, 1));
-    putdatamap("dht22/humidity", String(rh, 1));
-    putdatamap("dht22/heatindex", String(hi, 1));
-  }
-
-  if (errors == 5)
-  {
-    putdatamap("dht22/temperature", "-");
-    putdatamap("dht22/humidity", "-");
-    putdatamap("dht22/heatindex", "-");
-  }
-
-#ifdef NEOPIXELPIN
-  if (rh < 1) neopixelleds.setPixelColor(1, neopixelleds.Color(0, 0, 0));
-  else if (rh < 60) neopixelleds.setPixelColor(1, neopixelleds.Color(0, 20, 0));
-  else if (rh < 90) neopixelleds.setPixelColor(1, neopixelleds.Color(30, 15, 0));
-  else neopixelleds.setPixelColor(1, neopixelleds.Color(50, 0, 0));
-  neopixelleds.show();
-#endif
-}
-#endif
 
 void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties, size_t len, size_t, size_t) {
   String payloadstring = "";
@@ -1346,6 +1244,128 @@ String uint64ToString(uint64_t input) {
   return result;
 }
 
+
+void initMqtt()
+{
+  // Because mqtt lib uses a pointer to const char[], we have to make a static variables
+  static String willtopic = String(mqtt_topicprefix) + "status";
+
+  mqttClient.onMessage(onMqttMessage);
+  mqttClient.onDisconnect(onMqttDisconnect);
+  mqttClient.onConnect(onMqttConnect);
+  mqttClient.onSubscribe(onMqttSubscribe);
+  mqttClient.onUnsubscribe(onMqttUnsubscribe);
+  mqttClient.onPublish(onMqttPublish);
+  mqttClient.setCredentials(mqtt_username.c_str(), mqtt_password.c_str());
+  mqttClient.setServer(mqtt_server.c_str(), mqtt_port);
+  mqttClient.setWill(willtopic.c_str(), 0, 1, "offline");
+  mqttClient.setSecure(mqtt_ssl);
+  //#define MQTT_SERVER_FINGERPRINT {0x3F, 0x80, 0xCF, 0x16, 0xD9, 0x43, 0x3B, 0x92, 0xB6, 0x3A, 0x0A, 0x02, 0xFE, 0x27, 0x0B, 0x60, 0xC1, 0x9A, 0x8B, 0xB1}
+  //mqttClient.addServerFingerprint((const uint8_t[])MQTT_SERVER_FINGERPRINT);
+}
+
+void connectToMqtt()
+{
+  DEBUG_I("Connecting to Mqtt\n");
+  if (!mainstate.mqttconnected)
+  {
+    mqttClient.disconnect();
+    mqttClient.connect();
+    mqttReconnectTimer.once(30, connectToMqtt); // retry over 30 seconds if connection can not be established
+  }
+}
+
+void disconnectMqtt()
+{
+  DEBUG_W("Disconnecting Mqtt\n");
+  mqttReconnectTimer.detach();
+  mqttClient.disconnect();
+  mainstate.mqttconnected = false;
+  mainstate.mqttready = false;
+  triggers.mqttdisconnected = true;
+}
+
+
+
+void initSerial()
+{
+  Serial.setRxBufferSize(2048);
+#if defined(MH_Z19) || defined( ESPMQTT_OPENTHERM) || defined( ESPMQTT_GROWATT)
+  Serial.setDebugOutput(false);
+  Serial.begin(9600);  //Init serial 9600 baud
+#elif defined ( ESPMQTT_SONOFFPOWR2)
+  Serial.setDebugOutput(false);
+  Serial.begin(4800, SERIAL_8E1);
+#elif defined ( ESPMQTT_AMGPELLETSTOVE)
+  Serial.setDebugOutput(false);
+#elif defined ( ESPMQTT_SDM120) || defined (ESPMQTT_DDM18SD)
+  Serial.setDebugOutput(false);
+  sdm.begin();
+#elif defined ( ESPMQTT_OBD2)
+  Serial.setDebugOutput(false);
+  Serial.begin(38400, SERIAL_8N1);
+#elif defined ( ESPMQTT_ZMAI90)
+  Serial.setDebugOutput(false);
+  Serial.begin(9600, SERIAL_8E1);
+#elif defined (ESPMQTT_SMARTMETER) || defined (QSWIFIDIMMERCHANNELS) || defined (ESPMQTT_BHT002)
+  // do nothing, smartmeter initializes serial in init function.
+#else
+  Serial.begin(115200); //Init serial 115200 baud
+#endif
+
+#if defined(MH_Z19)
+  //  Serial.swap();
+  putdatamap ("mhz19/co2", "-");
+  putdatamap ("mhz19/temperature", "-");
+#endif
+}
+#ifdef DHTPIN
+void update_dht()
+{
+  static uint8 errors = 4;
+  float rh = dht.readHumidity();
+  // Read temperature as Celsius (the default)
+  float temp = dht.readTemperature();
+#ifdef DHTTEMPOFFSET
+  temp += DHTTEMPOFFSET;
+#endif
+
+  float hi = dht.computeHeatIndex(temp, rh, false);
+
+  // Check if any reads failed and exit early (to try again).
+  if (isnan(temp) || isnan(rh))
+  {
+    DEBUG_E("Reading DHT22 failed!\n");
+    if (errors < 255) errors++;
+  }
+  else errors = 0;
+
+  DEBUG_I("%s", ("DHT22 temp=" + String(temp, 1) + " rh=" + String(rh, 1) + " hi=" + String(hi, 1) + "\n").c_str());
+
+  if (errors == 0)
+  {
+    putdatamap("dht22/temperature", String(temp, 1));
+    putdatamap("dht22/humidity", String(rh, 1));
+    putdatamap("dht22/heatindex", String(hi, 1));
+  }
+
+  if (errors == 5)
+  {
+    putdatamap("dht22/temperature", "-");
+    putdatamap("dht22/humidity", "-");
+    putdatamap("dht22/heatindex", "-");
+  }
+
+#ifdef NEOPIXELPIN
+  if (rh < 1) neopixelleds.setPixelColor(1, neopixelleds.Color(0, 0, 0));
+  else if (rh < 60) neopixelleds.setPixelColor(1, neopixelleds.Color(0, 20, 0));
+  else if (rh < 90) neopixelleds.setPixelColor(1, neopixelleds.Color(30, 15, 0));
+  else neopixelleds.setPixelColor(1, neopixelleds.Color(50, 0, 0));
+  neopixelleds.show();
+#endif
+}
+#endif
+
 void write_oled_display()
 {
 #ifdef OLED_ADDRESS
@@ -1443,6 +1463,46 @@ String doubletostring (double value, int precision)
   if (isnan(value)) return "-";
   else return String(value, precision);
 }
+
+#ifdef FLASHBUTTON
+void flashbutton_handle()
+{
+  static uint8_t flashbuttontimer = 0;
+  static unsigned long buttonpresstimer = millis();
+  if (millis() > buttonpresstimer)
+  {
+    buttonpresstimer += 1000;
+    if ((digitalRead(FLASHBUTTON) == 0) && (flashbuttontimer < (2 ^ (sizeof(flashbuttontimer) * 8))))
+    {
+      flashbuttontimer++;
+      DEBUG_I("Flash button is pressed, flashbuttontimer=%d\n", flashbuttontimer);
+    }
+    else
+    {
+      flashbuttontimer = 0;
+    }
+
+    if (flashbuttontimer == 3) // After 3 seconds clear passwords
+    {
+      flashbuttonstatus = 2;
+      esp_password = "esplogin";
+      DEBUG_I("Web Password defaulted to esplogin until reboot!\n");
+      mainstate.defaultpassword = true;
+    }
+
+    if (flashbuttontimer == 6) // After 6 seconds start access point
+    {
+      flashbuttonstatus = 1;
+      if (!WiFi.softAP(WiFi.hostname().c_str(), "esplogin", 6, 0)) DEBUG_E("Failed setting WiFi.softAP()");
+      WiFi.mode(WIFI_AP);
+      DEBUG_I("Wifi Accesspoint started!\n");
+      mainstate.accesspoint = true;
+    }
+
+    if (flashbuttontimer == 10) ESP.reset();
+  }
+}
+#endif
 
 void loop()
 {
@@ -2639,45 +2699,6 @@ void publishdatamap(int32_t packetId, bool publishall, bool init)
   }
 }
 
-#ifdef FLASHBUTTON
-void flashbutton_handle()
-{
-  static uint8_t flashbuttontimer = 0;
-  static unsigned long buttonpresstimer = millis();
-  if (millis() > buttonpresstimer)
-  {
-    buttonpresstimer += 1000;
-    if ((digitalRead(FLASHBUTTON) == 0) && (flashbuttontimer < (2 ^ (sizeof(flashbuttontimer) * 8))))
-    {
-      flashbuttontimer++;
-      DEBUG_I("Flash button is pressed, flashbuttontimer=%d\n", flashbuttontimer);
-    }
-    else
-    {
-      flashbuttontimer = 0;
-    }
-
-    if (flashbuttontimer == 3) // After 3 seconds clear passwords
-    {
-      flashbuttonstatus = 2;
-      esp_password = "esplogin";
-      DEBUG_I("Web Password defaulted to esplogin until reboot!\n");
-      mainstate.defaultpassword = true;
-    }
-
-    if (flashbuttontimer == 6) // After 6 seconds start access point
-    {
-      flashbuttonstatus = 1;
-      if (!WiFi.softAP(WiFi.hostname().c_str(), "esplogin", 6, 0)) DEBUG_E("Failed setting WiFi.softAP()");
-      WiFi.mode(WIFI_AP);
-      DEBUG_I("Wifi Accesspoint started!\n");
-      mainstate.accesspoint = true;
-    }
-
-    if (flashbuttontimer == 10) ESP.reset();
-  }
-}
-#endif
 
 uint8_t oldeeprom_read(String * data, byte eepromindex)
 {
@@ -2747,15 +2768,6 @@ void eeprom_write(String value, int eepromindex)
   eepromMap->put(eepromindex, value);
 }
 
-void eeprom_init ()
-{
-  if (oldeeprom_read())
-  {
-    eeprom_commit();
-  }
-  eeprom_read();
-}
-
 uint8_t eeprom_read()
 {
   DEBUG_D("eeprom_read();\n");
@@ -2783,6 +2795,15 @@ uint8_t eeprom_read()
     eepromMap->put(index++, data);
   }
   return 1;
+}
+
+void eeprom_init ()
+{
+  if (oldeeprom_read())
+  {
+    eeprom_commit();
+  }
+  eeprom_read();
 }
 
 void eeprom_erase()
@@ -3185,19 +3206,89 @@ void smartmetercallback (String topic, String payload)
 }
 #endif
 
-String getRandomString(int len) {
-  static const char alphanum[] =
-    "0123456789"
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    "abcdefghijklmnopqrstuvwxyz";
-
-  String returnstring = "";
-
-  for (int i = 0; i < len; ++i) {
-    returnstring += alphanum[random(sizeof(alphanum) - 1)];
+void processCmdRemoteDebug()
+{
+  String lastCmd = Debug.getLastCommand();
+  String lastArg = "";
+  if (lastCmd.indexOf(" ") > 0)
+  {
+    lastArg = lastCmd.substring(lastCmd.indexOf(" ") + 1);
+    lastCmd = lastCmd.substring(0, lastCmd.indexOf(" "));
+  }
+  DEBUG("[%s]  [%s]\n", lastCmd.c_str(), lastArg.c_str());
+  if (lastCmd == "help")
+  {
+    DEBUG("Available Debug Commands:\n");
+    DEBUG("  showdatamap\n");
+    DEBUG("  ping [hostname]\n");
+    DEBUG("  route\n");
+    DEBUG("  mqttforceconnect\n");
+    DEBUG("  showmainstate\n");
+    DEBUG("  factoryreset\n");
   }
 
-  return returnstring;
+  if (lastCmd == "ping")
+  {
+    if (Ping.ping(lastArg.c_str())) {
+      DEBUG("Ping Success!!\n");
+    } else {
+      DEBUG("Ping Error!!\n");
+    }
+  }
+
+  if (lastCmd == "route")
+  {
+    String gw = WiFi.gatewayIP().toString();
+    DEBUG("%s\n", gw.c_str());
+  }
+
+  if (lastCmd == "mqttforceconnect")
+  {
+    connectToMqtt();
+  }
+
+  if (lastCmd == "showmainstate")
+  {
+    DEBUG("wificonnected=%d\n", mainstate.wificonnected);
+    DEBUG("mqttconnected=%d\n", mainstate.mqttconnected);
+    DEBUG("mqttready=%d\n", mainstate.mqttready);
+    DEBUG("mqttsenddatamap=%d\n", mainstate.mqttsenddatamap);
+    DEBUG("defaultpassword=%d\n", mainstate.defaultpassword);
+    DEBUG("accesspoint=%d\n", mainstate.accesspoint);
+  }
+
+  if (lastCmd == "showdatamap") showdatamap();
+
+  if (lastCmd == "factoryreset")
+  {
+    WiFi.disconnect();
+    eeprom_erase();
+    delay(1000);
+    ESP.restart();
+    delay(1000);
+  }
+
+#ifdef  ESPMQTT_WATERMETER
+  if (lastCmd == "help") DEBUG("  watermeterreadeeprom\n  watermeterwriteeeprom\n");
+  if (lastCmd == "watermeterreadeeprom")
+  {
+    DEBUG("i2cEeprom read liters=%d\n", i2cEeprom_read());
+    watermeter_setliters(i2cEeprom_read());
+  }
+  if (lastCmd == "watermeterwriteeeprom")
+  {
+    DEBUG("i2cEeprom write liters=%d\n", watermeter_getliters());
+    i2cEeprom_write(watermeter_getliters());
+  }
+#endif
+
+#ifdef ESPMQTT_BHT002
+  if (lastCmd == "b")
+  {
+    bht002_senddebug(atoi(lastArg.c_str()));
+  }
+#endif
+
 }
 
 void setup() {
@@ -3530,90 +3621,6 @@ void setup() {
 #endif
 }
 
-void processCmdRemoteDebug()
-{
-  String lastCmd = Debug.getLastCommand();
-  String lastArg = "";
-  if (lastCmd.indexOf(" ") > 0)
-  {
-    lastArg = lastCmd.substring(lastCmd.indexOf(" ") + 1);
-    lastCmd = lastCmd.substring(0, lastCmd.indexOf(" "));
-  }
-  DEBUG("[%s]  [%s]\n", lastCmd.c_str(), lastArg.c_str());
-  if (lastCmd == "help")
-  {
-    DEBUG("Available Debug Commands:\n");
-    DEBUG("  showdatamap\n");
-    DEBUG("  ping [hostname]\n");
-    DEBUG("  route\n");
-    DEBUG("  mqttforceconnect\n");
-    DEBUG("  showmainstate\n");
-    DEBUG("  factoryreset\n");
-  }
-
-  if (lastCmd == "ping")
-  {
-    if (Ping.ping(lastArg.c_str())) {
-      DEBUG("Ping Success!!\n");
-    } else {
-      DEBUG("Ping Error!!\n");
-    }
-  }
-
-  if (lastCmd == "route")
-  {
-    String gw = WiFi.gatewayIP().toString();
-    DEBUG("%s\n", gw.c_str());
-  }
-
-  if (lastCmd == "mqttforceconnect")
-  {
-    connectToMqtt();
-  }
-
-  if (lastCmd == "showmainstate")
-  {
-    DEBUG("wificonnected=%d\n", mainstate.wificonnected);
-    DEBUG("mqttconnected=%d\n", mainstate.mqttconnected);
-    DEBUG("mqttready=%d\n", mainstate.mqttready);
-    DEBUG("mqttsenddatamap=%d\n", mainstate.mqttsenddatamap);
-    DEBUG("defaultpassword=%d\n", mainstate.defaultpassword);
-    DEBUG("accesspoint=%d\n", mainstate.accesspoint);
-  }
-
-  if (lastCmd == "showdatamap") showdatamap();
-
-  if (lastCmd == "factoryreset")
-  {
-    WiFi.disconnect();
-    eeprom_erase();
-    delay(1000);
-    ESP.restart();
-    delay(1000);
-  }
-
-#ifdef  ESPMQTT_WATERMETER
-  if (lastCmd == "help") DEBUG("  watermeterreadeeprom\n  watermeterwriteeeprom\n");
-  if (lastCmd == "watermeterreadeeprom")
-  {
-    DEBUG("i2cEeprom read liters=%d\n", i2cEeprom_read());
-    watermeter_setliters(i2cEeprom_read());
-  }
-  if (lastCmd == "watermeterwriteeeprom")
-  {
-    DEBUG("i2cEeprom write liters=%d\n", watermeter_getliters());
-    i2cEeprom_write(watermeter_getliters());
-  }
-#endif
-
-#ifdef ESPMQTT_BHT002
-  if (lastCmd == "b")
-  {
-    bht002_senddebug(atoi(lastArg.c_str()));
-  }
-#endif
-
-}
 
 static void handleDataExternalIpServer(void*, AsyncClient* client, void *data, size_t len) {
   char *chardata = (char *)data;
