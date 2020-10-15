@@ -5,8 +5,10 @@
 #include "bht002.h"
 float bht002_temperature = NAN;
 float bht002_setpoint = NAN;
-uint8_t bht002_heating = -1;
-bool wifipairing = false;
+bool bht002_heating = false;
+bool bht002_deviceon = false;
+bool bht002_deviceoninitialized = false;
+bool bht002_preventdeviceoff = true;
 
 void(*_bht002_callback)(String, String);
 
@@ -14,17 +16,31 @@ void bht002_commandCharsToSerial(unsigned int length, unsigned char* command)
 {
   int chkSum = 0;
   int i;
+  String commandStr = "";
+
   if (length > 2) {
     for (i = 0; i < length; i++) {
       unsigned char chValue = command[i];
       chkSum += chValue;
       Serial.print((char) chValue);
-      DEBUG ("SEND SERIALDATA=%d:%02X\n", i, chValue);
+      String hexvalue = String(chValue, HEX);
+      if (hexvalue.length() == 1) hexvalue = "0" + hexvalue;
+      commandStr += "0x" + hexvalue + " ";
     }
     unsigned char chValue = chkSum % 0x100;
     Serial.print((char) chValue);
-    DEBUG ("SEND SERIALDATA=%d:%02X (checksum)\n", i , chValue);
+    String hexvalue = String(chValue, HEX);
+    if (hexvalue.length() == 1) hexvalue = "0" + hexvalue;
+    commandStr += "0x" + hexvalue + " ";
+    DEBUG ("SEND SERIALDATA=%s\n", commandStr.c_str());
   }
+}
+
+void bht002_senddevicestate(bool state)
+{
+  DEBUG ("Sending On\n");
+  unsigned char bht002Command[] = { 0x55, 0xAA, 0x00, 0x06, 0x00, 0x05, 0x01, 0x01, 0x00, 0x01, state ? 1 : 0 };
+  bht002_commandCharsToSerial(11, bht002Command);
 }
 
 void bht002_sendtime()
@@ -33,10 +49,10 @@ void bht002_sendtime()
   char strftime_buf[64];
   struct tm timeinfo;
 
-  time(&now);
   // Set timezone to NL
   setenv("TZ", "GMT+1", 1);
   tzset();
+  time(&now);
 
   localtime_r(&now, &timeinfo);
   strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
@@ -55,9 +71,6 @@ void bht002_init(void(*callback)(String, String))
   Serial.begin(9600, SERIAL_8N1);
   Serial.setRxBufferSize(2048);
   _bht002_callback = callback;
-
-
-
   // Start init sequence
   //  DEBUG ("Sending Query Product Information\n");
   //  unsigned char queryProductCommand[] = { 0x55, 0xAA, 0x00, 0x01, 0x00, 0x00 };
@@ -95,7 +108,7 @@ void bht002_senddebug(uint8_t cmdnr)
         DEBUG ("Sending Query State\n");
         unsigned char queryStateCommand[] = { 0x55, 0xAA, 0x00, 0x08, 0x00, 0x00 };
         bht002_commandCharsToSerial(6, queryStateCommand);
-        wifipairing = false;
+        //wifipairing = false;
       }
       break;
     case 4:
@@ -103,7 +116,7 @@ void bht002_senddebug(uint8_t cmdnr)
         DEBUG ("Sending Wifi Pairing Off\n");
         unsigned char queryStateCommand[] = { 0x55, 0xAA, 0x00, 0x03, 0x00, 0x01, 0x02 };
         bht002_commandCharsToSerial(7, queryStateCommand);
-        wifipairing = false;
+        //wifipairing = false;
       }
       break;
     case 5:
@@ -111,7 +124,7 @@ void bht002_senddebug(uint8_t cmdnr)
         DEBUG ("Sending Wifi Connected\n");
         unsigned char queryStateCommand[] = { 0x55, 0xAA, 0x00, 0x03, 0x00, 0x01, 0x03 };
         bht002_commandCharsToSerial(7, queryStateCommand);
-        wifipairing = false;
+        //wifipairing = false;
       }
       break;
     case 6:
@@ -202,7 +215,18 @@ int8_t bht002_getheating()
 
 void bht002_processSerialCommand(uint8_t commandLength, uint8_t receivedCommand[])
 {
-  if (commandLength > -1)
+  if (commandLength > 0)
+  {
+    String commandStr = "";
+    for (uint8_t i = 0; i < commandLength; i++)
+    {
+      String hexvalue = String(receivedCommand[i], HEX);
+      if (hexvalue.length() == 1) hexvalue = "0" + hexvalue;
+      commandStr += "0x" + hexvalue + " ";
+    }
+    DEBUG ("RECEIVED SERIALDATA=%s\n", commandStr.c_str());
+  }
+  if (commandLength > 3)
   {
     if (receivedCommand[3] == 0x00)
     {
@@ -240,11 +264,28 @@ void bht002_processSerialCommand(uint8_t commandLength, uint8_t receivedCommand[
       //unsigned char configCommand[] = { 0x55, 0xAA, 0x00, 0x03, 0x00, 0x01, 0x00 };
       //bht002_commandCharsToSerial(7, configCommand);
       //onConfigurationRequest();
-      wifipairing = true;
+      //      wifipairing = true;
     }
     else if (receivedCommand[3] == 0x07)
     {
       //Status report from MCU
+      if (receivedCommand[6] == 0x01)
+      {
+        DEBUG ("Device On=%d\n", receivedCommand[10]);
+        _bht002_callback("deviceon", String(receivedCommand[10], DEC));
+        bht002_deviceon = receivedCommand[10] ? 1 : 0;
+        if (!bht002_deviceon)
+        {
+          if (!bht002_deviceoninitialized || bht002_preventdeviceoff)
+          {
+            bht002_senddevicestate(true);
+            bht002_deviceoninitialized = true;
+          }
+          _bht002_callback("heating", "0");
+          bht002_heating = false;
+        }
+      }
+
       if (receivedCommand[6] == 0x02)
       {
         DEBUG ("Room Setpoint=%d\n", receivedCommand[13]);
@@ -264,24 +305,28 @@ void bht002_processSerialCommand(uint8_t commandLength, uint8_t receivedCommand[
         if (receivedCommand[10] == 0x00)
         {
           DEBUG ("HEATING ON\n");
-          _bht002_callback("heating", "1");
-          bht002_heating = 1;
+          if (bht002_deviceon)
+          {
+            bht002_heating = true;
+            _bht002_callback("heating", "1");
+          }
+          else bht002_heating = false;
         }
 
         if (receivedCommand[10] == 0x01)
         {
           DEBUG("HEATING OFF\n");
           _bht002_callback("heating", "0");
-          bht002_heating = 0;
+          bht002_heating = false;
         }
       }
 
     }
-    else if (receivedCommand[3] == 0x1C) 
+    else if (receivedCommand[3] == 0x1C)
     {
       bht002_sendtime();
     }
-    else 
+    else
     {
       DEBUG ("Received Unknown Command %02X\n", receivedCommand[3]);
       // Unknown Command
@@ -306,10 +351,13 @@ void bht002_disconnected()
 
 void bht002_handle()
 {
+  static bool bht002_initialize_counter = 0;
+
   const unsigned char BHT002_COMMAND_START[] = {0x55, 0xAA};
+#define receivedCommandLength 140
 
   static int8_t receiveIndex = -1;
-  static uint8_t receivedCommand[140];
+  static uint8_t receivedCommand[receivedCommandLength];
   static uint8_t commandLength = 0;
 
 
@@ -317,8 +365,8 @@ void bht002_handle()
   {
     receiveIndex++;
     unsigned char inChar = Serial.read();
-    DEBUG ("SERIALDATA=%d:%02X\n", receiveIndex, inChar);
-    receivedCommand[receiveIndex] = inChar;
+    //DEBUG ("SERIALDATA=%d:%02X\n", receiveIndex, inChar);
+    if (receiveIndex < receivedCommandLength) receivedCommand[receiveIndex] = inChar;
     if (receiveIndex < 2)
     {
       //Check command start
@@ -339,9 +387,11 @@ void bht002_handle()
         expChecksum += receivedCommand[i];
       }
       expChecksum = expChecksum % 0x100;
-      if (expChecksum == receivedCommand[receiveIndex]) {
-        DEBUG ("bht002 Checksum ok!\n");
-        bht002_processSerialCommand(commandLength, receivedCommand);
+
+      if (expChecksum == receivedCommand[receiveIndex])
+      {
+        // DEBUG ("bht002 Checksum ok!\n");
+        bht002_processSerialCommand(6 + commandLength, receivedCommand);
       }
       else DEBUG ("bht002 Checksum FAIL!\n");
       receiveIndex = -1;
