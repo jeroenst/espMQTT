@@ -1,4 +1,4 @@
-  // SimpleMap adapted by JeroenSt:
+// SimpleMap adapted by JeroenSt:
 //  - Removed map sorting on put
 
 #ifndef SimpleMap_h
