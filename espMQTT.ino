@@ -5,7 +5,7 @@
     https://github.com/jeroenst/RemoteDebug
     https://github.com/jeroenst/ESPAsyncTCP
     https://github.com/jeroenst/async-mqtt-client
-    https://github.com/jeroenst///syslog
+    https://github.com/jeroenst/syslog
 
    Optional libraries depending on defines:
     (Sonoff POW) https://github.com/jeroenst/hlw8012
@@ -1058,7 +1058,7 @@ void mqttdosubscriptions(int32_t packetId = -1)
   if (packetId > 0) nextsubscribe++;
   nextpacketid = -1;
   subscribetopic = "";
-  while ((subscribetopic == "") && (nr_of_subsribe_topics <= 22))
+  while ((subscribetopic == "") && (nextsubscribe <= nr_of_subsribe_topics))
   {
     //DEBUG("mqttdosubscriptions while nextsubscribe=%d\n", nextsubscribe);
     switch (nextsubscribe)
@@ -1106,6 +1106,7 @@ void mqttdosubscriptions(int32_t packetId = -1)
 #ifdef ESPMQTT_BHT002
       case 22: subscribetopic = mqtt_topicprefix + "setsetpoint"; break;
 #endif
+      default: break;
     }
     if (subscribetopic == "") nextsubscribe++;
   }
