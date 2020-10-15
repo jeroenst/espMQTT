@@ -304,7 +304,7 @@ void bht002_processSerialCommand(uint8_t commandLength, uint8_t receivedCommand[
       {
         if (receivedCommand[10] == 0x00)
         {
-          DEBUG ("HEATING ON\n");
+          DEBUG ("Heating=1\n");
           if (bht002_deviceon)
           {
             bht002_heating = true;
@@ -315,7 +315,7 @@ void bht002_processSerialCommand(uint8_t commandLength, uint8_t receivedCommand[
 
         if (receivedCommand[10] == 0x01)
         {
-          DEBUG("HEATING OFF\n");
+          DEBUG("Heating=0\n");
           _bht002_callback("heating", "0");
           bht002_heating = false;
         }
