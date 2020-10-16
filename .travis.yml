@@ -26,6 +26,12 @@ env:
     - TRAVISBUILD="yes"
 # Optional, will default to "$TRAVIS_BUILD_DIR/Doxyfile"
 #    - DOXYFILE: $TRAVIS_BUILD_DIR/Doxyfile
+notifications:
+  email:
+    recipients:
+      - $EMAILADDRESS
+    on_success: always # default: change
+    on_failure: always # default: always
 
 before_install:
   - sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules
@@ -51,9 +57,3 @@ deploy:
   on:
     tags: true
 
-notifications:
-  email:
-    recipients:
-      - $EMAILADDRESS
-    on_success: always # default: change
-    on_failure: always # default: always
