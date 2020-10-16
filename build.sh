@@ -47,7 +47,7 @@ build ()
   -build-cache $HOME/Arduino/espMQTT/builds/cache \
   -prefs=build.warn_data_percentage=75 \
   -prefs="build.extra_flags=-DESP8266 -DWEBSOCKET_DISABLED=true -DASYNC_TCP_SSL_ENABLED -DUSE_HARDWARESERIAL -DESPMQTT_BUILDSCRIPT -DESPMQTT_VERSION=\"$VERSION\" -D$targetname" \
-  "$HOME/Arduino/espMQTT/espMQTT.ino"
+  \"$HOME/Arduino/espMQTT/espMQTT.ino\"
   
   set +x
 

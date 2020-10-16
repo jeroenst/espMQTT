@@ -4,10 +4,10 @@ language: c
 arch: amd64
 os: linux
 dist: xenial
-cache:
-  directories:
-    - ~/arduino_ide
-    - ~/.arduino15/packages/
+#cache:
+#  directories:
+#    - ~/arduino_ide
+#    - ~/.arduino15/packages/
 git:
   depth: false
   quiet: true
@@ -45,9 +45,8 @@ before_install:
   - ./configure.sh
 
 script:
-  - bash build.sh
-  - git reset HEAD espMQTT_buildscript.h
-  - git checkout -f espMQTT_buildscript.h
+  - cd ~/Arduino/espMQTT
+  - ./build.sh
 
 deploy:
   provider: releases
