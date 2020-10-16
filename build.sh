@@ -1,6 +1,5 @@
 #!/bin/bash
 set -e
-set -x
 
 increment_version ()
 {
@@ -23,12 +22,12 @@ increment_version ()
 
 build ()
 {
-  set +x
   echo ''
   echo '###################################################################################################'
   echo BUILDING $targetname VERSION $VERSION...
   echo '###################################################################################################'
   echo ''
+
   set -x
   
   $HOME/arduino_ide/arduino-builder \
@@ -49,29 +48,27 @@ build ()
   -prefs=build.warn_data_percentage=75 \
   -prefs="build.extra_flags=-DESP8266 -DWEBSOCKET_DISABLED=true -DASYNC_TCP_SSL_ENABLED -DUSE_HARDWARESERIAL -DESPMQTT_BUILDSCRIPT -DESPMQTT_VERSION=\"$VERSION\" -D$targetname" \
   "$HOME/Arduino/espMQTT/espMQTT.ino"
+  
+  set +x
 
   if [ $? -ne 0 ]
   then 
-  set +x
   echo ''
   echo '###################################################################################################'
   echo BUILDING $targetname VERSION $VERSION FAILED!!!
   echo '###################################################################################################'
   echo ''
-  set -x
   exit $?
   fi
 
   echo $VERSION > $HOME/Arduino/espMQTT/builds/v$VERSION/$targetname.version
   mv $HOME/Arduino/espMQTT/builds/tmp/espMQTT.ino.bin $HOME'/Arduino/espMQTT/builds/v'$VERSION'/'$targetname'_'$VERSION.bin
 
-  set +x
   echo ''
   echo '###################################################################################################'
   echo BUILDING $targetname VERSION $VERSION FINISHED.
   echo '###################################################################################################'
   echo ''
-  set -x
 }
 
 VERSION=$(git describe --tags | sed 's/v//')
