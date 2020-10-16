@@ -1,4 +1,5 @@
-#include <ESP8266WiFi.h>
+#include "espMQTT.h"
+#include "smartmeter.h"
 
 void(*_smartmeter_callback)(String,String);
 

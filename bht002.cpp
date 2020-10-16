@@ -1,6 +1,5 @@
 // Created with information from: https://github.com/klausahrenberg/WThermostatBeca/
 
-#include <ESP8266WiFi.h>
 #include "espMQTT.h"
 #include "bht002.h"
 float bht002_temperature = NAN;

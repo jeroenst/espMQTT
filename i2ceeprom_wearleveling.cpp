@@ -1,4 +1,3 @@
-#include <ESP8266WiFi.h>
 #include <Wire.h>
 #include "espMQTT.h"
 // DO NOT DISABLE DEBUG, READING EEPROM WILL NOT WORK..

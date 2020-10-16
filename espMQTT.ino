@@ -513,7 +513,9 @@ Adafruit_NeoPixel neopixelleds = Adafruit_NeoPixel(2, NEOPIXELPIN, NEO_RGB + NEO
 #include <coredecls.h>                  // settimeofday_cb()
 #include "sntp.h"
 
-#include <ESP8266WiFi.h>
+
+#include "espMQTT.h"
+
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>        // Include the mDNS library
 #include <ESP8266HTTPClient.h>
@@ -521,7 +523,6 @@ Adafruit_NeoPixel neopixelleds = Adafruit_NeoPixel(2, NEOPIXELPIN, NEO_RGB + NEO
 #include <ArduinoJson.h>
 
 #include <EEPROM.h>
-#include "espMQTT.h"
 #include <AsyncMqttClient.h>
 AsyncMqttClient mqttClient;
 #include <ArduinoOTA.h>

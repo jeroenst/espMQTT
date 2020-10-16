@@ -4,7 +4,8 @@
     BUG: The timer ISR is executed +/- every 800 ms, I don't knpw why
 */
 
-#include <ESP8266WiFi.h>
+#include "espMQTT.h"
+#include "dimmer.h"
 #include "hw_timer.h"
 
 bool dimmer_fade = 1;
@@ -44,7 +45,7 @@ bool dimmer_getstate()
   return dimmer_state;
 }
 
-void dimmer_init(uint8_t zerocrosspin, uint8_t triacpin, bool fade = true)
+void dimmer_init(uint8_t zerocrosspin, uint8_t triacpin, bool fade)
 {
   dimmer_zerocrosspin = zerocrosspin;
   dimmer_triacpin = triacpin;

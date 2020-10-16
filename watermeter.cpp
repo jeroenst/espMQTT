@@ -1,4 +1,5 @@
-#include <ESP8266WiFi.h>
+#include "espMQTT.h"
+#include "watermeter.h"
 
 uint32_t _watermeter_liters = 0;
 double _watermeter_lmin = 0;

@@ -1,4 +1,3 @@
-#include <ESP8266WiFi.h>
 #include "espMQTT.h"
 #ifndef D0
 #define D0 0

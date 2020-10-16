@@ -1,4 +1,3 @@
-#include <ESP8266WiFi.h>  //ESP8266 Core WiFi Library         
 #include <SPI.h>
 #include <user_interface.h>
 #define ADS_SPISPEED 1250000
