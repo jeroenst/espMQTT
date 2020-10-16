@@ -28,9 +28,6 @@ build ()
   echo '###################################################################################################'
   echo ''
   
-  echo '#define '$targetname > $HOME/Arduino/espMQTT/espMQTT_buildscript.h
-  echo '#define ESPMQTT_VERSION "'$VERSION'"' >> $HOME/Arduino/espMQTT/espMQTT_buildscript.h
-
   $HOME/arduino_ide/arduino-builder \
   -compile \
   -hardware $HOME/arduino_ide/hardware \
@@ -47,12 +44,8 @@ build ()
   -warnings=none \
   -build-cache $HOME/Arduino/espMQTT/builds/cache \
   -prefs=build.warn_data_percentage=75 \
-  -prefs="build.extra_flags=-DESP8266 -DWEBSOCKET_DISABLED=true -DASYNC_TCP_SSL_ENABLED -DUSE_HARDWARESERIAL -DESPMQTT_BUILDSCRIPT" \
+  -prefs="build.extra_flags=-DESP8266 -DWEBSOCKET_DISABLED=true -DASYNC_TCP_SSL_ENABLED -DUSE_HARDWARESERIAL -DESPMQTT_BUILDSCRIPT -DESPMQTT_VERSION=\"$VERSION\" -D$targetname" \
   "$HOME/Arduino/espMQTT/espMQTT.ino"
-
-#  -fqbn=esp8266com:esp8266:esp8285:xtal=80,vt=flash,exception=legacy,ssl=all,ResetMethod=nodemcu,CrystalFreq=26,eesz=1M64,led=2,ip=lm2f,dbg=Disabled,lvl=None____,wipe=none,baud=115200 
-
-  echo '' > espMQTT_buildscript.h
 
   if [ $? -ne 0 ]
   then 
@@ -64,7 +57,7 @@ build ()
   exit $?
   fi
 
-  echo $VERSION > ./builds/v$VERSION/$targetname.version
+  echo $VERSION > $HOME/Arduino/espMQTT/builds/v$VERSION/$targetname.version
   mv $HOME/Arduino/espMQTT/builds/tmp/espMQTT.ino.bin $HOME'/Arduino/espMQTT/builds/v'$VERSION'/'$targetname'_'$VERSION.bin
 
   echo ''
@@ -143,5 +136,4 @@ do
 done
 
 
-git checkout -f espMQTT_buildscript.h
 

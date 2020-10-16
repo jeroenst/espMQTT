@@ -66,7 +66,7 @@
 
 #define ESPMQTT_VERSION "TEST"
 #else
-#include "espMQTT_buildscript.h"
+// Using build.sh option are passed through -D flags
 #endif
 
 #ifdef ESPMQTT_ZMAI90
