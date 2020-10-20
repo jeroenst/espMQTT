@@ -47,7 +47,7 @@
 /* ESP8285 */
 // #define ESPMQTT_ZMAI90
 // #define ESPMQTT_DUCOBOX
-// #define ESPMQTT_SONOFFS20 // coffeelamp & sonoffs20_00X
+ #define ESPMQTT_SONOFFS20 // coffeelamp & sonoffs20_00X
 // #define ESPMQTT_SONOFFBULB
 // #define ESPMQTT_GARDEN //ESP8285 TUIN & MARIANNE & LUIFEL
 // #define ESPMQTT_SONOFF_FLOORHEATING
@@ -62,7 +62,7 @@
 // #define ESPMQTT_SONOFFPOWR2 // tv&washingmachine&server&dishwasher
 // #define ESPMQTT_SONOFFTH
 // #define ESPMQTT_GENERIC8255
-#define ESPMQTT_BHT002
+// #define ESPMQTT_BHT002
 
 #define ESPMQTT_VERSION "TEST"
 #else
@@ -972,6 +972,7 @@ void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
   putdatamap("mqtt/ssl", String(mqtt_ssl), sendupdate);
   putdatamap("mqtt/state", mqttClient.connected() ? "connected" : "disconnected", sendupdate);
   putdatamap("mqtt/clientid", String(mqttClient.getClientId()), sendupdate);
+  putdatamap("mqtt/user", String(mqtt_username.c_str()), sendupdate);
 }
 
 
