@@ -31,7 +31,7 @@
 // #define ESPMQTT_BATHROOM
 // #define ESPMQTT_BEDROOM2
 // #define ESPMQTT_OPENTHERM
-// #define ESPMQTT_SMARTMETER
+#define ESPMQTT_SMARTMETER
 // #define ESPMQTT_GROWATT
 // #define ESPMQTT_SDM120
 // #define ESPMQTT_DDM18SD
@@ -43,11 +43,12 @@
 // #define ESPMQTT_NOISE
 // #define ESPMQTT_SOIL
 // #define ESPMQTT_DIMMER
+// #define ESPMQTT_RELAY
 
 /* ESP8285 */
 // #define ESPMQTT_ZMAI90
 // #define ESPMQTT_DUCOBOX
- #define ESPMQTT_SONOFFS20 // coffeelamp & sonoffs20_00X
+// #define ESPMQTT_SONOFFS20 // coffeelamp & sonoffs20_00X
 // #define ESPMQTT_SONOFFBULB
 // #define ESPMQTT_GARDEN //ESP8285 TUIN & MARIANNE & LUIFEL
 // #define ESPMQTT_SONOFF_FLOORHEATING
@@ -68,6 +69,8 @@
 #else
 // Using build.sh option are passed through -D flags
 #endif
+
+#define APONBOOT
 
 #ifdef ESPMQTT_ZMAI90
 #define FIRMWARE_TARGET "ZMAI90"
@@ -254,6 +257,19 @@ const byte sonoff_relays[4] = {12, 5, 4, 15};
 const byte sonoff_buttons[4] = {0, 9, 10, 14};
 static bool sonoff_oldbuttons[4] = {1, 1, 1, 1};
 #endif
+
+#ifdef  ESPMQTT_RELAY
+#ifndef FIRMWARE_TARGET
+#define FIRMWARE_TARGET "RELAY"
+#endif
+#define ESPLED 2
+#define SONOFFCH 1
+#define APONBOOT
+const byte sonoff_relays[2] = {15};
+const byte sonoff_buttons[2] = {0};
+static bool sonoff_oldbuttons[2] = {1};
+#endif
+
 
 #ifdef  ESPMQTT_SONOFFDUAL
 #ifndef FIRMWARE_TARGET
@@ -672,8 +688,8 @@ String esp_hostname = "";
 String esp_orig_hostname = "";
 //#include "esp8266_peri.h"
 RemoteDebug Debug;
-String postwifissid = "";
-String postwifikey = "";
+String wifissid = "";
+String wifipsk = "";
 
 #include <Ticker.h>
 Ticker mqttReconnectTimer;
@@ -698,7 +714,6 @@ void ICACHE_RAM_ATTR hlw8012_cf_interrupt() {
 
 
 void publishdatamap(int32_t packetId = -1, bool publishall = false, bool init = false);
-
 
 String getRandomString(int len) {
   static const char alphanum[] =
@@ -972,7 +987,7 @@ void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
   putdatamap("mqtt/ssl", String(mqtt_ssl), sendupdate);
   putdatamap("mqtt/state", mqttClient.connected() ? "connected" : "disconnected", sendupdate);
   putdatamap("mqtt/clientid", String(mqttClient.getClientId()), sendupdate);
-  putdatamap("mqtt/user", String(mqtt_username.c_str()), sendupdate);
+  putdatamap("mqtt/user", mqtt_username, sendupdate);
 }
 
 
@@ -990,8 +1005,6 @@ void connectToWifi()
 {
   if (!mainstate.wificonnected && !mainstate.accesspoint)
   {
-    String wifissid = WiFi.SSID();
-    String wifipsk =  WiFi.psk();
     DEBUG_I("Connecting to Wi-Fi: SSID=\"%s\"...\n", wifissid.c_str());
     WiFi.mode(WIFI_STA);
     WiFi.disconnect();
@@ -1546,12 +1559,12 @@ void loop()
   {
     mainstate.accesspoint = false;
     WiFi.mode(WIFI_STA); // After saving settings return to wifi client mode and disable AP
-    if ((postwifissid != ""))
+    if ((wifissid != ""))
     {
-      DEBUG_I ("Connecting wifi to %s\n", postwifissid.c_str());
+      DEBUG_I ("Connecting wifi to %s\n", wifissid.c_str());
       WiFi.disconnect();
       WiFi.hostname(esp_hostname);
-      WiFi.begin(postwifissid.c_str(), postwifikey.c_str()); // Save wifi ssid and key and also activate new hostname...
+      WiFi.begin(wifissid.c_str(), wifipsk.c_str()); // Save wifi ssid and key and also activate new hostname...
     }
     wifichangesettingstimeout = 0;
   }
@@ -1746,9 +1759,7 @@ void loop()
       if ((strongestwifiid >= 0) && ((WiFi.RSSI() >= 0) || (currentwifiid == -1) || ((currentwifiid != strongestwifiid) && (currentwifirssi + 10 < strongestwifirssi))))
       {
         DEBUG_I ("Switching to stronger AP %d (%s, %s, %s)\n", strongestwifiid, WiFi.SSID().c_str(), WiFi.psk().c_str(), WiFi.BSSIDstr(strongestwifiid).c_str());
-        String wifissid = WiFi.SSID();
-        String wifipsk =  WiFi.psk();
-        WiFi.disconnect();
+        WiFi.disconnect(false);
         WiFi.begin(wifissid.c_str(), wifipsk.c_str(), WiFi.channel(strongestwifiid), WiFi.BSSID(strongestwifiid));
       }
     }
@@ -2969,6 +2980,34 @@ bool MHZ19_read(int *ppm, int *temp)
 
 #endif
 
+void eeprom_save_variables()
+{
+    eeprom_write(mqtt_server, 0);
+    eeprom_write(mqtt_username, 1);
+    eeprom_write(mqtt_password, 2);
+    eeprom_write(esp_password, 3);
+    eeprom_write(esp_hostname, 4);
+    eeprom_write(String(mqtt_port), 5);
+    eeprom_write(String(mqtt_ssl), 6);
+    eeprom_write(mqtt_topicprefix, 7);
+#ifdef  ESPMQTT_QSWIFIDIMMERD01
+    eeprom_write(String(qswifidimmer_getdimoffset()), 8);
+    putdatamap("dimoffset", String(qswifidimmer_getdimoffset()));
+    eeprom_write("", 9);
+#elif defined ESPMQTT_QSWIFIDIMMERD02
+    eeprom_write(String(qswifidimmer_getdimoffset(0)), 8);
+    putdatamap("dimoffset/0", String(qswifidimmer_getdimoffset(0)));
+    eeprom_write(String(qswifidimmer_getdimoffset(1)), 9);
+    putdatamap("dimoffset/1", String(qswifidimmer_getdimoffset(1)));
+#else
+    eeprom_write("", 8);
+    eeprom_write("", 9);
+#endif
+    eeprom_write(wifissid, 10);
+    eeprom_write(wifipsk, 11);
+    eeprom_commit();
+}
+
 
 void handleWWWSettings()
 {
@@ -2991,8 +3030,8 @@ void handleWWWSettings()
     mqtt_ssl = 0;
     for (uint8_t i = 0; i < webserver.args(); i++)
     {
-      if (webserver.argName(i) == "wifissid") postwifissid = webserver.arg(i);
-      if (webserver.argName(i) == "wifikey") postwifikey = webserver.arg(i);
+      if (webserver.argName(i) == "wifissid") wifissid = webserver.arg(i);
+      if (webserver.argName(i) == "wifipsk") wifipsk = webserver.arg(i);
       if (webserver.argName(i) == "mqttserver") mqtt_server = webserver.arg(i);
       if (webserver.argName(i) == "mqttusername") mqtt_username = webserver.arg(i);
       if (webserver.argName(i) == "mqttpassword") mqtt_password = webserver.arg(i);
@@ -3021,25 +3060,8 @@ void handleWWWSettings()
       if (webserver.argName(i) == "qswifidimoffset1") qswifidimmer_setdimoffset((webserver.arg(i)).toInt(), 1);
 #endif
     }
-    eeprom_write(mqtt_server, 0);
-    eeprom_write(mqtt_username, 1);
-    eeprom_write(mqtt_password, 2);
-    eeprom_write(esp_password, 3);
-    eeprom_write(esp_hostname, 4);
-    eeprom_write(String(mqtt_port), 5);
-    eeprom_write(String(mqtt_ssl), 6);
-    eeprom_write(mqtt_topicprefix, 7);
-#ifdef  ESPMQTT_QSWIFIDIMMERD01
-    eeprom_write(String(qswifidimmer_getdimoffset()), 8);
-    putdatamap("dimoffset", String(qswifidimmer_getdimoffset()));
-#endif
-#ifdef  ESPMQTT_QSWIFIDIMMERD02
-    eeprom_write(String(qswifidimmer_getdimoffset(0)), 8);
-    putdatamap("dimoffset/0", String(qswifidimmer_getdimoffset(0)));
-    eeprom_write(String(qswifidimmer_getdimoffset(1)), 9);
-    putdatamap("dimoffset/1", String(qswifidimmer_getdimoffset(1)));
-#endif
-    eeprom_commit();
+    eeprom_save_variables();
+    
     ArduinoOTA.setHostname(esp_hostname.c_str());
     ArduinoOTA.setPassword(esp_password.c_str());
     MDNS.begin(esp_hostname.c_str());
@@ -3055,7 +3077,7 @@ void handleWWWSettings()
       wifichangesettingstimeout = uptime + 4;
     }
 
-    if ((postwifissid != "") && (postwifikey != "") && (esp_hostname != "") && ((postwifissid != WiFi.SSID()) || (postwifikey != WiFi.psk())))
+    if ((wifissid != "") && (wifipsk != "") && (esp_hostname != "") && ((wifissid != WiFi.SSID()) || (wifipsk != WiFi.psk())))
     {
       webserver.send(200, "text/html", "<HTML><BODY>Settings Saved.<BR>Please wait a moment and connect to proper wifi network and open the page of the saved hostname.</BODY></HTML>");
       flashbuttonstatus = 0;
@@ -3086,8 +3108,8 @@ void handleWWWSettings()
     webpage += "<HTML><HEAD><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"></HEAD><BODY><CENTER><div align=\"left\" style=\"width:400px; margin:auto\">";
     webpage += String("<CENTER><H1>") + WiFi.hostname() + "</H1></CENTER><form action=\"/settings\" method=\"post\" autocomplete=\"off\"><TABLE style=\"width:400px; margin:auto\">";
     webpage += String("<TR><TD>Hostname</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"") + String(EEPROMSTRINGSIZE - 2) + "\" name=\"hostname\" value=\"" + WiFi.hostname() + "\"></TD></TR>";
-    webpage += String("<TR><TD>WifiSSID</TD><TD><select style=\"width:200\" name=\"wifissid\">") + wifiselectoptions + "</select></TD></TR>";
-    webpage += String("<TR><TD>WifiKEY</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"64\" name=\"wifikey\" value=\"") + String(WiFi.psk()) + "\"></TD></TR>";
+    webpage += String("<TR><TD>Wifi SSID</TD><TD><select style=\"width:200\" name=\"wifissid\">") + wifiselectoptions + "</select></TD></TR>";
+    webpage += String("<TR><TD>wifi Key</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"64\" name=\"wifipsk\" value=\"") + String(WiFi.psk()) + "\"></TD></TR>";
     webpage += String("<TR><TD>MQTT Server</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttserver\" value=\"") + mqtt_server + "\"></TD></TR>";
     webpage += String("<TR><TD>MQTT Port</TD><TD><input style=\"width:200\" type=\"number\" maxlength=\"5\" name=\"mqttport\" value=\"") + String(mqtt_port) + "\"></TD></TR>";
     webpage += String("<TR><TD>MQTT Ssl</TD><TD ALIGN=\"left\"><input type=\"checkbox\" name=\"mqttssl\" ") + (mqtt_ssl ? "checked" : "") + "></TD></TR>";
@@ -3227,6 +3249,7 @@ void processCmdRemoteDebug()
     DEBUG("  mqttforceconnect\n");
     DEBUG("  showmainstate\n");
     DEBUG("  factoryreset\n");
+    DEBUG("  showeeprommap\n");
   }
 
   if (lastCmd == "ping")
@@ -3291,37 +3314,29 @@ void processCmdRemoteDebug()
   }
 #endif
 
+  if (lastCmd == "showeeprommap")
+  {
+  int eeprompointer = 0;
+  for (int i = 0; i < eepromMap->size(); i++)
+  {
+    uint8_t checksum = 20;
+    String eepromdata = eepromMap->get(i);
+    DEBUG_D("EEPROM %d=%s\n", i, eepromdata.c_str());
+  }
+  }
 }
 
-void setup() {
-
-  ESP.wdtDisable(); // Use hardware watchdog of 6 seconds to prevent auto reboot when function takes more time..
-  EEPROM.begin(512);
-
-  initSerial();
-
-#ifdef SERIALLOG
-  Debug.setSerialEnabled(true);
-#else
-  Debug.setSerialEnabled(false);
-#endif
-
-  Debug.begin("");
-  DEBUG_I("\n\nInitializing ESP8266 %s %s...\n\n", FIRMWARE_TARGET, ESPMQTT_VERSION);
-
-  char buffer[25];
-  snprintf(buffer, 25, "%08X", ESP.getChipId());
-  chipid = buffer;
-
-  sntp_set_timezone(1);
-  sntp_setservername(0, "nl.pool.ntp.org");
-  // Read settings from EEPROM
+void eeprom_load_variables()
+{
+    // Read settings from EEPROM
   DEBUG_D("Reading internal EEPROM...\n");
   eeprom_init();
   if (!eeprom_read(&mqtt_server, 0))
   {
     DEBUG_E("Error reading mqtt server from internal eeprom\n");
   }
+  DEBUG_D("mqtt server=%s\n", mqtt_server.c_str());
+
   if (!eeprom_read(&mqtt_username, 1))
   {
     DEBUG_E("Error reading mqtt username from internal eeprom\n");
@@ -3376,6 +3391,48 @@ void setup() {
   }
   DEBUG_D("mqtt topicprefix=%s\n", mqtt_topicprefix.c_str());
 
+  if (!eeprom_read(&wifissid, 10))
+  {
+    DEBUG_E("Error reading wifi ssid from internal eeprom\n");
+    wifissid = WiFi.SSID();
+  }
+  DEBUG_D("wifi ssid=%s\n", wifissid.c_str());
+  if (wifissid == "") wifissid = WiFi.SSID();
+  
+  if (!eeprom_read(&wifipsk, 11))
+  {
+    DEBUG_E("Error reading wifi key from internal eeprom\n");
+    wifipsk = WiFi.psk();
+    eeprom_save_variables(); // If reading key was in error, wifi data was not stored in eeprom before, so store it.
+  }
+  if (wifipsk == "") wifipsk = WiFi.psk();
+  DEBUG_D("wifi key=%s\n", wifipsk.c_str());
+}
+
+void setup() {
+
+  ESP.wdtDisable(); // Use hardware watchdog of 6 seconds to prevent auto reboot when function takes more time..
+  EEPROM.begin(512);
+
+  initSerial();
+
+#ifdef SERIALLOG
+  Debug.setSerialEnabled(true);
+#else
+  Debug.setSerialEnabled(false);
+#endif
+
+  Debug.begin("");
+  DEBUG_I("\n\nInitializing ESP8266 %s %s...\n\n", FIRMWARE_TARGET, ESPMQTT_VERSION);
+
+  char buffer[25];
+  snprintf(buffer, 25, "%08X", ESP.getChipId());
+  chipid = buffer;
+
+  sntp_set_timezone(1);
+  sntp_setservername(0, "nl.pool.ntp.org");
+
+  eeprom_load_variables();
 
 #ifdef  ESPMQTT_DDNS
   EasyDDNS.service("duckdns");
