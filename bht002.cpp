@@ -2,12 +2,14 @@
 
 #include "espMQTT.h"
 #include "bht002.h"
-float bht002_temperature = NAN;
-float bht002_setpoint = NAN;
+int8_t bht002_temperature = 128;
+uint8_t bht002_setpoint = 18;
 bool bht002_heating = false;
 bool bht002_deviceon = false;
 bool bht002_deviceoninitialized = false;
 bool bht002_preventdeviceoff = true;
+bool bht002_wificonnected = false;
+bool bht002_initready = false;
 
 void(*_bht002_callback)(String, String);
 
@@ -112,7 +114,7 @@ void bht002_senddebug(uint8_t cmdnr)
       break;
     case 4:
       {
-        DEBUG ("Sending Wifi Pairing Off\n");
+        DEBUG ("Sending Wifi Off\n");
         unsigned char queryStateCommand[] = { 0x55, 0xAA, 0x00, 0x03, 0x00, 0x01, 0x02 };
         bht002_commandCharsToSerial(7, queryStateCommand);
         //wifipairing = false;
@@ -189,11 +191,36 @@ void bht002_senddebug(uint8_t cmdnr)
   }
 }
 
+void bht002_sendon()
+{
+  DEBUG ("Sending On\n");
+  unsigned char bht002Command[] = { 0x55, 0xAA, 0x00, 0x06, 0x00, 0x05, 0x01, 0x01, 0x00, 0x01, 0x01 };
+  bht002_commandCharsToSerial(11, bht002Command);
+}
+
+void bht002_sendoff()
+{
+  DEBUG ("Sending Off\n");
+  unsigned char bht002Command[] = { 0x55, 0xAA, 0x00, 0x06, 0x00, 0x05, 0x01, 0x01, 0x00, 0x01, 0x00 };
+  bht002_commandCharsToSerial(11, bht002Command);
+}
+
+
+void bht002_sendsetsetpoint()
+{
+  DEBUG ("Sending setpoint=%d\n", bht002_setpoint);
+  unsigned char bht002Command[] = { 0x55, 0xAA, 0x00, 0x06, 0x00, 0x08, 0x02, 0x02, 0x00, 0x04, 0x00, 0x00, 0x00, bht002_setpoint };
+  bht002_commandCharsToSerial(14, bht002Command);
+}
+
+
 void bht002_setsetpoint(uint8_t temperature)
 {
-  DEBUG ("Sending setpoint=11\n");
-  unsigned char bht002Command[] = { 0x55, 0xAA, 0x00, 0x06, 0x00, 0x08, 0x02, 0x02, 0x00, 0x04, 0x00, 0x00, 0x00, temperature };
-  bht002_commandCharsToSerial(14, bht002Command);
+  bht002_setpoint = temperature;
+  if (bht002_initready)
+  {
+    bht002_sendsetsetpoint();
+  }
 }
 
 int8_t bht002_getsetpoint()
@@ -334,23 +361,45 @@ void bht002_processSerialCommand(uint8_t commandLength, uint8_t receivedCommand[
   }
 }
 
+void bht002_sendwifistate()
+{
+  if (bht002_wificonnected)
+  {
+    DEBUG ("Sending Wifi Connected\n");
+    unsigned char queryStateCommand[] = { 0x55, 0xAA, 0x00, 0x03, 0x00, 0x01, 0x03 };
+    bht002_commandCharsToSerial(7, queryStateCommand);
+    bht002_wificonnected = true;
+  }
+  else
+  {
+    DEBUG ("Sending Wifi Disconnected\n");
+    unsigned char queryStateCommand[] = { 0x55, 0xAA, 0x00, 0x03, 0x00, 0x01, 0x02 };
+    bht002_commandCharsToSerial(7, queryStateCommand);
+    bht002_wificonnected = false;
+  }
+}
+
 void bht002_connected()
 {
-  DEBUG ("Sending Wifi Connected\n");
-  unsigned char queryStateCommand[] = { 0x55, 0xAA, 0x00, 0x03, 0x00, 0x01, 0x03 };
-  bht002_commandCharsToSerial(7, queryStateCommand);
+    bht002_wificonnected = true;
+  if (bht002_initready)
+  {
+    bht002_sendwifistate();
+  }
 }
 
 void bht002_disconnected()
 {
-  DEBUG ("Sending Wifi Disconnected\n");
-  unsigned char queryStateCommand[] = { 0x55, 0xAA, 0x00, 0x03, 0x00, 0x01, 0x02 };
-  bht002_commandCharsToSerial(7, queryStateCommand);
+  bht002_wificonnected = false;
+  if (bht002_initready)
+  {
+    bht002_sendwifistate();
+  }
 }
 
 void bht002_handle()
 {
-  static bool bht002_initialize_counter = 0;
+  static uint8_t bht002_initialize_counter = 0;
 
   const unsigned char BHT002_COMMAND_START[] = {0x55, 0xAA};
 #define receivedCommandLength 140
@@ -395,5 +444,34 @@ void bht002_handle()
       else DEBUG ("bht002 Checksum FAIL!\n");
       receiveIndex = -1;
     }
+  }
+
+  if ((bht002_initialize_counter == 0) && (millis() > 4000))
+  {
+    bht002_initialize_counter = 1;
+    DEBUG ("Sending Heartbeat?\n");
+    unsigned char bht002Command[] = { 0x55, 0xAA, 0x00, 0x00, 0x00, 0x00 };
+    bht002_commandCharsToSerial(6, bht002Command);
+  }
+
+
+  if ((bht002_initialize_counter == 1) && (millis() > 5000))
+  {
+    bht002_initialize_counter = 2;
+    bht002_sendon();
+  }
+
+  if ((bht002_initialize_counter == 2) && (millis() > 6000))
+  {
+    bht002_initialize_counter = 3;
+    bht002_sendwifistate();
+  }
+
+
+  if ((bht002_initialize_counter == 3) && (millis() > 7000))
+  {
+    bht002_initialize_counter = 4;
+    bht002_sendsetsetpoint();
+    bht002_initready = true;
   }
 }
