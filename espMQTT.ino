@@ -31,7 +31,7 @@
 // #define ESPMQTT_BATHROOM
 // #define ESPMQTT_BEDROOM2
 // #define ESPMQTT_OPENTHERM
-#define ESPMQTT_SMARTMETER
+// #define ESPMQTT_SMARTMETER
 // #define ESPMQTT_GROWATT
 // #define ESPMQTT_SDM120
 // #define ESPMQTT_DDM18SD
@@ -55,7 +55,7 @@
 // #define SPMQTT_IRRIGATION
 // #define ESPMQTT_BLITZWOLF
 // #define ESPMQTT_QSWIFIDIMMERD01
-// #define ESPMQTT_QSWIFIDIMMERD02
+#define ESPMQTT_QSWIFIDIMMERD02
 // #define ESPMQTT_SONOFF4CH //ESP8285
 // #define ESPMQTT_SONOFFDUAL
 // #define ESPMQTT_SONOFFS20_PRINTER
@@ -1008,7 +1008,7 @@ void connectToWifi()
     DEBUG_I("Connecting to Wi-Fi: SSID=\"%s\"...\n", wifissid.c_str());
     WiFi.mode(WIFI_STA);
     WiFi.disconnect();
-    WiFi.begin(wifissid.c_str(), wifipsk.c_str(), 0, 0); // First connect to any available AP, later scan for stronger AP
+    WiFi.begin(wifissid, wifipsk); // First connect to any available AP, later scan for stronger AP
   }
 }
 
@@ -1558,13 +1558,10 @@ void loop()
   if ((0 != wifichangesettingstimeout) && (uptime > wifichangesettingstimeout))
   {
     mainstate.accesspoint = false;
-    WiFi.mode(WIFI_STA); // After saving settings return to wifi client mode and disable AP
     if ((wifissid != ""))
     {
       DEBUG_I ("Connecting wifi to %s\n", wifissid.c_str());
-      WiFi.disconnect();
-      WiFi.hostname(esp_hostname);
-      WiFi.begin(wifissid.c_str(), wifipsk.c_str()); // Save wifi ssid and key and also activate new hostname...
+      connectToWifi();
     }
     wifichangesettingstimeout = 0;
   }
@@ -1760,7 +1757,7 @@ void loop()
       {
         DEBUG_I ("Switching to stronger AP %d (%s, %s, %s)\n", strongestwifiid, WiFi.SSID().c_str(), WiFi.psk().c_str(), WiFi.BSSIDstr(strongestwifiid).c_str());
         WiFi.disconnect(false);
-        WiFi.begin(wifissid.c_str(), wifipsk.c_str(), WiFi.channel(strongestwifiid), WiFi.BSSID(strongestwifiid));
+        WiFi.begin(wifissid.c_str(), wifipsk.c_str(), WiFi.channel(strongestwifiid), WiFi.BSSID(strongestwifiid), 1);
       }
     }
   }
@@ -2225,7 +2222,7 @@ void loop()
     // try to do this as less as posisble because during scan the esp is unreachable for about a second.
     if ((!mainstate.accesspoint))
     {
-      if (((uptime % 600) == 0) || ((WiFi.status() != WL_CONNECTED) && (uptime % 30)) || (((uptime % 30) == 0) && WiFi.RSSI() < -70))
+      if ((uptime > 10) && (((uptime % 600) == 0) || ((WiFi.status() != WL_CONNECTED) && ((uptime % 30) == 0)) || (((uptime % 30) == 0) && WiFi.RSSI() < -70)))
       {
         static uint32_t wifilastscan = 0;
         // prevent scanning more than once per 30 seconds and wait 2 seconds before first scan
@@ -2298,6 +2295,7 @@ void loop()
       DEBUG_I("Stopping accesspoint");
       WiFi.mode(WIFI_STA);
       mainstate.accesspoint = false;
+      connectToWifi();
     }
 #endif
 
