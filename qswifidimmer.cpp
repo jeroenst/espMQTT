@@ -9,7 +9,7 @@
    GPIO5  = S2
 */
 static uint8_t qswifidimmer_nrofchannels = 0;
-static uint8_t qswifidimmer_dimvalue[2] = {1, 1};
+static uint8_t qswifidimmer_dimvalue[2] = {100, 100};
 static uint8_t qswifidimmer_dimoffset[2] = {20 , 20};
 static bool qswifidimmer_dimstate[2] = {0, 0};
 static bool qswifidimmer_dimenabled[2] = {1, 1};
