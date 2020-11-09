@@ -2,7 +2,7 @@
 #include "qswifidimmer.h"
 
 /*
-  MOESHOUSE QS WIFI DIMMER D01 (QS-WIFI-D01) not tested
+  MOESHOUSE QS WIFI DIMMER D01 (QS-WIFI-D01) tested ok
   MOESHOUSE QS WIFI DIMMER D01 (QS-WIFI-D02) tested ok
 
    GPIO13 = S1
@@ -25,50 +25,50 @@ void qswifidimmer_init(const uint8_t nrofchannels, void(*callback)(uint8_t, uint
 
   // Define all unused GPIO as output to prevent inteference and slow wifi
   pinMode(0, OUTPUT);
-  digitalWrite(0,0);
+  digitalWrite(0, 0);
   // GPIO 1 is TX
   pinMode(2, OUTPUT);
-  digitalWrite(2,0);
+  digitalWrite(2, 0);
   pinMode(3, FUNCTION_0); // Change RX pin to GPIO
   pinMode(3, OUTPUT);
-  digitalWrite(3,0);
+  digitalWrite(3, 0);
   pinMode(4, OUTPUT);
   // Gpio 5 = Switch input 2
-  digitalWrite(4,0);
+  digitalWrite(4, 0);
   // Pin 6 t/m 11 = flash
   pinMode(12, OUTPUT);
-  digitalWrite(12,0);
+  digitalWrite(12, 0);
   // Gpio 13 = Switch input 1
   pinMode(14, OUTPUT);
-  digitalWrite(14,0);
+  digitalWrite(14, 0);
   pinMode(15, OUTPUT);
-  digitalWrite(15,0);
+  digitalWrite(15, 0);
   pinMode(16, OUTPUT);
-  digitalWrite(16,0);
+  digitalWrite(16, 0);
 
   qswifidimmer_nrofchannels = nrofchannels;
   qswifidimmer_setdimvalue(0, 0);
   qswifidimmer_setdimstate(0, 0);
   pinMode(13, INPUT_PULLUP);
-  
+
   if (qswifidimmer_nrofchannels == 2)
   {
     qswifidimmer_setdimvalue(0, 1);
     qswifidimmer_setdimstate(0, 1);
-    qswifidimmer_nrofchannels = 2;
     pinMode(5, INPUT_PULLUP);
   }
-  else 
+  else
   {
+    qswifidimmer_nrofchannels = 1;
     pinMode(5, OUTPUT);
-    digitalWrite(5,0);
+    digitalWrite(5, 0);
   }
 }
 
 void qswifidimmer_setswitchcallback(void(*callback)(uint8_t, bool))
 {
   _qswifidimmer_switchcallback = callback;
-  for (int i = 0; i < qswifidimmer_nrofchannels;  i++) _qswifidimmer_switchcallback(i, false);
+  for (uint8_t i = 0; i < qswifidimmer_nrofchannels;  i++) _qswifidimmer_switchcallback(i, false);
 }
 
 void qswifidimmer_send(uint8_t dimchannel)
@@ -108,104 +108,118 @@ void qswifidimmer_handle()
   static uint32_t Stime[2] = {0, 0};
   static uint32_t Stimeout[2] = {0, 0};
   static bool Sdimup[2] = {1, 1};
-  static bool fullbrightstart[2] = {0,0};
+  static bool fullbrightstart[2] = {0, 0};
+  static uint8_t dimchannel = 0;
 
-  // Itterate trough dimchannels (D01 or D02 dimmer)
-  for (uint8_t dimchannel = 0; dimchannel < qswifidimmer_nrofchannels; dimchannel++)
+  uint32_t msec = millis(); // store millis in variable because otherwise wifi gets slow.
+  // Iterate trough dimchannels (D01 or D02 dimmer)
+  if (dimchannel >= qswifidimmer_nrofchannels) dimchannel = 0;
+
+  // Count pulses on input (50hz when button is pressed, but 2 pulses per full sine, so 10ms per pulse)
+  bool Stemp = (dimchannel == 0 ? digitalRead(13) : digitalRead(5));
+  Spulse[dimchannel] = 0;
+  if (Stemp != S[dimchannel])
   {
-    // Count pulses on input (50hz when button is pressed, but 2 pulses per full sine, so 10ms per pulse)
-    bool Stemp = (dimchannel == 0 ? digitalRead(13) : digitalRead(5));
-    Spulse[dimchannel] = 0;
-    if (Stemp != S[dimchannel])
-    {
-      S[dimchannel] = Stemp;
-      Scounter[dimchannel]++;
-      Stime[dimchannel] = millis();
-      Spulse[dimchannel] = 1;
-    }
+    S[dimchannel] = Stemp;
+    Scounter[dimchannel]++;
+    Stime[dimchannel] = msec;
+    Spulse[dimchannel] = 1;
+  }
 
-    // If 6 pulses are counted do a callback to inform switch is pressed
-    if (Scounter[dimchannel] == 6)
-    {
-      _qswifidimmer_switchcallback(dimchannel, true);
-    }
+  // If 6 pulses are counted do a callback to inform switch is pressed
+  if (Scounter[dimchannel] == 6)
+  {
+    // Callback switch is pressed
+    _qswifidimmer_switchcallback(dimchannel, true);
+  }
 
-    // When switch was pressed for 5 pulses and released for about 100ms switch from on to off or from off to on and also reset counters etc.
-    if ((Scounter[dimchannel] > 5) && (Stime[dimchannel] + 100 < millis()))
+
+  // When switch was pressed for more then 5 pulses and released for about 100ms switch from on to off or from off to on and also reset counters etc.
+  if ((Scounter[dimchannel] > 5) && (Stime[dimchannel] + 100 < msec))
+  {
+    if (Scounter[dimchannel] < 100)
     {
-      if (Scounter[dimchannel] < 100)
+      // Toggle lamp on / off
+      qswifidimmer_dimstate[dimchannel] = qswifidimmer_dimstate[dimchannel] ? 0 : 1;
+
+      // If dimming is disabled set dimvalue to 100 when dimstate is 1 or 0 if dimstate is 0
+      if (!qswifidimmer_dimenabled[dimchannel])
       {
-        qswifidimmer_dimstate[dimchannel] = qswifidimmer_dimstate[dimchannel] ? 0 : 1;
-        if (!qswifidimmer_dimenabled[dimchannel])
-        {
-          qswifidimmer_dimvalue[dimchannel] = qswifidimmer_dimstate[dimchannel] ? 100 : 0;
-        }
-        qswifidimmer_send(dimchannel);
-        _qswifidimmer_callback(dimchannel, qswifidimmer_dimstate[dimchannel] ? qswifidimmer_dimvalue[dimchannel] : 0, qswifidimmer_dimstate[dimchannel]);
+        qswifidimmer_dimvalue[dimchannel] = qswifidimmer_dimstate[dimchannel] ? 100 : 0;
       }
-      _qswifidimmer_switchcallback(dimchannel, false);
+
+      // Send update to dimchannel
+      qswifidimmer_send(dimchannel);
+
+      // Callback to parent
+      _qswifidimmer_callback(dimchannel, qswifidimmer_dimstate[dimchannel] ? qswifidimmer_dimvalue[dimchannel] : 0, qswifidimmer_dimstate[dimchannel]);
+    }
+    // Callback switch is released
+    _qswifidimmer_switchcallback(dimchannel, false);
+    Scounter[dimchannel] = 0;
+    Stime[dimchannel] = 0;
+    fullbrightstart[dimchannel] = 0;
+  }
+
+  // If lamps are off and switch is pressed more than 100 pulses (10ms*100=2000ms), put lamps on with full brightness
+  if (!qswifidimmer_dimstate[dimchannel] && Scounter[dimchannel] > 100)
+  {
+    qswifidimmer_dimstate[dimchannel] = true;
+    qswifidimmer_dimvalue[dimchannel] = 100;
+    qswifidimmer_send(dimchannel);
+    _qswifidimmer_callback(dimchannel, qswifidimmer_dimstate[dimchannel] ? qswifidimmer_dimvalue[dimchannel] : 0, qswifidimmer_dimstate[dimchannel]);
+    fullbrightstart[dimchannel] = 1;
+  }
+
+
+  // If dimming for this channel is enabled and state is on and lamps are not just set on with fullbright start changing dimlevel
+  if ((qswifidimmer_dimenabled[dimchannel]) && (qswifidimmer_dimstate[dimchannel]) && !fullbrightstart[dimchannel])
+  {
+    // When switch is released reset pulse counter and timeout, change dim direction and send values to callback handler
+    if ((Stimeout[dimchannel] > 0) && (Stimeout[dimchannel] < msec))
+    {
       Scounter[dimchannel] = 0;
-      Stime[dimchannel] = 0;
-      fullbrightstart[dimchannel] = 0;      
+      Stimeout[dimchannel] = 0;
+      Sdimup[dimchannel] = Sdimup[dimchannel] ? 0 : 1;
+      _qswifidimmer_callback(dimchannel, qswifidimmer_dimstate[dimchannel] ? qswifidimmer_dimvalue[dimchannel] : 0, qswifidimmer_dimstate[dimchannel]);
     }
 
-    // If lamps are off and switch is pressed more than 100 pulses (10ms*100=2000ms), put lamps on with full brightness
-    if (!qswifidimmer_dimstate[dimchannel] && Scounter[dimchannel] > 100)
+    if (Scounter[dimchannel] > 100)
     {
-        qswifidimmer_dimstate[dimchannel] = true;
-        qswifidimmer_dimvalue[dimchannel] = 100;
-        qswifidimmer_send(dimchannel);
-        _qswifidimmer_callback(dimchannel, qswifidimmer_dimstate[dimchannel] ? qswifidimmer_dimvalue[dimchannel] : 0, qswifidimmer_dimstate[dimchannel]);
-        fullbrightstart[dimchannel] = 1;
-    }
-
-    // If dimming for this channel is enabled and the dimstate is on start changing dimlevel while button is pressed longer then 100ms
-    if ((qswifidimmer_dimenabled[dimchannel]) && (qswifidimmer_dimstate[dimchannel]) && !fullbrightstart[dimchannel])
-    {
-      if ((Stimeout[dimchannel] > 0) && (Stimeout[dimchannel] < millis()))
+      Stimeout[dimchannel] = msec + 50;
+      if (Sdimup[dimchannel])
       {
-        Scounter[dimchannel] = 0;
-        Stimeout[dimchannel] = 0;
-        Sdimup[dimchannel] = Sdimup[dimchannel] ? 0 : 1;
-        _qswifidimmer_callback(dimchannel, qswifidimmer_dimstate[dimchannel] ? qswifidimmer_dimvalue[dimchannel] : 0, qswifidimmer_dimstate[dimchannel]);
+        if (qswifidimmer_dimvalue[dimchannel] < 100)
+        {
+          if ((Scounter[dimchannel] % 3) == 0)
+          {
+            if (Spulse[dimchannel])
+            {
+              qswifidimmer_dimvalue[dimchannel] = qswifidimmer_dimvalue[dimchannel] + 1;
+              qswifidimmer_send(dimchannel);
+            }
+          }
+        }
+        else Sdimup[dimchannel] = 0;
       }
-
-      if (Scounter[dimchannel] > 100)
+      else
       {
-        Stimeout[dimchannel] = millis() + 50;
-        if (Sdimup[dimchannel])
+        if (qswifidimmer_dimvalue[dimchannel] > 1)
         {
-          if (qswifidimmer_dimvalue[dimchannel] < 100)
+          if ((Scounter[dimchannel] % 3) == 0)
           {
-            if ((Scounter[dimchannel] % 3) == 0)
+            if (Spulse[dimchannel])
             {
-              if (Spulse[dimchannel])
-              {
-                qswifidimmer_dimvalue[dimchannel] = qswifidimmer_dimvalue[dimchannel] + 1;
-                qswifidimmer_send(dimchannel);
-              }
+              qswifidimmer_dimvalue[dimchannel] = qswifidimmer_dimvalue[dimchannel] - 1;
+              qswifidimmer_send(dimchannel);
             }
           }
-          else Sdimup[dimchannel] = 0;
         }
-        else
-        {
-          if (qswifidimmer_dimvalue[dimchannel] > 1)
-          {
-            if ((Scounter[dimchannel] % 3) == 0)
-            {
-              if (Spulse[dimchannel])
-              {
-                qswifidimmer_dimvalue[dimchannel] = qswifidimmer_dimvalue[dimchannel] - 1;
-                qswifidimmer_send(dimchannel);
-              }
-            }
-          }
-          else Sdimup[dimchannel] = 1;
-        }
+        else Sdimup[dimchannel] = 1;
       }
     }
   }
+  dimchannel++; 
 }
 
 void qswifidimmer_setdimoffset(uint8_t value, uint8_t dimchannel)
