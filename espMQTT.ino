@@ -736,6 +736,7 @@ void updateexternalip();
 String getdatamap(String topic)
 {
   return dataMap->get(topic).payload;
+  yield();
 }
 
 void showdatamap()
@@ -768,6 +769,7 @@ void putdatamap(String topic, String value, bool sendupdate = true, bool forcese
     datamapstruct.payload = value;
     dataMap->put(topic, datamapstruct);
   }
+  yield();
 }
 
 void obd2_writeserial (String data)
