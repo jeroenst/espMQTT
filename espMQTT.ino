@@ -18,6 +18,8 @@
     (I2C) Wire
 */
 
+#define DEFAULT_PASSWORD "esplogin"
+
 #define DEBUGLEVEL Debug.DEBUG
 //#define //syslogDEBUG
 
@@ -571,6 +573,7 @@ AsyncMqttClient mqttClient;
 struct Triggers {
   bool wificonnected = false;
   bool wifidisconnected = false;
+  bool wifistartap = false;
   bool mqttconnected = false;
   bool mqttdisconnected = false;
   bool wifiscanready = false;
@@ -683,7 +686,7 @@ String mqtt_password = "";
 String mqtt_topicprefix = "";
 int mqtt_port = 1883;
 bool mqtt_ssl = 0;
-String esp_password = "esplogin";
+String esp_password = DEFAULT_PASSWORD;
 String esp_hostname = "";
 String esp_orig_hostname = "";
 //#include "esp8266_peri.h"
@@ -991,10 +994,6 @@ void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
 }
 
 
-void initWifi()
-{
-  // Moved to connecttowifi
-}
 
 void connectToWifi()
 {
@@ -1016,7 +1015,24 @@ void connectToWifi()
     ArduinoOTA.setHostname(esp_hostname.c_str());
     ArduinoOTA.setPassword(esp_password.c_str());
     Debug.setPassword(esp_password);
+
+    mainstate.accesspoint = false;
   }
+}
+
+void startWifiAP()
+{
+      WiFi.disconnect();
+      if (!WiFi.softAP(WiFi.hostname().c_str(), DEFAULT_PASSWORD, 6, 0))
+      {
+        mainstate.accesspoint = true;
+        DEBUG_E("Failed setting WiFi.softAP()");
+        static uint8 routermode = 0;
+        wifi_softap_set_dhcps_offer_option(OFFER_ROUTER, &routermode);
+        WiFi.mode(WIFI_AP);
+        esp_password = DEFAULT_PASSWORD;
+      }
+      else connectToWifi();
 }
 
 void onMqttConnect(bool sessionPresent) {
@@ -1507,7 +1523,7 @@ void flashbutton_handle()
     if (flashbuttontimer == 3) // After 3 seconds clear passwords
     {
       flashbuttonstatus = 2;
-      esp_password = "esplogin";
+      esp_password = DEFAULT_PASSWORD;
       DEBUG_I("Web Password defaulted to esplogin until reboot!\n");
       mainstate.defaultpassword = true;
     }
@@ -1515,10 +1531,7 @@ void flashbutton_handle()
     if (flashbuttontimer == 6) // After 6 seconds start access point
     {
       flashbuttonstatus = 1;
-      if (!WiFi.softAP(WiFi.hostname().c_str(), "esplogin", 6, 0)) DEBUG_E("Failed setting WiFi.softAP()");
-      WiFi.mode(WIFI_AP);
-      DEBUG_I("Wifi Accesspoint started!\n");
-      mainstate.accesspoint = true;
+      startWifiAP();
     }
 
     if (flashbuttontimer == 10) ESP.reset();
@@ -2289,17 +2302,11 @@ void loop()
     {
       DEBUG_W("Connection to wifi failed, starting accesspoint\n");
       mainstate.accesspoint = true;
-      if (!WiFi.softAP(WiFi.hostname().c_str(), "esplogin", 6, 0)) DEBUG_E("Failed setting WiFi.softAP()");
-      static uint8 routermode = 0;
-      wifi_softap_set_dhcps_offer_option(OFFER_ROUTER, &routermode);
-      WiFi.mode(WIFI_AP);
-      esp_password = "esplogin";
+      startWifiAP();
     }
     if (uptime == 630)
     {
       DEBUG_I("Stopping accesspoint");
-      WiFi.mode(WIFI_STA);
-      mainstate.accesspoint = false;
       connectToWifi();
     }
 #endif
@@ -3454,7 +3461,6 @@ void setup() {
   sonoff_init();
 #endif
 
-  initWifi();
   connectToWifi();
 
 
