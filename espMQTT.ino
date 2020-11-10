@@ -33,7 +33,7 @@
 // #define ESPMQTT_BATHROOM
 // #define ESPMQTT_BEDROOM2
 // #define ESPMQTT_OPENTHERM
-#define ESPMQTT_SMARTMETER
+// #define ESPMQTT_SMARTMETER
 // #define ESPMQTT_GROWATT
 // #define ESPMQTT_SDM120
 // #define ESPMQTT_DDM18SD
@@ -56,7 +56,7 @@
 // #define ESPMQTT_SONOFF_FLOORHEATING
 // #define SPMQTT_IRRIGATION
 // #define ESPMQTT_BLITZWOLF
-// #define ESPMQTT_QSWIFIDIMMERD01
+#define ESPMQTT_QSWIFIDIMMERD01
 // #define ESPMQTT_QSWIFIDIMMERD02
 // #define ESPMQTT_SONOFF4CH //ESP8285
 // #define ESPMQTT_SONOFFDUAL
@@ -573,7 +573,6 @@ AsyncMqttClient mqttClient;
 struct Triggers {
   bool wificonnected = false;
   bool wifidisconnected = false;
-  bool wifistartap = false;
   bool mqttconnected = false;
   bool mqttdisconnected = false;
   bool wifiscanready = false;
@@ -993,46 +992,54 @@ void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
   putdatamap("mqtt/user", mqtt_username, sendupdate);
 }
 
-
+void startWifiAP()
+{
+  WiFi.disconnect();
+  if (!WiFi.softAP(WiFi.hostname().c_str(), DEFAULT_PASSWORD, 6, 0))
+  {
+    mainstate.accesspoint = true;
+    DEBUG_E("Failed setting WiFi.softAP()");
+    static uint8 routermode = 0;
+    wifi_softap_set_dhcps_offer_option(OFFER_ROUTER, &routermode);
+    WiFi.mode(WIFI_AP);
+    esp_password = DEFAULT_PASSWORD;
+    ArduinoOTA.setPassword(esp_password.c_str());
+    Debug.setPassword(esp_password);
+  }
+  else connectToWifi();
+}
 
 void connectToWifi()
 {
-  if (!mainstate.wificonnected && !mainstate.accesspoint)
+  // If no ssid was configured start accesspoint
+  if (wifissid != "")
   {
-    DEBUG_I("Connecting to Wi-Fi: SSID='%s' HOSTNAME='%s'...\n", wifissid.c_str(), esp_hostname.c_str());
-    WiFi.disconnect();
-
-    WiFi.setAutoReconnect(false); // We handle reconnect our self
-    WiFi.setSleepMode(WIFI_NONE_SLEEP); // When sleep is on regular disconnects occur https://github.com/esp8266/Arduino/issues/5083
-    WiFi.setOutputPower(20);        // 10dBm == 10mW, 14dBm = 25mW, 17dBm = 50mW, 20dBm = 100mW
-    WiFi.hostname(esp_hostname);
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(wifissid, wifipsk); // First connect to any available AP, later scan for stronger AP
-
-    MDNS.begin(esp_hostname);
-    MDNS.addService("http", "tcp", 80);
-
-    ArduinoOTA.setHostname(esp_hostname.c_str());
-    ArduinoOTA.setPassword(esp_password.c_str());
-    Debug.setPassword(esp_password);
-
-    mainstate.accesspoint = false;
-  }
-}
-
-void startWifiAP()
-{
+    if (!mainstate.wificonnected && !mainstate.accesspoint)
+    {
+      DEBUG_I("Connecting to Wi-Fi: SSID='%s' HOSTNAME='%s'...\n", wifissid.c_str(), esp_hostname.c_str());
       WiFi.disconnect();
-      if (!WiFi.softAP(WiFi.hostname().c_str(), DEFAULT_PASSWORD, 6, 0))
-      {
-        mainstate.accesspoint = true;
-        DEBUG_E("Failed setting WiFi.softAP()");
-        static uint8 routermode = 0;
-        wifi_softap_set_dhcps_offer_option(OFFER_ROUTER, &routermode);
-        WiFi.mode(WIFI_AP);
-        esp_password = DEFAULT_PASSWORD;
-      }
-      else connectToWifi();
+
+      WiFi.setAutoReconnect(false); // We handle reconnect our self
+      WiFi.setSleepMode(WIFI_NONE_SLEEP); // When sleep is on regular disconnects occur https://github.com/esp8266/Arduino/issues/5083
+      WiFi.setOutputPower(20);        // 10dBm == 10mW, 14dBm = 25mW, 17dBm = 50mW, 20dBm = 100mW
+      WiFi.hostname(esp_hostname);
+      WiFi.mode(WIFI_STA);
+      WiFi.begin(wifissid, wifipsk); // First connect to any available AP, later scan for stronger AP
+
+      MDNS.begin(esp_hostname);
+      MDNS.addService("http", "tcp", 80);
+
+      ArduinoOTA.setHostname(esp_hostname.c_str());
+      ArduinoOTA.setPassword(esp_password.c_str());
+      Debug.setPassword(esp_password);
+
+      mainstate.accesspoint = false;
+    }
+  }
+  else 
+  {
+    startWifiAP();
+  }
 }
 
 void onMqttConnect(bool sessionPresent) {
@@ -2298,13 +2305,13 @@ void loop()
 #endif
 
 #ifdef APONBOOT
-    if ((uptime == 30) && (WiFi.status() != WL_CONNECTED))
+    if ((uptime == 60) && (WiFi.status() != WL_CONNECTED))
     {
       DEBUG_W("Connection to wifi failed, starting accesspoint\n");
       mainstate.accesspoint = true;
       startWifiAP();
     }
-    if (uptime == 630)
+    if (uptime == 660)
     {
       DEBUG_I("Stopping accesspoint");
       connectToWifi();
@@ -3434,6 +3441,10 @@ void setup() {
   Debug.setSerialEnabled(false);
 #endif
 
+  eeprom_load_variables();
+
+  connectToWifi();
+
   Debug.begin("");
   DEBUG_I("\n\nInitializing ESP8266 %s %s...\n\n", FIRMWARE_TARGET, ESPMQTT_VERSION);
 
@@ -3444,7 +3455,6 @@ void setup() {
   sntp_set_timezone(1);
   sntp_setservername(0, "nl.pool.ntp.org");
 
-  eeprom_load_variables();
 
 #ifdef  ESPMQTT_DDNS
   EasyDDNS.service("duckdns");
@@ -3461,7 +3471,6 @@ void setup() {
   sonoff_init();
 #endif
 
-  connectToWifi();
 
 
   Debug.begin(esp_hostname.c_str(), DEBUGLEVEL);
