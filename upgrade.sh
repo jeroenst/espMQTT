@@ -24,7 +24,12 @@ echo "Upgrade of $2 finished."
 echo ""
 }
 
-VERSION=$(head -n 1 ~/Arduino/espMQTT/version)
+if [ $4 == "" ]
+then
+	VERSION=$(head -n 1 ~/Arduino/espMQTT/version)
+else
+	VERSION=$4
+fi
 
 if [ "$1" == "" ] 
 then
