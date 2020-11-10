@@ -769,7 +769,6 @@ void putdatamap(String topic, String value, bool sendupdate = true, bool forcese
     datamapstruct.payload = value;
     dataMap->put(topic, datamapstruct);
   }
-  yield();
 }
 
 void obd2_writeserial (String data)
@@ -3446,10 +3445,6 @@ void setup() {
   Debug.setSerialEnabled(false);
 #endif
 
-  eeprom_load_variables();
-
-  connectToWifi();
-
   Debug.begin("");
   DEBUG_I("\n\nInitializing ESP8266 %s %s...\n\n", FIRMWARE_TARGET, ESPMQTT_VERSION);
 
@@ -3460,6 +3455,9 @@ void setup() {
   sntp_set_timezone(1);
   sntp_setservername(0, "nl.pool.ntp.org");
 
+  eeprom_load_variables();
+
+  connectToWifi();
 
 #ifdef  ESPMQTT_DDNS
   EasyDDNS.service("duckdns");
