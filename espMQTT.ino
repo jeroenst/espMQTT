@@ -587,7 +587,7 @@ struct Mainstate {
   bool mqttconnectedtrigger = false;
   bool mqttready = false;
   bool mqttsenddatamap = false;
-  bool defaultpassword = false;
+  bool defaultpassword = true;
   bool accesspoint = false;
 } mainstate;
 
@@ -671,7 +671,6 @@ bool floorheating_valveon = 0;
 
 //WiFiClientSecure wifiClientSecure;
 //WiFiClient wifiClient;
-static uint8_t wifiTimer = 0;
 ESP8266WebServer webserver(80);
 #include <WiFiUdp.h>
 
@@ -1003,6 +1002,7 @@ void startWifiAP()
     wifi_softap_set_dhcps_offer_option(OFFER_ROUTER, &routermode);
     WiFi.mode(WIFI_AP);
     esp_password = DEFAULT_PASSWORD;
+    mainstate.defaultpassword = true;
     ArduinoOTA.setPassword(esp_password.c_str());
     Debug.setPassword(esp_password);
   }
@@ -1549,7 +1549,9 @@ void flashbutton_handle()
 void loop()
 {
   ESP.wdtFeed(); // Prevent HW WD to kick in...
+  yield();
   ArduinoOTA.handle();
+  yield();
   Debug.handle();
   yield();
 
@@ -1565,6 +1567,7 @@ void loop()
     if (mainstate.wificonnected) triggers.wifidisconnected = true;
     mainstate.wificonnected = false;
   }
+  yield();
 
 
 #ifdef QSWIFIDIMMERCHANNELS
@@ -1574,6 +1577,7 @@ void loop()
 
 #ifdef  ESPMQTT_DDNS
   EasyDDNS.update(10000);
+  yield();
 #endif
 
   if ((0 != reboottimeout) && (uptime > reboottimeout))
@@ -1581,6 +1585,7 @@ void loop()
     ESP.restart();
     delay(1000);
   }
+  yield();
 
   if ((0 != wifichangesettingstimeout) && (uptime > wifichangesettingstimeout))
   {
@@ -1591,6 +1596,7 @@ void loop()
     }
     wifichangesettingstimeout = 0;
   }
+  yield();
 
 
   if (triggers.wificonnected)
@@ -1612,6 +1618,7 @@ void loop()
     bht002_connected();
 #endif
   }
+  yield();
 
   if (triggers.wifidisconnected)
   {
@@ -1623,6 +1630,7 @@ void loop()
     bht002_disconnected();
 #endif
   }
+  yield();
 
   if (triggers.mqttconnected)
   {
@@ -1634,6 +1642,7 @@ void loop()
     mqttdosubscriptions();
     updateexternalip();
   }
+  yield();
 
   if (triggers.mqttdisconnected)
   {
@@ -1645,6 +1654,7 @@ void loop()
       mqttReconnectTimer.once(5, connectToMqtt);
     }
   }
+  yield();
 
   if (triggers.mqttpublished)
   {
@@ -1653,6 +1663,7 @@ void loop()
     publishdatamap(mqttlastpublishedpacketid);
 
   }
+  yield();
 
   if (triggers.mqttpublishall)
   {
@@ -1724,6 +1735,7 @@ void loop()
       }
     }
   }
+  yield();
 
   if (triggers.wifiscanready)
   {
@@ -1786,8 +1798,10 @@ void loop()
       }
     }
   }
+  yield();
 
   webserver.handleClient();
+  yield();
 
 #ifdef SONOFFCH
   sonoff_handle();
@@ -2337,9 +2351,6 @@ void loop()
     else circuitnr = 0;
 #endif
 
-    if (wifiTimer < 20) wifiTimer++;
-
-
 #ifdef ESPMQTT_ZMAI90
     if (uptime % 10 == 0)
     {
@@ -2425,7 +2436,6 @@ void loop()
 
     if (WiFi.status() == WL_CONNECTED)
     {
-      wifiTimer = 0;
       if (WiFi.status() != previouswifistatus)
       {
 #ifdef NEOPIXELPIN
@@ -2445,17 +2455,6 @@ void loop()
       neopixelleds.setPixelColor(0, neopixelleds.Color(30, 0, 0));
       neopixelleds.show();
 #endif
-      if (flashbuttonstatus == 0)
-      {
-
-        /*if (wifiTimer >= 30)
-          {
-          WiFi.disconnect(false);
-          delay(10);
-          WiFi.begin();
-          wifiTimer = 0;
-          }*/
-      }
     }
     previouswifistatus = WiFi.status();
   }
@@ -3365,6 +3364,10 @@ void eeprom_load_variables()
   if (!eeprom_read(&mqtt_password, 2))
   {
     DEBUG_E("Error reading mqtt password from internal eeprom\n");
+  }
+  else
+  {
+    mainstate.defaultpassword = true;
   }
   DEBUG_D("mqtt password=%s\n", mqtt_password.c_str());
 
