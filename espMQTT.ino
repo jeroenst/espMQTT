@@ -31,7 +31,7 @@
 // #define ESPMQTT_BATHROOM
 // #define ESPMQTT_BEDROOM2
 // #define ESPMQTT_OPENTHERM
-// #define ESPMQTT_SMARTMETER
+#define ESPMQTT_SMARTMETER
 // #define ESPMQTT_GROWATT
 // #define ESPMQTT_SDM120
 // #define ESPMQTT_DDM18SD
@@ -55,7 +55,7 @@
 // #define SPMQTT_IRRIGATION
 // #define ESPMQTT_BLITZWOLF
 // #define ESPMQTT_QSWIFIDIMMERD01
-#define ESPMQTT_QSWIFIDIMMERD02
+// #define ESPMQTT_QSWIFIDIMMERD02
 // #define ESPMQTT_SONOFF4CH //ESP8285
 // #define ESPMQTT_SONOFFDUAL
 // #define ESPMQTT_SONOFFS20_PRINTER
@@ -993,21 +993,22 @@ void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
 
 void initWifi()
 {
-  WiFi.setAutoReconnect(false); // We handle reconnect our self
-  WiFi.setSleepMode(WIFI_NONE_SLEEP); // When sleep is on regular disconnects occur https://github.com/esp8266/Arduino/issues/5083
-  WiFi.mode(WIFI_STA);
-  WiFi.setOutputPower(20);        // 10dBm == 10mW, 14dBm = 25mW, 17dBm = 50mW, 20dBm = 100mW
-  WiFi.hostname(esp_hostname);
-  DEBUG_I("Wifi Initialized: Hostname=%s\n", esp_hostname.c_str());
+  // Moved to connecttowifi
 }
 
 void connectToWifi()
 {
   if (!mainstate.wificonnected && !mainstate.accesspoint)
   {
-    DEBUG_I("Connecting to Wi-Fi: SSID=\"%s\"...\n", wifissid.c_str());
+    DEBUG_I("Connecting to Wi-Fi: SSID='%s' HOSTNAME='%s'...\n", wifissid.c_str(), esp_hostname.c_str());
+    WiFi.disconnect(true);
+
+    WiFi.setAutoReconnect(false); // We handle reconnect our self
+    WiFi.setSleepMode(WIFI_NONE_SLEEP); // When sleep is on regular disconnects occur https://github.com/esp8266/Arduino/issues/5083
     WiFi.mode(WIFI_STA);
-    WiFi.disconnect();
+    WiFi.setOutputPower(20);        // 10dBm == 10mW, 14dBm = 25mW, 17dBm = 50mW, 20dBm = 100mW
+    WiFi.hostname(esp_hostname);
+
     WiFi.begin(wifissid, wifipsk); // First connect to any available AP, later scan for stronger AP
   }
 }
@@ -1560,7 +1561,6 @@ void loop()
     mainstate.accesspoint = false;
     if ((wifissid != ""))
     {
-      DEBUG_I ("Connecting wifi to %s\n", wifissid.c_str());
       connectToWifi();
     }
     wifichangesettingstimeout = 0;
@@ -3248,6 +3248,13 @@ void processCmdRemoteDebug()
     DEBUG("  showmainstate\n");
     DEBUG("  factoryreset\n");
     DEBUG("  showeeprommap\n");
+    DEBUG("  scanwifinetworks (scan for stronger wifi network and connect to it)\n");
+  }
+
+  if (lastCmd == "scanwifinetworks")
+  {
+     DEBUG_D("Starting Wifi Scan...\n");
+     WiFi.scanNetworksAsync(wifiScanReady);
   }
 
   if (lastCmd == "ping")
