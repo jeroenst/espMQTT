@@ -1001,15 +1001,21 @@ void connectToWifi()
   if (!mainstate.wificonnected && !mainstate.accesspoint)
   {
     DEBUG_I("Connecting to Wi-Fi: SSID='%s' HOSTNAME='%s'...\n", wifissid.c_str(), esp_hostname.c_str());
-    WiFi.disconnect(true);
+    WiFi.disconnect();
 
     WiFi.setAutoReconnect(false); // We handle reconnect our self
     WiFi.setSleepMode(WIFI_NONE_SLEEP); // When sleep is on regular disconnects occur https://github.com/esp8266/Arduino/issues/5083
-    WiFi.mode(WIFI_STA);
     WiFi.setOutputPower(20);        // 10dBm == 10mW, 14dBm = 25mW, 17dBm = 50mW, 20dBm = 100mW
     WiFi.hostname(esp_hostname);
-
+    WiFi.mode(WIFI_STA);
     WiFi.begin(wifissid, wifipsk); // First connect to any available AP, later scan for stronger AP
+
+    MDNS.begin(esp_hostname);
+    MDNS.addService("http", "tcp", 80);
+
+    ArduinoOTA.setHostname(esp_hostname.c_str());
+    ArduinoOTA.setPassword(esp_password.c_str());
+    Debug.setPassword(esp_password);
   }
 }
 
@@ -1582,7 +1588,6 @@ void loop()
           yield();
         }
       #endif*/
-    MDNS.begin(esp_hostname.c_str());
 #ifdef ESPMQTT_BHT002
     bht002_connected();
 #endif
@@ -2980,30 +2985,30 @@ bool MHZ19_read(int *ppm, int *temp)
 
 void eeprom_save_variables()
 {
-    eeprom_write(mqtt_server, 0);
-    eeprom_write(mqtt_username, 1);
-    eeprom_write(mqtt_password, 2);
-    eeprom_write(esp_password, 3);
-    eeprom_write(esp_hostname, 4);
-    eeprom_write(String(mqtt_port), 5);
-    eeprom_write(String(mqtt_ssl), 6);
-    eeprom_write(mqtt_topicprefix, 7);
+  eeprom_write(mqtt_server, 0);
+  eeprom_write(mqtt_username, 1);
+  eeprom_write(mqtt_password, 2);
+  eeprom_write(esp_password, 3);
+  eeprom_write(esp_hostname, 4);
+  eeprom_write(String(mqtt_port), 5);
+  eeprom_write(String(mqtt_ssl), 6);
+  eeprom_write(mqtt_topicprefix, 7);
 #ifdef  ESPMQTT_QSWIFIDIMMERD01
-    eeprom_write(String(qswifidimmer_getdimoffset()), 8);
-    putdatamap("dimoffset", String(qswifidimmer_getdimoffset()));
-    eeprom_write("", 9);
+  eeprom_write(String(qswifidimmer_getdimoffset()), 8);
+  putdatamap("dimoffset", String(qswifidimmer_getdimoffset()));
+  eeprom_write("", 9);
 #elif defined ESPMQTT_QSWIFIDIMMERD02
-    eeprom_write(String(qswifidimmer_getdimoffset(0)), 8);
-    putdatamap("dimoffset/0", String(qswifidimmer_getdimoffset(0)));
-    eeprom_write(String(qswifidimmer_getdimoffset(1)), 9);
-    putdatamap("dimoffset/1", String(qswifidimmer_getdimoffset(1)));
+  eeprom_write(String(qswifidimmer_getdimoffset(0)), 8);
+  putdatamap("dimoffset/0", String(qswifidimmer_getdimoffset(0)));
+  eeprom_write(String(qswifidimmer_getdimoffset(1)), 9);
+  putdatamap("dimoffset/1", String(qswifidimmer_getdimoffset(1)));
 #else
-    eeprom_write("", 8);
-    eeprom_write("", 9);
+  eeprom_write("", 8);
+  eeprom_write("", 9);
 #endif
-    eeprom_write(wifissid, 10);
-    eeprom_write(wifipsk, 11);
-    eeprom_commit();
+  eeprom_write(wifissid, 10);
+  eeprom_write(wifipsk, 11);
+  eeprom_commit();
 }
 
 
@@ -3059,12 +3064,7 @@ void handleWWWSettings()
 #endif
     }
     eeprom_save_variables();
-    
-    ArduinoOTA.setHostname(esp_hostname.c_str());
-    ArduinoOTA.setPassword(esp_password.c_str());
-    MDNS.begin(esp_hostname.c_str());
-    MDNS.notifyAPChange();
-    Debug.setPassword(esp_password);
+
     mainstate.defaultpassword = false;
 
     disconnectMqtt(); // Disconnect mqtt server
@@ -3253,8 +3253,8 @@ void processCmdRemoteDebug()
 
   if (lastCmd == "scanwifinetworks")
   {
-     DEBUG_D("Starting Wifi Scan...\n");
-     WiFi.scanNetworksAsync(wifiScanReady);
+    DEBUG_D("Starting Wifi Scan...\n");
+    WiFi.scanNetworksAsync(wifiScanReady);
   }
 
   if (lastCmd == "ping")
@@ -3321,19 +3321,19 @@ void processCmdRemoteDebug()
 
   if (lastCmd == "showeeprommap")
   {
-  int eeprompointer = 0;
-  for (int i = 0; i < eepromMap->size(); i++)
-  {
-    uint8_t checksum = 20;
-    String eepromdata = eepromMap->get(i);
-    DEBUG_D("EEPROM %d=%s\n", i, eepromdata.c_str());
-  }
+    int eeprompointer = 0;
+    for (int i = 0; i < eepromMap->size(); i++)
+    {
+      uint8_t checksum = 20;
+      String eepromdata = eepromMap->get(i);
+      DEBUG_D("EEPROM %d=%s\n", i, eepromdata.c_str());
+    }
   }
 }
 
 void eeprom_load_variables()
 {
-    // Read settings from EEPROM
+  // Read settings from EEPROM
   DEBUG_D("Reading internal EEPROM...\n");
   eeprom_init();
   if (!eeprom_read(&mqtt_server, 0))
@@ -3403,7 +3403,7 @@ void eeprom_load_variables()
   }
   DEBUG_D("wifi ssid=%s\n", wifissid.c_str());
   if (wifissid == "") wifissid = WiFi.SSID();
-  
+
   if (!eeprom_read(&wifipsk, 11))
   {
     DEBUG_E("Error reading wifi key from internal eeprom\n");
@@ -3457,7 +3457,6 @@ void setup() {
   initWifi();
   connectToWifi();
 
-  ArduinoOTA.setHostname(esp_hostname.c_str());
 
   Debug.begin(esp_hostname.c_str(), DEBUGLEVEL);
   Debug.setPassword(esp_password);
@@ -3472,7 +3471,6 @@ void setup() {
   DEBUG_I("ESP8266 Started...\n");
   DEBUG_I("Hostname=%s\n", WiFi.hostname().c_str());
 
-  ArduinoOTA.setPassword(esp_password.c_str());
 
   ArduinoOTA.onStart([]() {
     Serial.end();
@@ -3571,8 +3569,6 @@ void setup() {
   webserver.begin();
 
 
-  MDNS.begin(esp_hostname.c_str());
-  MDNS.addService("http", "tcp", 80);
 
   systemTimer.attach_ms(100, systemTimerCallback);
   // In my case the ZMAI90 is always on because it is the main power feed of the house
