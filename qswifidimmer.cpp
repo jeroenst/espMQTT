@@ -114,6 +114,7 @@ void qswifidimmer_handle()
   uint32_t msec = millis(); // store millis in variable because otherwise wifi gets slow.
   // Iterate trough dimchannels (D01 or D02 dimmer)
   if (dimchannel >= qswifidimmer_nrofchannels) dimchannel = 0;
+  yield();
 
   // Count pulses on input (50hz when button is pressed, but 2 pulses per full sine, so 10ms per pulse)
   bool Stemp = (dimchannel == 0 ? digitalRead(13) : digitalRead(5));
@@ -125,6 +126,7 @@ void qswifidimmer_handle()
     Stime[dimchannel] = msec;
     Spulse[dimchannel] = 1;
   }
+  yield();
 
   // If 6 pulses are counted do a callback to inform switch is pressed
   if (Scounter[dimchannel] == 6)
@@ -132,7 +134,7 @@ void qswifidimmer_handle()
     // Callback switch is pressed
     _qswifidimmer_switchcallback(dimchannel, true);
   }
-
+  yield();
 
   // When switch was pressed for more then 5 pulses and released for about 100ms switch from on to off or from off to on and also reset counters etc.
   if ((Scounter[dimchannel] > 5) && (Stime[dimchannel] + 100 < msec))
@@ -160,6 +162,7 @@ void qswifidimmer_handle()
     Stime[dimchannel] = 0;
     fullbrightstart[dimchannel] = 0;
   }
+  yield();
 
   // If lamps are off and switch is pressed more than 100 pulses (10ms*100=2000ms), put lamps on with full brightness
   if (!qswifidimmer_dimstate[dimchannel] && Scounter[dimchannel] > 100)
@@ -170,6 +173,7 @@ void qswifidimmer_handle()
     _qswifidimmer_callback(dimchannel, qswifidimmer_dimstate[dimchannel] ? qswifidimmer_dimvalue[dimchannel] : 0, qswifidimmer_dimstate[dimchannel]);
     fullbrightstart[dimchannel] = 1;
   }
+  yield();
 
 
   // If dimming for this channel is enabled and state is on and lamps are not just set on with fullbright start changing dimlevel
@@ -219,6 +223,7 @@ void qswifidimmer_handle()
       }
     }
   }
+  yield();
   dimchannel++; 
 }
 
