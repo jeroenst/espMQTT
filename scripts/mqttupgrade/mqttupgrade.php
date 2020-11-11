@@ -5,15 +5,16 @@ require("mqttupgradesettings.php");
 
 $mqtt = new phpMQTT($server, $port, $client_id);
 if ($mqtt->connect(true, NULL, $username, $password)) {
-
+echo ("Connected to MQTT server\n");
 $topics = array();
-$topics['NL5527HM35/ESP_SMARTMETER/firmware/upgradekey'] = array("qos" => 0, "function" => 'upgrade_device');
-$topics['NL5527HM35/SONOFF_GARAGE/firmware/upgradekey'] = array("qos" => 0, "function" => 'upgrade_device');
-$topics['home/GENERIC8266_00068F98/firmware/upgradekey'] = array("qos" => 0, "function" => 'upgrade_device');
-$topics['home/ESP_SMARTMETER/firmware/upgradekey'] = array("qos" => 0, "function" => 'upgrade_device');
-$topics['home/ESP_WATERMETER/firmware/upgradekey'] = array("qos" => 0, "function" => 'upgrade_device');
-$topics['home/ESP_GROWATT/firmware/upgradekey'] = array("qos" => 0, "function" => 'upgrade_device');
-$topics['home/ESP_WEATHER/firmware/upgradekey'] = array("qos" => 0, "function" => 'upgrade_device');
+//$topics['0002/ESP_SMARTMETER/firmware/upgradekey'] = array("qos" => 0, "function" => 'upgrade_device');
+//$topics['NL5527HM35/SONOFF_GARAGE/firmware/upgradekey'] = array("qos" => 0, "function" => 'upgrade_device');
+$topics['5527HM35/SONOFFPONDTEMP/firmware/upgradekey'] = array("qos" => 0, "function" => 'upgrade_device');
+//$topics['home/GENERIC8266_00068F98/firmware/upgradekey'] = array("qos" => 0, "function" => 'upgrade_device');
+//$topics['home/ESP_SMARTMETER/firmware/upgradekey'] = array("qos" => 0, "function" => 'upgrade_device');
+//$topics['home/ESP_WATERMETER/firmware/upgradekey'] = array("qos" => 0, "function" => 'upgrade_device');
+//$topics['home/ESP_GROWATT/firmware/upgradekey'] = array("qos" => 0, "function" => 'upgrade_device');
+//$topics['home/ESP_WEATHER/firmware/upgradekey'] = array("qos" => 0, "function" => 'upgrade_device');
 
 $mqtt->subscribe($topics, 0);
 
@@ -28,7 +29,7 @@ $mqtt->close();
 
 function upgrade_device($topic, $msg)
 {
-     echo "$topic=$msg\n";
+    echo "$topic=$msg\n";
     $topicarray = explode("/", $topic);
     $maintopic = $topicarray[0] . "/" . $topicarray[1];
     $devicetype = "";
@@ -54,6 +55,10 @@ function upgrade_device($topic, $msg)
             $devicetype = "ESPMQTT_SONOFF4CH";
         break;
 
+        case "SONOFFPONDTEMP":
+            $devicetype = "ESPMQTT_SONOFFTH";
+        break;
+
         case "GENERIC8266_00068F98":
             $devicetype = "ESPMQTT_GENERIC8266";
         break;
@@ -66,7 +71,7 @@ function upgrade ($devicetype, $maintopic, $upgradekey)
     global $firmwarepath;
     global $version;
     global $mqtt;
-    $url = $firmwarepath.'v'.$version.'/'.$devicetype.'_'.$version.'.bin';
+    $url = $firmwarepath.'/v'.$version.'/'.$devicetype.'_'.$version.'.bin';
     echo "Upgrading: ".$maintopic." to ".$url."\n";
     $mqtt->publish($maintopic."/startfirmwareupgrade", '{"version":"'.$version.'", "url":"'.$url.'", "key":"'.$upgradekey.'"}', 0);
 }
