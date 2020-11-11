@@ -3368,8 +3368,9 @@ void eeprom_load_variables()
   }
   else
   {
-    mainstate.defaultpassword = true;
+    mainstate.defaultpassword = false;
   }
+  
   DEBUG_D("mqtt password=%s\n", mqtt_password.c_str());
 
   if (!eeprom_read(&esp_password, 3))
