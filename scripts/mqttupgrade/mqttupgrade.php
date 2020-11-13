@@ -34,6 +34,7 @@ $devicetopics[] = "home/QSWIFIDIMMER05";
 
 $devicetopics[] = "0002/ESP_SMARTMETER";
 $devicetopics[] = "0002/RELAY-CV";
+$devicetopics[] = "0002/BHT002-LIVINGROOM";
 
 $devices = array();
 
