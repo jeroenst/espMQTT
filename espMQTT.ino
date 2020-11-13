@@ -39,7 +39,7 @@
 // #define ESPMQTT_DDM18SD
 // #define ESPMQTT_WATERMETER
 // #define ESPMQTT_DDNS
-// #define ESPMQTT_GENERIC8266
+#define ESPMQTT_GENERIC8266
 // #define ESPMQTT_MAINPOWERMETER
 // #define ESPMQTT_OBD2
 // #define ESPMQTT_NOISE
@@ -56,7 +56,7 @@
 // #define ESPMQTT_SONOFF_FLOORHEATING
 // #define SPMQTT_IRRIGATION
 // #define ESPMQTT_BLITZWOLF
-#define ESPMQTT_QSWIFIDIMMERD01
+// #define ESPMQTT_QSWIFIDIMMERD01
 // #define ESPMQTT_QSWIFIDIMMERD02
 // #define ESPMQTT_SONOFF4CH //ESP8285
 // #define ESPMQTT_SONOFFDUAL
@@ -995,7 +995,7 @@ void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
 void startWifiAP()
 {
   WiFi.disconnect();
-  if (!WiFi.softAP(WiFi.hostname().c_str(), DEFAULT_PASSWORD, 6, 0))
+  if (WiFi.softAP(WiFi.hostname().c_str(), DEFAULT_PASSWORD, 6, 0))
   {
     mainstate.accesspoint = true;
     DEBUG_E("Failed setting WiFi.softAP()");
@@ -1035,6 +1035,7 @@ void connectToWifi()
       Debug.setPassword(esp_password);
 
       mainstate.accesspoint = false;
+      mainstate.defaultpassword = false;
     }
   }
   else 
@@ -2323,7 +2324,6 @@ void loop()
     if ((uptime == 60) && (WiFi.status() != WL_CONNECTED))
     {
       DEBUG_W("Connection to wifi failed, starting accesspoint\n");
-      mainstate.accesspoint = true;
       startWifiAP();
     }
     if (uptime == 660)
