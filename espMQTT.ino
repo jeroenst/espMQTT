@@ -1027,9 +1027,6 @@ void connectToWifi()
       WiFi.mode(WIFI_STA);
       WiFi.begin(wifissid, wifipsk); // First connect to any available AP, later scan for stronger AP
 
-      MDNS.begin(esp_hostname);
-      MDNS.addService("http", "tcp", 80);
-
       ArduinoOTA.setHostname(esp_hostname.c_str());
       ArduinoOTA.setPassword(esp_password.c_str());
       Debug.setPassword(esp_password);
@@ -1294,29 +1291,29 @@ String uint64ToString(uint64_t input) {
 
 void initMqtt()
 {
-  // Because mqtt lib uses a pointer to const char[], we have to make a static variables
-  static String willtopic = String(mqtt_topicprefix) + "status";
-
   mqttClient.onMessage(onMqttMessage);
   mqttClient.onDisconnect(onMqttDisconnect);
   mqttClient.onConnect(onMqttConnect);
   mqttClient.onSubscribe(onMqttSubscribe);
   mqttClient.onUnsubscribe(onMqttUnsubscribe);
   mqttClient.onPublish(onMqttPublish);
-  mqttClient.setCredentials(mqtt_username.c_str(), mqtt_password.c_str());
-  mqttClient.setServer(mqtt_server.c_str(), mqtt_port);
-  mqttClient.setWill(willtopic.c_str(), 0, 1, "offline");
-  mqttClient.setSecure(mqtt_ssl);
   //#define MQTT_SERVER_FINGERPRINT {0x3F, 0x80, 0xCF, 0x16, 0xD9, 0x43, 0x3B, 0x92, 0xB6, 0x3A, 0x0A, 0x02, 0xFE, 0x27, 0x0B, 0x60, 0xC1, 0x9A, 0x8B, 0xB1}
   //mqttClient.addServerFingerprint((const uint8_t[])MQTT_SERVER_FINGERPRINT);
 }
 
 void connectToMqtt()
 {
+  // Because mqtt lib uses a pointer to const char[], we have to make a static variables
+  static String willtopic = String(mqtt_topicprefix) + "status";
+
   DEBUG_I("Connecting to Mqtt\n");
   if (!mainstate.mqttconnected)
   {
     mqttClient.disconnect();
+    mqttClient.setCredentials(mqtt_username.c_str(), mqtt_password.c_str());
+    mqttClient.setServer(mqtt_server.c_str(), mqtt_port);
+    mqttClient.setWill(willtopic.c_str(), 0, 1, "offline");
+    mqttClient.setSecure(mqtt_ssl);
     mqttClient.connect();
     mqttReconnectTimer.once(30, connectToMqtt); // retry over 30 seconds if connection can not be established
   }
@@ -1554,6 +1551,8 @@ void loop()
   yield();
   ArduinoOTA.handle();
   yield();
+  MDNS.update();
+  yield();
   Debug.handle();
   yield();
 
@@ -1608,6 +1607,8 @@ void loop()
     //syslogN("Connected to WiFi SSID=%s RSSI=%d\n", WiFi.SSID().c_str(), WiFi.RSSI());
     initMqtt();
     connectToMqtt();
+    MDNS.begin(esp_hostname);
+    MDNS.addService("http", "tcp", 80);
 
     /*#ifdef syslogDEBUG
         for (int i = 0; i < dataMap->size(); i++)
@@ -3490,7 +3491,6 @@ void setup() {
   DEBUG_I("ESP8266 Started...\n");
   DEBUG_I("Hostname=%s\n", WiFi.hostname().c_str());
 
-
   ArduinoOTA.onStart([]() {
     Serial.end();
 #ifdef  ESPMQTT_DIMMER
@@ -3509,11 +3509,11 @@ void setup() {
     //    ESP.wdtFeed();
   });
 
+  ArduinoOTA.setHostname(esp_hostname.c_str());
+  ArduinoOTA.setPassword(esp_password.c_str());
   ArduinoOTA.begin();
 
   update_systeminfo(true);
-
-
 
   // Initialize display
 
