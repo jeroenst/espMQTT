@@ -204,7 +204,7 @@ void amgpelletstove_handle()
               _amgpelletstove_callback("phase", "cooling down phase 2");
               break;
             default:
-              _amgpelletstove_callback("phase", "unknown");
+              _amgpelletstove_callback("phase", "unknown ("+String(amgcmdnr)+")");
               break;
           }
           _amgpelletstove_callback("phase/value", String(value));
