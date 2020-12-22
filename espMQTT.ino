@@ -162,7 +162,7 @@ SDM sdm(serSDM, 2400);
 #endif
 
 #ifdef ESPMQTT_TUYA_2GANGDIMMERV2
-#define FIRMWARE_TARGET "2GANGDIMMERV2"
+#define FIRMWARE_TARGET "TUYA_2GANGDIMMERV2"
 #define APONBOOT
 #define ESPMQTT_NOSERIAL_DEBUG
 #include "tuya.h"
@@ -1015,6 +1015,9 @@ void startWifiAP()
     mainstate.defaultpassword = true;
     ArduinoOTA.setPassword(esp_password.c_str());
     Debug.setPassword(esp_password);
+#ifdef ESPMQTT_TUYA_2GANGDIMMERV2
+      tuya_apmode();
+#endif
   }
   else connectToWifi();
 }
@@ -1639,6 +1642,10 @@ void loop()
 #ifdef ESPMQTT_BHT002
     bht002_connected();
 #endif
+
+#ifdef ESPMQTT_TUYA_2GANGDIMMERV2
+    tuya_connected();
+#endif
   }
   yield();
 
@@ -1650,6 +1657,10 @@ void loop()
     if (!mainstate.accesspoint) wifiReconnectTimer.once(2, connectToWifi); // trying to connect to wifi can cause AP to fail
 #ifdef ESPMQTT_BHT002
     bht002_disconnected();
+#endif
+
+#ifdef ESPMQTT_TUYA_2GANGDIMMERV2
+  tuya_disconnected();
 #endif
   }
   yield();
@@ -1663,6 +1674,9 @@ void loop()
     update_systeminfo(true);
     mqttdosubscriptions();
     updateexternalip();
+#ifdef ESPMQTT_TUYA_2GANGDIMMERV2
+      tuya_connectedMQTT();
+#endif
   }
   yield();
 

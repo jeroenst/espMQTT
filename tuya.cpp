@@ -1,6 +1,12 @@
 #include "espMQTT.h"
 #include "tuya.h"
 
+static uint8_t tuya_dimvalue0 = 0;
+static uint8_t tuya_dimvalue1 = 0;
+static uint8_t tuya_dimstate0 = 0;
+static uint8_t tuya_dimstate1 = 0;
+
+
 void(*_tuya_callback)(String, String);
 
 void tuya_commandCharsToSerial(unsigned int length, unsigned char* command)
@@ -33,11 +39,70 @@ void tuya_init(void(*callback)(String, String))
   Serial.begin(9600, SERIAL_8N1);
   Serial.setRxBufferSize(2048);
   _tuya_callback = callback;
+
+  unsigned char tuyaCommand[] = { 0x55, 0xAA, 0x00, 0x08, 0x00, 0x00};
+  tuya_commandCharsToSerial(6, tuyaCommand);    
+}
+
+void tuya_connected()
+{
+  unsigned char tuyaCommand[] = { 0x55, 0xAA, 0x00, 0x03, 0x00, 0x01, 0x04};
+  tuya_commandCharsToSerial(7, tuyaCommand);    
+}
+
+void tuya_connectedMQTT()
+{
+  unsigned char tuyaCommand[] = { 0x55, 0xAA, 0x00, 0x03, 0x00, 0x01, 0x03};
+  tuya_commandCharsToSerial(7, tuyaCommand);  
+}
+
+void tuya_disconnected()
+{
+  unsigned char tuyaCommand[] = { 0x55, 0xAA, 0x00, 0x03, 0x00, 0x01, 0x02};
+  tuya_commandCharsToSerial(7, tuyaCommand);  
+}
+
+void tuya_apmode()
+{
+  unsigned char tuyaCommand[] = { 0x55, 0xAA, 0x00, 0x03, 0x00, 0x01, 0x01};
+  tuya_commandCharsToSerial(7, tuyaCommand);  
 }
 
 void tuya_processSerialCommand(uint8_t commandLength, uint8_t receivedCommand[])
 {
-  
+  if (commandLength > 6)
+  {
+    if (receivedCommand[2] == 0x00) // Version = 0
+    {
+      if (receivedCommand[3] == 0x07) // Command == Report DP status.
+      {
+        if (commandLength > 10)
+        {
+          if (receivedCommand[6] == 0x01) // DPID = 1
+          {
+            tuya_dimstate0 = receivedCommand[10];
+          }
+          if (receivedCommand[6] == 0x07) // DPID = 7
+          {
+            tuya_dimstate1 = receivedCommand[10];
+          }
+        }
+        if (commandLength > 13)
+        {
+          if (receivedCommand[6] == 0x02) // DPID = 2
+          {
+            tuya_dimvalue0 = tuya_dimstate0 ? int(((receivedCommand[12] << 8) + receivedCommand[13]) / 10) : 0;
+          }
+          if (receivedCommand[6] == 0x08) // DPID = 8
+          {
+            tuya_dimvalue1 = tuya_dimstate1 ? int(((receivedCommand[12] << 8) + receivedCommand[13]) / 10) : 0;
+          }
+        }
+        _tuya_callback("dimstate/0", String(tuya_dimstate0, DEC));
+        _tuya_callback("dimstate/1", String(tuya_dimstate1, DEC));
+      }
+    }
+  }
 }
 
 void tuya_handle()
@@ -55,7 +120,7 @@ void tuya_handle()
   {
     receiveIndex++;
     unsigned char inChar = Serial.read();
-    DEBUG ("SERIALDATA=%d:%02X\n", receiveIndex, inChar);
+    DEBUG ("SERIALDATA=%d:0x%02X\n", receiveIndex, inChar);
     if (receiveIndex < receivedCommandLength) receivedCommand[receiveIndex] = inChar;
     if (receiveIndex < 2)
     {
@@ -87,6 +152,26 @@ void tuya_handle()
       receiveIndex = -1;
     }
   }
+
+  static unsigned long oldticktime = 0;
+  static uint8_t olddimvalue0 = 0;
+  static uint8_t olddimvalue1 = 0;
+  if (millis() > oldticktime + 1000)
+  {
+        // Prevent constant update of dimvalue while changing dimvalue
+        if (olddimvalue0 == tuya_dimvalue0)
+        {
+            _tuya_callback("dimvalue/0", String(tuya_dimvalue0, DEC));
+        }
+        else olddimvalue0 = tuya_dimvalue0;
+    
+        if (olddimvalue1 == tuya_dimvalue1)
+        {
+            _tuya_callback("dimvalue/1", String(tuya_dimvalue1, DEC));
+        }
+        else olddimvalue1 = tuya_dimvalue1;
+        oldticktime = millis();
+    }
 }
 
 void tuya_2gangdimmerv2_setdimstate(bool dimstate, uint8_t dimchannel)
@@ -97,9 +182,8 @@ void tuya_2gangdimmerv2_setdimstate(bool dimstate, uint8_t dimchannel)
 
 void tuya_2gangdimmerv2_setdimvalue(uint8_t dimvalue, uint8_t dimchannel)
 {
-  uint16_t calculated_dimvalue = (dimvalue * 10)-9;
-  if (calculated_dimvalue > 990) calculated_dimvalue = 1000;
+  uint16_t calculated_dimvalue = MIN((dimvalue * 10), 1000);
   unsigned char tuyaCommand[] = { 0x55, 0xAA, 0x00, 0x06, 0x00, 0x08, (dimchannel == 0 ? 0x02 : 0x08), 0x02, 0x00, 0x04, 0x00, 0x00, (calculated_dimvalue >> 8) & 0xFF, (calculated_dimvalue & 0xFF)};
   tuya_commandCharsToSerial(14, tuyaCommand);
-  tuya_2gangdimmerv2_setdimstate(dimvalue?1:0, dimchannel);
+  tuya_2gangdimmerv2_setdimstate(dimvalue ? 1 : 0, dimchannel);
 }
