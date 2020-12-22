@@ -24,6 +24,7 @@ $devicetopics[] = "home/BLITZWOLF_COFFEE";
 $devicetopics[] = "home/ESP_BEDROOM2";
 $devicetopics[] = "home/ESP_OPENTHERM";
 $devicetopics[] = "home/ESP_BATHROOM";
+$devicetopics[] = "home/ESP_WATERMETER";
 $devicetopics[] = "home/SONOFF_DISHWASHER";
 $devicetopics[] = "home/SONOFF_TV";
 $devicetopics[] = "home/QSWIFIDIMMER01";
@@ -35,6 +36,7 @@ $devicetopics[] = "home/QSWIFIDIMMER05";
 $devicetopics[] = "0002/ESP_SMARTMETER";
 $devicetopics[] = "0002/RELAY-CV";
 $devicetopics[] = "0002/BHT002-LIVINGROOM";
+$devicetopics[] = "0002/SONOFF_PONDTEMP";
 
 $devices = array();
 
