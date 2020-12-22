@@ -39,7 +39,7 @@
 // #define ESPMQTT_DDM18SD
 // #define ESPMQTT_WATERMETER
 // #define ESPMQTT_DDNS
-#define ESPMQTT_GENERIC8266
+// #define ESPMQTT_GENERIC8266
 // #define ESPMQTT_MAINPOWERMETER
 // #define ESPMQTT_OBD2
 // #define ESPMQTT_NOISE
@@ -66,6 +66,7 @@
 // #define ESPMQTT_SONOFFTH
 // #define ESPMQTT_GENERIC8255
 // #define ESPMQTT_BHT002
+#define ESPMQTT_TUYA_2GANGDIMMERV2
 
 #define ESPMQTT_VERSION "TEST"
 #else
@@ -157,8 +158,16 @@ SDM sdm(serSDM, 2400);
 #define FIRMWARE_TARGET "BHT002"
 #define APONBOOT
 #include "bht002.h"
+#undef SERIALLOG
 #endif
 
+#ifdef ESPMQTT_TUYA_2GANGDIMMERV2
+#define FIRMWARE_TARGET "2GANGDIMMERV2"
+#define APONBOOT
+#define ESPMQTT_NOSERIAL_DEBUG
+#include "tuya.h"
+#undef SERIALLOG
+#endif
 
 #ifdef  ESPMQTT_GENERIC8255
 #define FIRMWARE_TARGET "GENERIC8266"
@@ -1117,7 +1126,7 @@ void mqttdosubscriptions(int32_t packetId = -1)
       case 15:  subscribetopic = mqtt_topicprefix + "setdimvalue"; break;
       case 16:  subscribetopic = mqtt_topicprefix + "setdimstate"; break;
 #endif
-#ifdef ESPMQTT_QSWIFIDIMMERD02
+#if defined(ESPMQTT_QSWIFIDIMMERD02) || defined(ESPMQTT_TUYA_2GANGDIMMERV2)
       case 17:  subscribetopic = mqtt_topicprefix + "setdimvalue/0"; break;
       case 18:  subscribetopic = mqtt_topicprefix + "setdimvalue/1"; break;
       case 19:  subscribetopic = mqtt_topicprefix + "setdimstate/0"; break;
@@ -1252,11 +1261,11 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties,
   amgpelletstove_receivemqtt(topicstring, payloadstring);
 #endif
 
-#ifdef  ESPMQTT_QSWIFIDIMMERD01
+#ifdef ESPMQTT_QSWIFIDIMMERD01
   if (topicstring == mqtt_topicprefix + "setdimvalue") qswifidimmer_setdimvalue(payloadstring.toInt());
   if (topicstring == mqtt_topicprefix + "setdimstate") qswifidimmer_setdimstate(payloadstring.toInt() ? 1 : 0);
 #endif
-#ifdef  ESPMQTT_QSWIFIDIMMERD02
+#ifdef ESPMQTT_QSWIFIDIMMERD02
   if (topicstring == mqtt_topicprefix + "setdimvalue/0") qswifidimmer_setdimvalue(payloadstring.toInt(), 0);
   if (topicstring == mqtt_topicprefix + "setdimvalue/1") qswifidimmer_setdimvalue(payloadstring.toInt(), 1);
   if (topicstring == mqtt_topicprefix + "setdimstate/0") qswifidimmer_setdimstate(payloadstring.toInt(), 0);
@@ -1269,6 +1278,14 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties,
 #ifdef ESPMQTT_BHT002
   if (topicstring == mqtt_topicprefix + "setsetpoint") bht002_setsetpoint(payloadstring.toInt());
 #endif
+
+#ifdef ESPMQTT_TUYA_2GANGDIMMERV2
+  if (topicstring == mqtt_topicprefix + "setdimvalue/0") tuya_2gangdimmerv2_setdimvalue(payloadstring.toInt(), 0);
+  if (topicstring == mqtt_topicprefix + "setdimvalue/1") tuya_2gangdimmerv2_setdimvalue(payloadstring.toInt(), 1);
+  if (topicstring == mqtt_topicprefix + "setdimstate/0") tuya_2gangdimmerv2_setdimstate(payloadstring.toInt(), 0);
+  if (topicstring == mqtt_topicprefix + "setdimstate/1") tuya_2gangdimmerv2_setdimstate(payloadstring.toInt(), 1);
+#endif
+
 }
 
 String uint64ToString(uint64_t input) {
@@ -1351,8 +1368,10 @@ void initSerial()
 #elif defined ( ESPMQTT_ZMAI90)
   Serial.setDebugOutput(false);
   Serial.begin(9600, SERIAL_8E1);
-#elif defined (ESPMQTT_SMARTMETER) || defined (QSWIFIDIMMERCHANNELS) || defined (ESPMQTT_BHT002)
+#elif defined (ESPMQTT_SMARTMETER) || defined (QSWIFIDIMMERCHANNELS) || defined (ESPMQTT_BHT002) 
   // do nothing, smartmeter initializes serial in init function.
+#elif defined (ESPMQTT_NOSERIAL_DEBUG)
+  // do not initialize serial
 #else
   Serial.begin(115200); //Init serial 115200 baud
 #endif
@@ -1833,6 +1852,12 @@ void loop()
   bht002_handle();
   yield();
 #endif
+
+#ifdef ESPMQTT_TUYA_2GANGDIMMERV2
+  tuya_handle();
+  yield();
+#endif
+
 
 #ifdef RAINMETERPIN
   static uint32_t rainpinmillis = 0;
@@ -3206,6 +3231,12 @@ void bht002callback (String topic, String payload)
   yield();
 }
 
+void tuyacallback (String topic, String payload)
+{
+  putdatamap(topic, payload);
+  yield();
+}
+
 void openthermcallback (String topic, String payload)
 {
   putdatamap(topic, payload);
@@ -3469,6 +3500,10 @@ void setup() {
 
 #ifdef ESPMQTT_BHT002
   bht002_init(bht002callback);
+#endif
+
+#ifdef ESPMQTT_TUYA_2GANGDIMMERV2
+  tuya_init(tuyacallback);
 #endif
 
 
