@@ -6,6 +6,9 @@ static uint8_t _ducobox_relay0 = 0;
 static uint8_t _ducobox_relay1 = 0;
 static uint8_t _ducobox_refreshtime = 30;
 static uint16_t _ducobox_co2 = 0;
+static uint8_t _ducobox_rh = 0;
+static float _ducobox_temp = 0;
+
 static String _serialsendqueue = "";
 static unsigned long _nextupdatetime = 0;
 static bool recvok = 1;
@@ -68,27 +71,35 @@ void _ducobox_handleserial(String ducomessage)
 
   DEBUG_V ("ducomessage='%s'\n", ducomessage.c_str());
 
-  if (ducomessage.indexOf("  FanSpeed:") == 0)
+  if (ducocmd == 0)
   {
-    _ducobox_callback("status", "querying");
-    recvok = 1;
+    int stringpos = ducomessage.indexOf("  FanSpeed:");
+    if (stringpos == 0)
+    {
+      _ducobox_callback("status", "querying");
+      recvok = 1;
 
-    // Read fanspeed
-    ducovalue = ducomessage.substring(19);
-    ducovalue = ducovalue.substring(0, ducovalue.indexOf(' '));
+      // Read fanspeed
+      ducovalue = ducomessage.substring(19);
+      ducovalue = ducovalue.substring(0, ducovalue.indexOf(' '));
 
-    topic = "1/fanspeed";
-    _ducobox_callback(topic, ducovalue);
-    ducocmd = 1;
+      topic = "1/fanspeed";
+      _ducobox_callback(topic, ducovalue);
+      //ducocmd = 1;
+    }
   }
 
-  if (ducomessage.indexOf("   2. MIN FAN SPEED") == 0)
+  if (ducocmd == 1)
   {
-    ducovalue = ducomessage.substring(ducomessage.indexOf(":") + 2);
-    ducovalue = ducovalue.substring(0, ducovalue.indexOf(" ["));
-    topic = "1/minfanspeed";
-    _ducobox_callback(topic, ducovalue);
-    ducocmd = 2;
+    int stringpos = ducomessage.indexOf("   2. MIN FAN SPEED");
+    if (stringpos == 0)
+    {
+      ducovalue = ducomessage.substring(ducomessage.indexOf(":") + 2);
+      ducovalue = ducovalue.substring(0, ducovalue.indexOf(" ["));
+      topic = "1/minfanspeed";
+      _ducobox_callback(topic, ducovalue);
+      //ducocmd = 2;
+    }
   }
 
   if ((ducomessage.indexOf("  -->") == 0) || (ducomessage.indexOf("  Failed") == 0))
@@ -116,7 +127,7 @@ void _ducobox_handleserial(String ducomessage)
         if (tempretry == 30) _ducobox_callback("2/temperature", "-");
         _ducobox_callback("2/temperature/retries", String(tempretry));
 
-        ducocmd = 3;
+        //      ducocmd = 3;
         break;
       case 3:
         // Read node 2 co2
@@ -140,44 +151,32 @@ void _ducobox_handleserial(String ducomessage)
         }
         _ducobox_callback("2/co2/retries", String(co2retry));
 
-        ducocmd = 4;
+        //        ducocmd = 4;
         break;
     }
   }
 
   if (ducocmd == 4)
   {
-    ducocmd = 5;
-    _ducobox_callback("status", "ready");
-    static uint8_t fanspeed = 0;
-    switch (fanspeed)
+    int stringpos = ducomessage.indexOf("RH : ");
+    if (stringpos > 0)
     {
-      case 0:
-        if (_ducobox_co2 >= 1000) fanspeed = 1;
-        break;
-      case 1:
-        if (_ducobox_co2 < 900) fanspeed = 0;
-        if (_ducobox_co2 >= 1200) fanspeed = 2;
-        break;
-      case 2:
-        if (_ducobox_co2 < 1000) fanspeed = 1;
-        break;
+      _ducobox_rh = ducomessage.substring(stringpos + 5, stringpos+5+4).toInt() / 100;
+      _ducobox_callback ("26/humidity", String(_ducobox_rh));
     }
-    if (_ducobox_co2 == 0) fanspeed = 1; // When no co2 reading do some extra ventilation to prevent high co2...
-
-    ducobox_setfan_internal(0, fanspeed);
-
-    /* Setting fanspeed by serial command is disabled because it can break the onboard flash of the ducobox when used to many times (>10.000)
-      oldminfanspeed = setminfanspeed;
-      String cmd = "fanparaset 2 " + String(setminfanspeed) + "\r\n";
-      ducobox_writeserial(cmd.c_str());
-      nextupdatetime = millis() + 2000; // Next update over 2 seconds
-    */
+    
+    stringpos = ducomessage.indexOf("TEMP : ");
+    if (stringpos > 0)
+    {
+      _ducobox_temp = float(ducomessage.substring(stringpos + 8, stringpos+8+3).toInt()) / 10;
+      _ducobox_callback ("26/temperature", String(_ducobox_temp, 1));
+    }
   }
 
   if (ducomessage == "> ")
   {
     _nextupdatetime = millis() + (_ducobox_refreshtime * 1000); // Next update over _duco_refreshtime seconds
+    ducocmd++;
     switch (ducocmd)
     {
       case 1:
@@ -188,6 +187,38 @@ void _ducobox_handleserial(String ducomessage)
         break;
       case 3:
         ducobox_writeserial("nodeparaget 3 74");       // Request CO2 of sensor 3
+        break;
+      case 4:
+        ducobox_writeserial("sensorinfo");       // Request internal sensors
+        break;
+      case 5:
+        _ducobox_callback("status", "ready");
+        ducocmd = 0;
+
+        static uint8_t fanspeed = 0;
+        switch (fanspeed)
+        {
+          case 0:
+            if (_ducobox_co2 >= 1000) fanspeed = 1;
+            break;
+          case 1:
+            if (_ducobox_co2 < 900) fanspeed = 0;
+            if (_ducobox_co2 >= 1200) fanspeed = 2;
+            break;
+          case 2:
+            if (_ducobox_co2 < 1000) fanspeed = 1;
+            break;
+        }
+        if (_ducobox_co2 == 0) fanspeed = 1; // When no co2 reading do some extra ventilation to prevent high co2...
+
+        ducobox_setfan_internal(0, fanspeed);
+
+        /* Setting fanspeed by serial command is disabled because it can break the onboard flash of the ducobox when used to many times (>10.000)
+          oldminfanspeed = setminfanspeed;
+          String cmd = "fanparaset 2 " + String(setminfanspeed) + "\r\n";
+          ducobox_writeserial(cmd.c_str());
+          nextupdatetime = millis() + 2000; // Next update over 2 seconds
+        */
         break;
     }
   }
@@ -261,6 +292,8 @@ void ducobox_init(uint8_t ducobox_relay0, uint8_t ducobox_relay1, uint8_t ducobo
   ducobox_writeserial(""); // Clear bogus
   _ducobox_callback("1/fanspeed", "-");
   _ducobox_callback("1/minfanspeed", "-");
+  _ducobox_callback("26/humidity", "-");
+  _ducobox_callback("26/temperature", "-");
   _ducobox_callback("2/co2", "-");
   _ducobox_callback("2/co2/retries", "-");
   _ducobox_callback("2/temperature", "-");
