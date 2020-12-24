@@ -49,6 +49,7 @@ script:
   - ./build.sh
 
 deploy:
+  skip_cleanup: true
   provider: releases
   token: $GITHUBAPIKEY
   file_glob: true
