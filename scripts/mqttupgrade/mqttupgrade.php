@@ -37,6 +37,9 @@ $devicetopics[] = "0002/ESP_SMARTMETER";
 $devicetopics[] = "0002/RELAY-CV";
 $devicetopics[] = "0002/BHT002-LIVINGROOM";
 $devicetopics[] = "0002/SONOFF_PONDTEMP";
+$devicetopics[] = "0002/DIMMER_BATHROOM";
+$devicetopics[] = "0002/DIMMER_BEDROOM";
+$devicetopics[] = "0002/BHT002_BATHROOM";
 
 $devices = array();
 
