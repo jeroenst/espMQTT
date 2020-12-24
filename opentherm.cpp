@@ -3,6 +3,12 @@ WiFiServer otserver(25238);
 
 void(*_opentherm_callback)(String,String);
 
+void opentherm_callback(String topic, String payload)
+{
+  yield();
+  _opentherm_callback(topic, payload);
+  yield();
+}
 
 uint16_t opentherm_message_touint(String otmessage)
 {
@@ -77,6 +83,7 @@ int opentherm_handle()
     serialmessage = serialmessage.substring(eolchar + 1);
     String otvalue = "";
     String topic = "";
+    uint16_t otintvalue = 0;
 
     if (otmessage.substring(0, 4) == "TC: ")
     {
@@ -107,6 +114,12 @@ int opentherm_handle()
       long otcommand = strtol(otmessage.substring(3, 5).c_str(), 0, 16);
       switch (otcommand)
       {
+        case 0:
+          otintvalue = opentherm_message_touint(otmessage);
+          opentherm_callback("ch/active", (otintvalue & 0x0002) ? "1" : "0");
+          opentherm_callback("dhw/active", (otintvalue & 0x0004) ? "1" : "0");
+          opentherm_callback("burner/active", (otintvalue & 0x0008) ? "1" : "0");
+        break;
         case 14:
           otvalue = String(opentherm_message_tofloat(otmessage), 1);
           topic = "burner/modulation/maxlevel";
