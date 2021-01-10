@@ -1,4 +1,5 @@
 #include "espMQTT.h"
+#include <Wire.h>
 WiFiServer otserver(25238);
 
 void(*_opentherm_callback)(String,String);
@@ -47,6 +48,8 @@ void opentherm_init(void(*callback)(String,String))
   Serial.setRxBufferSize(2048); 
   Serial.begin(9600);  //Init serial 9600 baud
   Serial.setDebugOutput(false);
+
+  Wire.begin();
 }
 
 int opentherm_handle()
@@ -223,6 +226,16 @@ int opentherm_handle()
       _opentherm_callback(topic, otvalue);
       returnvalue++;
     }
+  }
+
+  // Kick OTGW Watchdog
+  uint32_t wdtimeout = 0;
+  if (wdtimeout < millis())
+  {
+    wdtimeout = millis() + 1000;
+    Wire.beginTransmission(38); // Watchdog i2c address on otgw is 38 (0x26), see https://gitlab.com/guiguid/ESPEasy/blob/a7494e1decfcbd6591dbf3742231933778a92e3d/TinyI2CWatchdog/TinyI2CWatchdog.ino
+    Wire.write(0xA5);
+    Wire.endTransmission();
   }
 
   return returnvalue;
