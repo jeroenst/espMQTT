@@ -1,55 +1,55 @@
 [submodule "libraries/async-mqtt-client"]
 	path = libraries/async-mqtt-client
-	url = git@github.com:marvinroger/async-mqtt-client.git
+	url = https://github.com/marvinroger/async-mqtt-client.git
 [submodule "libraries/ESPAsyncTCP"]
 	path = libraries/ESPAsyncTCP
-	url = git@github.com:me-no-dev/ESPAsyncTCP.git
+	url = https://github.com/me-no-dev/ESPAsyncTCP.git
 [submodule "libraries/SDM_Energy_Meter"]
 	path = libraries/SDM_Energy_Meter
-	url = git@github.com:jeroenst/SDM_Energy_Meter.git
+	url = https://github.com/jeroenst/SDM_Energy_Meter.git
 [submodule "libraries/OneWire"]
 	path = libraries/OneWire
-	url = git@github.com:PaulStoffregen/OneWire.git
+	url = https://github.com/PaulStoffregen/OneWire.git
 [submodule "libraries/Arduino-Temperature-Control-Library"]
 	path = libraries/Arduino-Temperature-Control-Library
-	url = git@github.com:milesburton/Arduino-Temperature-Control-Library.git
+	url = https://github.com/milesburton/Arduino-Temperature-Control-Library.git
 [submodule "libraries/Syslog"]
 	path = libraries/Syslog
-	url = git@github.com:arcao/Syslog.git
+	url = https://github.com/arcao/Syslog.git
 [submodule "libraries/hlw8012"]
 	path = libraries/hlw8012
-	url = git@github.com:xoseperez/hlw8012.git
+	url = https://github.com/xoseperez/hlw8012.git
 [submodule "libraries/esp8266-oled-ssd1306"]
 	path = libraries/esp8266-oled-ssd1306
-	url = git@github.com:ThingPulse/esp8266-oled-ssd1306.git
+	url = https://github.com/ThingPulse/esp8266-oled-ssd1306.git
 [submodule "libraries/DHT-sensor-library"]
 	path = libraries/DHT-sensor-library
-	url = git@github.com:adafruit/DHT-sensor-library.git
+	url = https://github.com/adafruit/DHT-sensor-library.git
 [submodule "hardware/esp8266com/esp8266"]
 	path = hardware/esp8266com/esp8266
-	url = git@github.com:esp8266/Arduino.git
+	url = https://github.com/esp8266/Arduino.git
 	ignore = dirty
 [submodule "libraries/RemoteDebug"]
 	path = libraries/RemoteDebug
-	url = git@github.com:jeroenst/RemoteDebug.git
+	url = https://github.com/jeroenst/RemoteDebug.git
 [submodule "libraries/ESP8266Ping"]
 	path = libraries/ESP8266Ping
-	url = git@github.com:jeroenst/ESP8266Ping.git
+	url = https://github.com/jeroenst/ESP8266Ping.git
 [submodule "libraries/Adafruit_NeoPixel"]
 	path = libraries/Adafruit_NeoPixel
-	url = git@github.com:adafruit/Adafruit_NeoPixel.git
+	url = https://github.com/adafruit/Adafruit_NeoPixel.git
 [submodule "libraries/Adafruit_Sensor"]
 	path = libraries/Adafruit_Sensor
-	url = git@github.com:adafruit/Adafruit_Sensor.git
+	url = https://github.com/adafruit/Adafruit_Sensor.git
 [submodule "libraries/EasyDDNS"]
 	path = libraries/EasyDDNS
-	url = git@github.com:ayushsharma82/EasyDDNS.git
+	url = https://github.com/ayushsharma82/EasyDDNS.git
 [submodule "libraries/my92xx"]
 	path = libraries/my92xx
-	url = git@github.com:xoseperez/my92xx.git
+	url = https://github.com/xoseperez/my92xx.git
 [submodule "libraries/ArduinoJson"]
 	path = libraries/ArduinoJson
 	url = https://github.com/bblanchon/ArduinoJson.git
 [submodule "scripts/mqttupgrade/phpMQTT"]
 	path = scripts/mqttupgrade/phpMQTT
-	url = git@github.com:jeroenst/phpMQTT.git
+	url = https://github.com/jeroenst/phpMQTT.git
