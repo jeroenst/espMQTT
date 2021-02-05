@@ -26,13 +26,14 @@
 #ifndef ESPMQTT_BUILDSCRIPT // Only use defines when when firmware is not compiled from the build script...
 /* SETTINGS */
 //#define SERIALLOG
+#define MYTZ TZ_Europe_Amsterdam
 
 /* ESP8266 */
-// #define ESPMQTT_WEATHER
+#define ESPMQTT_WEATHER
 // #define ESPMQTT_AMGPELLETSTOVE
 // #define ESPMQTT_BATHROOM
 // #define ESPMQTT_BEDROOM2
-#define ESPMQTT_OPENTHERM
+// #define ESPMQTT_OPENTHERM
 // #define ESPMQTT_SMARTMETER
 // #define ESPMQTT_GROWATT
 // #define ESPMQTT_SDM120
@@ -46,6 +47,7 @@
 // #define ESPMQTT_SOIL
 // #define ESPMQTT_DIMMER
 // #define ESPMQTT_RELAY
+//#define ESPMQTT_LIVINGROOM
 
 /* ESP8285 */
 // #define ESPMQTT_ZMAI90
@@ -515,6 +517,16 @@ Adafruit_NeoPixel neopixelleds = Adafruit_NeoPixel(2, NEOPIXELPIN, NEO_RGB + NEO
 #undef SERIALLOG
 #endif
 
+
+#ifdef  ESPMQTT_LIVINGROOM
+#define FIRMWARE_TARGET "LIVINGROOM"
+#define FLASHBUTTON D3
+#define ESPLED D4
+#define DHTPIN D5
+#define DHTTYPE DHT22   // there are multiple kinds of DHT sensors
+#endif
+
+
 #ifdef ESPMQTT_SMARTMETER
 #define FIRMWARE_TARGET "SMARTMETER"
 #define FLASHBUTTON D3
@@ -542,6 +554,7 @@ Adafruit_NeoPixel neopixelleds = Adafruit_NeoPixel(2, NEOPIXELPIN, NEO_RGB + NEO
 
 
 #include "espMQTT.h"
+#include <TZ.h>
 
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>        // Include the mDNS library
@@ -3309,6 +3322,22 @@ void processCmdRemoteDebug()
     DEBUG("  factoryreset\n");
     DEBUG("  showeeprommap\n");
     DEBUG("  scanwifinetworks (scan for stronger wifi network and connect to it)\n");
+    DEBUG("  showtime\n");
+  }
+
+
+  if (lastCmd == "showtime")
+  {
+    time_t now;
+    char strftime_buf[64];
+    struct tm timeinfo;
+
+    time(&now);
+
+    localtime_r(&now, &timeinfo);
+    strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
+
+    DEBUG ("Datetime= %s\n", strftime_buf);
   }
 
   if (lastCmd == "scanwifinetworks")
@@ -3499,10 +3528,11 @@ void setup() {
   snprintf(buffer, 25, "%08X", ESP.getChipId());
   chipid = buffer;
 
-  sntp_set_timezone(1);
-  sntp_setservername(0, "nl.pool.ntp.org");
-
+  configTime(MYTZ, "nl.pool.ntp.org");
+  yield();
+  
   eeprom_load_variables();
+
 
   connectToWifi();
 

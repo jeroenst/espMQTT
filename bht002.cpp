@@ -50,9 +50,6 @@ void bht002_sendtime()
   char strftime_buf[64];
   struct tm timeinfo;
 
-  // Set timezone to NL
-  setenv("TZ", "GMT+1", 1);
-  tzset();
   time(&now);
 
   localtime_r(&now, &timeinfo);
