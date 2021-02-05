@@ -49,7 +49,7 @@ build ()
   -prefs="build.extra_flags=-DESP8266 -DWEBSOCKET_DISABLED=true -DASYNC_TCP_SSL_ENABLED -DUSE_HARDWARESERIAL -DESPMQTT_BUILDSCRIPT -DMYTZ=TZ_Europe_Amsterdam -DESPMQTT_VERSION=\"$VERSION\" -D$targetname" \
   \"$HOME/Arduino/espMQTT/espMQTT.ino\"
   
-  set +x
+  { set +x; } 2>/dev/null
 
   if [ $? -ne 0 ]
   then 
