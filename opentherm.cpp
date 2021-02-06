@@ -252,16 +252,30 @@ int opentherm_handle()
 
 void opentherm_setthermosttattemporary(double value)
 {
-  opentherm_serialprint("TT="+String(value,1));
+  static double oldvalue = -1;
+  if (oldvalue != value)
+  {
+    oldvalue = value;
+    opentherm_serialprint("TT="+String(value,1));
+  }
 }
 
 void opentherm_setthermosttatcontinue(double value)
 {
-  opentherm_serialprint("TC="+String(value,1));
-
+  static double oldvalue = -1;
+  if (oldvalue != value)
+  {
+    oldvalue = value;
+    opentherm_serialprint("TC="+String(value,1));
+  }
 }
 
 void opentherm_setchwatertemperature(double value)
 {
-  opentherm_serialprint("CS="+String(value,1));
+  static double oldvalue = -1;
+  if (oldvalue != value)
+  {
+    oldvalue = value;
+    opentherm_serialprint("CS="+String(value,1));
+  }
 }
