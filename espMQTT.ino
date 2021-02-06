@@ -29,11 +29,11 @@
 #define MYTZ TZ_Europe_Amsterdam
 
 /* ESP8266 */
-#define ESPMQTT_WEATHER
+// #define ESPMQTT_WEATHER
 // #define ESPMQTT_AMGPELLETSTOVE
 // #define ESPMQTT_BATHROOM
 // #define ESPMQTT_BEDROOM2
-// #define ESPMQTT_OPENTHERM
+#define ESPMQTT_OPENTHERM
 // #define ESPMQTT_SMARTMETER
 // #define ESPMQTT_GROWATT
 // #define ESPMQTT_SDM120
@@ -47,7 +47,7 @@
 // #define ESPMQTT_SOIL
 // #define ESPMQTT_DIMMER
 // #define ESPMQTT_RELAY
-//#define ESPMQTT_LIVINGROOM
+// #define ESPMQTT_LIVINGROOM
 
 /* ESP8285 */
 // #define ESPMQTT_ZMAI90

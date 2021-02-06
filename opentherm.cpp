@@ -11,6 +11,13 @@ void opentherm_callback(String topic, String payload)
   yield();
 }
 
+void opentherm_serialprint(String serialmessage)
+{
+  serialmessage += "\r\n";
+  DEBUG_V("%sSERIAL TX:%s %s", COLOR_RED, COLOR_RESET, serialmessage.c_str());
+  Serial.print(serialmessage);
+}
+
 uint16_t opentherm_message_touint(String otmessage)
 {
   return (strtol(otmessage.substring(5, 7).c_str(), 0, 16) << 8) + (strtol(otmessage.substring(7, 9).c_str(), 0, 16));
@@ -80,6 +87,8 @@ int opentherm_handle()
 
   while (serialmessage.indexOf(10) >= 0)
   {
+    yield();
+    DEBUG_V("%sSERIAL RX:%s %s", COLOR_GREEN, COLOR_RESET, serialmessage.c_str());
     yield();
     int eolchar = serialmessage.indexOf(10);
     String otmessage = serialmessage.substring(0, eolchar);
@@ -243,21 +252,16 @@ int opentherm_handle()
 
 void opentherm_setthermosttattemporary(double value)
 {
-    Serial.print("TT=");
-    Serial.print(String(value,1));
-    Serial.print("\r\n");
+  opentherm_serialprint("TT="+String(value,1));
 }
 
 void opentherm_setthermosttatcontinue(double value)
 {
-    Serial.print("TC=");
-    Serial.print(String(value,1));
-    Serial.print("\r\n");
+  opentherm_serialprint("TC="+String(value,1));
+
 }
 
 void opentherm_setchwatertemperature(double value)
 {
-    Serial.print("CS=");
-    Serial.print(String(value,1));
-    Serial.print("\r\n");
+  opentherm_serialprint("CS="+String(value,1));
 }
