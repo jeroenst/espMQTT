@@ -8,5 +8,6 @@ extern RemoteDebug Debug;
 
 #define MAX(x, y) (((x) > (y)) ? (x) : (y))
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
+#define NaN (FLT_MAX+1)
 
 #endif
