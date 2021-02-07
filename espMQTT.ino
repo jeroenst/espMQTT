@@ -670,7 +670,6 @@ DallasTemperature oneWireSensors(&oneWire);
 DeviceAddress onewire_chReturnWaterThermometer, onewire_dcwSupplyWaterThermometer;
 float onewire_chReturnWaterTemperature = -127, onewire_dcwSupplyWaterTemperature = -127;
 float oldonewire_chReturnWaterTemperature = -127, oldonewire_dcwSupplyWaterTemperature = -127;
-bool onewire_chReturnWaterEnabled = false, onewire_dcwSupplyWaterEnabled = false;
 #endif
 
 #ifdef  ESPMQTT_WEATHER
@@ -2432,24 +2431,24 @@ void loop()
 #ifdef  ESPMQTT_SONOFFTH
       temperature = oneWireSensors.getTempC(onewire_address);
       DEBUG_I("temperature=%f\n", temperature);
-      if (temperature != -127) putdatamap("temperature", String(temperature, 1));
+      if ((temperature != -127) && (temperature != 85)) putdatamap("temperature", String(temperature, 1));
       else putdatamap("temperature", "-");
 #endif
 #ifdef  ESPMQTT_OPENTHERM
       temperature = oneWireSensors.getTempC(onewire_chReturnWaterThermometer);
       DEBUG_I("chreturnwatertemp=%f\n", temperature);
-      if ((onewire_chReturnWaterEnabled) && (temperature != -127)) putdatamap("ow/ch/returnwatertemperature", String(temperature, 1));
+      if ((temperature != -127) && (temperature != 85)) putdatamap("ow/ch/returnwatertemperature", String(temperature, 1));
       else putdatamap("ow/ch/returnwatertemperature", "-");
       temperature = oneWireSensors.getTempC(onewire_dcwSupplyWaterThermometer);
       DEBUG_I("dcwsupplywatertemp=%f\n", temperature);
-      if ((onewire_dcwSupplyWaterEnabled) && (temperature != -127)) putdatamap("ow/dcw/temperature", String(temperature, 1));
+      if ((temperature != -127) && (temperature != 85)) putdatamap("ow/dcw/temperature", String(temperature, 1));
       else putdatamap("ow/dcw/temperature", "-");
       yield();
 #endif
 #ifdef  ESPMQTT_WEATHER
       temperature = oneWireSensors.getTempC(onewire_OutsideAddress);
       DEBUG_I("Outside Temperature=%f\n", temperature);
-      if (temperature != -127) putdatamap("temperature", String(temperature, 1));
+      if ((temperature != -127) && (temperature != 85)) putdatamap("temperature", String(temperature, 1));
       else putdatamap("temperature", "-");
       yield();
 #endif
@@ -2458,21 +2457,24 @@ void loop()
       DEBUG_I("Floor Water Temperature=%f\n", temperature);
       bool floorheatingrelayon = false;
       // When temperature exeeds maximum prevent pump from switching on
-      if (temperature < SONOFF_FLOORHEATING_TEMPMAX)
+      if ((temperature != -127) && (temperature != 85))
       {
-        // Every 24 hours run the pump for 1 minute to prevent locking
-        if ((int)(uptime / 60) % 1440 == 0)
+        putdatamap("temperature", String(temperature, 1));
+        if (temperature < SONOFF_FLOORHEATING_TEMPMAX)
         {
-          floorheatingrelayon = true;
+          // Every 24 hours run the pump for 1 minute to prevent locking
+          if ((int)(uptime / 60) % 1440 == 0)
+          {
+            floorheatingrelayon = true;
+          }
+          // Only if floorheating temperature as measured correctly put valve on if requested
+          else
+          {
+            floorheatingrelayon = floorheating_valveon;
+          }
         }
-        // Only if floorheating temperature as measured correctly put valve on if requested
-        else if (temperature != -127)
-        {
-          putdatamap("temperature", String(temperature, 1));
-          floorheatingrelayon = floorheating_valveon;
-        }
-        else putdatamap("temperature", "-");
       }
+      else putdatamap("temperature", "-");
 #ifdef SONOFFCHINVERSE
       digitalWrite(sonoff_relays[0], floorheatingrelayon ? false : true); // Set floorheating
 #else
@@ -3634,12 +3636,9 @@ void setup() {
   if (!oneWireSensors.getAddress(onewire_dcwSupplyWaterThermometer, 0)) {
     DEBUG_E("Unable to find address for onewire_dcwSupplyWaterThermometer\n");
   }
-  else onewire_dcwSupplyWaterEnabled = true;
   if (!oneWireSensors.getAddress(onewire_chReturnWaterThermometer, 1)) {
     DEBUG_E("Unable to find address for Device onewire_chReturnWaterThermometer\n");
-
   }
-  else onewire_chReturnWaterEnabled = true;
 #endif
 
 #ifdef  ESPMQTT_WEATHER
