@@ -1158,7 +1158,7 @@ void mqttdosubscriptions(int32_t packetId = -1)
     if (subscribetopic == "") nextsubscribe++;
   }
 
-  if (subscribetopic == "") triggers.mqttpublishall = true; // When subscibtion has finished start publishing of datamap
+  if (subscribetopic == "") triggers.mqttpublishall = true; // When subscription has finished start publishing of datamap
   else
   {
     DEBUG("MQTT Subscribing to: %s\n", subscribetopic.c_str());
