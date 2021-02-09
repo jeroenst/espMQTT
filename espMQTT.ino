@@ -1092,14 +1092,14 @@ void onMqttUnsubscribe(uint16_t packetId) {
 
 void mqttdosubscriptions(int32_t packetId = -1)
 {
-  const uint8_t nr_of_subsribe_topics = 22;
+  const uint8_t nr_of_subsribe_topics = 30;
 
   DEBUG_D("mqttdosubscriptions (%d)\n", packetId);
   static int32_t nextpacketid = -1;
   static uint16_t nextsubscribe = 0;
   static String subscribetopic = ""; // We need this static variable because mqttclient.subscribe uses a pointer
 
-  if (packetId == -1) nextsubscribe = 0;
+  //if (packetId == -1) nextsubscribe = 0;
   if (packetId > 0) nextsubscribe++;
   nextpacketid = -1;
   subscribetopic = "";
@@ -1112,45 +1112,47 @@ void mqttdosubscriptions(int32_t packetId = -1)
       case 0: subscribetopic = mqtt_topicprefix + "setthermostattemporary"; break;
       case 1: subscribetopic = mqtt_topicprefix + "setthermostatcontinue"; break;
       case 2: subscribetopic = mqtt_topicprefix + "setchwatertemperature"; break;
+      case 3: subscribetopic = mqtt_topicprefix + "setmaxmodulationlevel"; break;
+      case 4: subscribetopic = mqtt_topicprefix + "setoutsidetemperature"; break;
 #endif
 #ifdef ESPMQTT_DUCOBOX
-      case 3: subscribetopic = mqtt_topicprefix + "setfan"; break;
+      case 0: subscribetopic = mqtt_topicprefix + "setfan"; break;
 #endif
 #ifdef ESPMQTT_DIMMER
-      case 4: subscribetopic = mqtt_topicprefix + "setdimvalue"; break;
-      case 5: subscribetopic = mqtt_topicprefix + "setdimstate"; break;
+      case 0: subscribetopic = mqtt_topicprefix + "setdimvalue"; break;
+      case 1: subscribetopic = mqtt_topicprefix + "setdimstate"; break;
 #endif
 #ifdef ESPMQTT_SONOFFBULB
-      case 6: subscribetopic = mqtt_topicprefix + "setcolor"; break;
+      case 0: subscribetopic = mqtt_topicprefix + "setcolor"; break;
 #endif
 #ifdef ESPMQTT_AMGPELLETSTOVE
-      case 7: subscribetopic = mqtt_topicprefix + "setonoff"; break;
-      case 8: subscribetopic = mqtt_topicprefix + "setpower"; break;
-      case 9: subscribetopic = mqtt_topicprefix + "settemperature"; break;
+      case 0: subscribetopic = mqtt_topicprefix + "setonoff"; break;
+      case 1: subscribetopic = mqtt_topicprefix + "setpower"; break;
+      case 2: subscribetopic = mqtt_topicprefix + "settemperature"; break;
 #endif
 #ifdef SONOFFCH
-      case 10:  if (0 < SONOFFCH) subscribetopic = mqtt_topicprefix + "setrelay/0"; break;
-      case 11:  if (1 < SONOFFCH) subscribetopic = mqtt_topicprefix + "setrelay/1"; break;
-      case 12:  if (2 < SONOFFCH) subscribetopic = mqtt_topicprefix + "setrelay/2"; break;
-      case 13:  if (3 < SONOFFCH) subscribetopic = mqtt_topicprefix + "setrelay/3"; break;
+      case 0:  if (0 < SONOFFCH) subscribetopic = mqtt_topicprefix + "setrelay/0"; break;
+      case 1:  if (1 < SONOFFCH) subscribetopic = mqtt_topicprefix + "setrelay/1"; break;
+      case 2:  if (2 < SONOFFCH) subscribetopic = mqtt_topicprefix + "setrelay/2"; break;
+      case 3:  if (3 < SONOFFCH) subscribetopic = mqtt_topicprefix + "setrelay/3"; break;
 #endif
 #ifdef  ESPMQTT_SONOFF_FLOORHEATING
-      case 14: subscribetopic = mqtt_topicprefix + "setvalve"; break;
+      case 0: subscribetopic = mqtt_topicprefix + "setvalve"; break;
 #endif
 #ifdef ESPMQTT_QSWIFIDIMMERD01
-      case 15:  subscribetopic = mqtt_topicprefix + "setdimvalue"; break;
-      case 16:  subscribetopic = mqtt_topicprefix + "setdimstate"; break;
+      case 0:  subscribetopic = mqtt_topicprefix + "setdimvalue"; break;
+      case 1:  subscribetopic = mqtt_topicprefix + "setdimstate"; break;
 #endif
 #if defined(ESPMQTT_QSWIFIDIMMERD02) || defined(ESPMQTT_TUYA_2GANGDIMMERV2)
-      case 17:  subscribetopic = mqtt_topicprefix + "setdimvalue/0"; break;
-      case 18:  subscribetopic = mqtt_topicprefix + "setdimvalue/1"; break;
-      case 19:  subscribetopic = mqtt_topicprefix + "setdimstate/0"; break;
-      case 20:  subscribetopic = mqtt_topicprefix + "setdimstate/1"; break;
+      case 0:  subscribetopic = mqtt_topicprefix + "setdimvalue/0"; break;
+      case 1:  subscribetopic = mqtt_topicprefix + "setdimvalue/1"; break;
+      case 2:  subscribetopic = mqtt_topicprefix + "setdimstate/0"; break;
+      case 3:  subscribetopic = mqtt_topicprefix + "setdimstate/1"; break;
 #endif
-      case 21:  subscribetopic = mqtt_topicprefix + "startfirmwareupgrade"; break;
 #ifdef ESPMQTT_BHT002
-      case 22: subscribetopic = mqtt_topicprefix + "setsetpoint"; break;
+      case 0: subscribetopic = mqtt_topicprefix + "setsetpoint"; break;
 #endif
+      case 20:  subscribetopic = mqtt_topicprefix + "startfirmwareupgrade"; break;
       default: break;
     }
     if (subscribetopic == "") nextsubscribe++;
@@ -1236,6 +1238,16 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties,
   {
     DEBUG_I("RECEIVED SETCHWATERTEMPERATURE %s\n", payloadstring.c_str());
     opentherm_setchwatertemperature(payloadstring.toFloat());
+  }
+  if (String(topic) == String(mqtt_topicprefix + "setmaxmodulationlevel"))
+  {
+    DEBUG_I("RECEIVED SETMAXMODULATIONLEVEL %s\n", payloadstring.c_str());
+    opentherm_setmaxmodulationlevel(payloadstring.toInt());
+  }
+  if (String(topic) == String(mqtt_topicprefix + "setoutsidetemperature"))
+  {
+    DEBUG_I("RECEIVED SETOUTSIDETEMPERATURE %s\n", payloadstring.c_str());
+    opentherm_setoutsidetemperature(payloadstring.toFloat());
   }
 #endif
 
