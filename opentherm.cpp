@@ -3,7 +3,12 @@
 WiFiServer otserver(25238);
 
 uint32_t wdresettimeout = 0;
+uint32_t resendtimeout = 0;
 
+int8_t maxmodulationlevelset = -2;
+int8_t maxchwatertemperatureset = -1;
+double outsidetemperatureset = NaN;
+double thermostatcontinueset = NaN;
 
 void(*_opentherm_callback)(String, String);
 
@@ -283,17 +288,14 @@ int opentherm_handle()
     }
   }
 
-  opentherm_watchdog_kick();
-
   // If otgw chip doesn't respond to commands reset system
   if ((wdresettimeout != 0) && (millis() > wdresettimeout))
   {
-    // After startup wait at least 5 minutes before resetting
-    if (millis() > 300000)
-    {
       DEBUG_W("OTGW Chip not responding, Resetting by opentherm i2c watchdog...");
+      opentherm_watchdog_kick();
       opentherm_watchdog_reset();
       wdresettimeout = 0;
+      resendtimeout = 5000; // After 5 seconds resend values
     }
   }
 
@@ -314,10 +316,9 @@ void opentherm_setthermosttattemporary(double value)
 
 void opentherm_setthermosttatcontinue(double value)
 {
-  static double oldvalue = -1;
-  if (oldvalue != value)
+  if (thermostatcontinueset != value)
   {
-    oldvalue = value;
+    thermostatcontinueset = value;
     opentherm_serialprint("TC=" + String(value, 1));
     wdresettimeout = millis() + 5000;
   }
@@ -325,10 +326,9 @@ void opentherm_setthermosttatcontinue(double value)
 
 void opentherm_setchwatertemperature(int8_t value)
 {
-  static int8_t oldvalue = -1;
-  if ((oldvalue != value) && (value >= 0) && (value <= 100))
+  if ((chwatertemperatureset != value) && (value >= 0) && (value <= 100))
   {
-    oldvalue = value;
+    chwatertemperatureset = value;
     opentherm_serialprint("CS=" + String(value));
     wdresettimeout = millis() + 5000;
   }
@@ -336,10 +336,10 @@ void opentherm_setchwatertemperature(int8_t value)
 
 void opentherm_setmaxmodulationlevel(int8_t value)
 {
-  static int8_t oldvalue = -2;
-  if ((oldvalue != value) && (value >= -1) && (value <= 100))
+  
+  if ((maxmodulationlevelset != value) && (value >= -1) && (value <= 100))
   {
-    oldvalue = value;
+    maxmodulationlevelset = value;
     if (value > -1) opentherm_serialprint("MM=" + String(value));
     else opentherm_serialprint("MM=T");
     wdresettimeout = millis() + 5000;
@@ -348,10 +348,9 @@ void opentherm_setmaxmodulationlevel(int8_t value)
 
 void opentherm_setoutsidetemperature(double value)
 {
-  static double oldvalue = -1;
-  if (oldvalue != value)
+  if (outsidetemperatureset != value)
   {
-    oldvalue = value;
+    outsidetemperatureset = value;
     opentherm_serialprint("OT=" + String(value, 1));
     wdresettimeout = millis() + 5000;
   }

@@ -3600,9 +3600,6 @@ void setup() {
 
   ArduinoOTA.onProgress([](unsigned int, unsigned int) {
         ESP.wdtFeed();
-#ifdef  ESPMQTT_OPENTHERM
-        opentherm_watchdog_kick();
-#endif
   });
 
   ArduinoOTA.setHostname(esp_hostname.c_str());
