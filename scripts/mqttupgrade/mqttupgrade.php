@@ -64,6 +64,6 @@ function upgrade ($maintopic, $upgradekey, $devicetype)
     global $version;
     global $mqtt;
     $url = $firmwarepath.'/v'.$version.'/ESPMQTT_'.$devicetype.'_'.$version.'.bin';
-    echo "Upgrading: ".$maintopic." to ".$url."\n";
+    echo "Upgrading: ".$maintopic." with upgradekey ".$upgradekey." to ".$url."\n";
     $mqtt->publish($maintopic."/startfirmwareupgrade", '{"version":"'.$version.'", "url":"'.$url.'", "key":"'.$upgradekey.'"}', 0);
 }
