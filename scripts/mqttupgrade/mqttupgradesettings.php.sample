@@ -6,3 +6,7 @@ $password = "";                   // set your password
 $client_id = "phpMQTT-publisher1".uniqid(); // make sure this is unique for connecting to sever - you could use uniqid()
 $firmwarepath = ""; // url of path to firmware files
 $version = ""; // firmware version to upgrade to
+
+$devicetopics[] = "home/ESP_OPENTHERM";
+$devicetopics[] = "home/ESP_DUCOBOX";
+$devicetopics[] = "home/BHT002";
