@@ -1099,7 +1099,7 @@ void mqttdosubscriptions(int32_t packetId = -1)
   static uint16_t nextsubscribe = 0;
   static String subscribetopic = ""; // We need this static variable because mqttclient.subscribe uses a pointer
 
-  //if (packetId == -1) nextsubscribe = 0;
+  if (packetId == -1) nextsubscribe = 0;
   if (packetId > 0) nextsubscribe++;
   nextpacketid = -1;
   subscribetopic = "";
