@@ -1116,43 +1116,43 @@ void mqttdosubscriptions(int32_t packetId = -1)
       case 4: subscribetopic = mqtt_topicprefix + "setoutsidetemperature"; break;
 #endif
 #ifdef ESPMQTT_DUCOBOX
-      case 0: subscribetopic = mqtt_topicprefix + "setfan"; break;
+      case 5: subscribetopic = mqtt_topicprefix + "setfan"; break;
 #endif
 #ifdef ESPMQTT_DIMMER
-      case 0: subscribetopic = mqtt_topicprefix + "setdimvalue"; break;
-      case 1: subscribetopic = mqtt_topicprefix + "setdimstate"; break;
+      case 6: subscribetopic = mqtt_topicprefix + "setdimvalue"; break;
+      case 7: subscribetopic = mqtt_topicprefix + "setdimstate"; break;
 #endif
 #ifdef ESPMQTT_SONOFFBULB
-      case 0: subscribetopic = mqtt_topicprefix + "setcolor"; break;
+      case 8: subscribetopic = mqtt_topicprefix + "setcolor"; break;
 #endif
 #ifdef ESPMQTT_AMGPELLETSTOVE
-      case 0: subscribetopic = mqtt_topicprefix + "setonoff"; break;
-      case 1: subscribetopic = mqtt_topicprefix + "setpower"; break;
-      case 2: subscribetopic = mqtt_topicprefix + "settemperature"; break;
+      case 9: subscribetopic = mqtt_topicprefix + "setonoff"; break;
+      case 10: subscribetopic = mqtt_topicprefix + "setpower"; break;
+      case 11: subscribetopic = mqtt_topicprefix + "settemperature"; break;
 #endif
 #ifdef SONOFFCH
-      case 0:  if (0 < SONOFFCH) subscribetopic = mqtt_topicprefix + "setrelay/0"; break;
-      case 1:  if (1 < SONOFFCH) subscribetopic = mqtt_topicprefix + "setrelay/1"; break;
-      case 2:  if (2 < SONOFFCH) subscribetopic = mqtt_topicprefix + "setrelay/2"; break;
-      case 3:  if (3 < SONOFFCH) subscribetopic = mqtt_topicprefix + "setrelay/3"; break;
+      case 12:  if (0 < SONOFFCH) subscribetopic = mqtt_topicprefix + "setrelay/0"; break;
+      case 13:  if (1 < SONOFFCH) subscribetopic = mqtt_topicprefix + "setrelay/1"; break;
+      case 14:  if (2 < SONOFFCH) subscribetopic = mqtt_topicprefix + "setrelay/2"; break;
+      case 15:  if (3 < SONOFFCH) subscribetopic = mqtt_topicprefix + "setrelay/3"; break;
 #endif
 #ifdef  ESPMQTT_SONOFF_FLOORHEATING
-      case 0: subscribetopic = mqtt_topicprefix + "setvalve"; break;
+      case 16: subscribetopic = mqtt_topicprefix + "setvalve"; break;
 #endif
 #ifdef ESPMQTT_QSWIFIDIMMERD01
-      case 0:  subscribetopic = mqtt_topicprefix + "setdimvalue"; break;
-      case 1:  subscribetopic = mqtt_topicprefix + "setdimstate"; break;
+      case 17:  subscribetopic = mqtt_topicprefix + "setdimvalue"; break;
+      case 18:  subscribetopic = mqtt_topicprefix + "setdimstate"; break;
 #endif
 #if defined(ESPMQTT_QSWIFIDIMMERD02) || defined(ESPMQTT_TUYA_2GANGDIMMERV2)
-      case 0:  subscribetopic = mqtt_topicprefix + "setdimvalue/0"; break;
-      case 1:  subscribetopic = mqtt_topicprefix + "setdimvalue/1"; break;
-      case 2:  subscribetopic = mqtt_topicprefix + "setdimstate/0"; break;
-      case 3:  subscribetopic = mqtt_topicprefix + "setdimstate/1"; break;
+      case 19:  subscribetopic = mqtt_topicprefix + "setdimvalue/0"; break;
+      case 20:  subscribetopic = mqtt_topicprefix + "setdimvalue/1"; break;
+      case 21:  subscribetopic = mqtt_topicprefix + "setdimstate/0"; break;
+      case 22:  subscribetopic = mqtt_topicprefix + "setdimstate/1"; break;
 #endif
 #ifdef ESPMQTT_BHT002
-      case 0: subscribetopic = mqtt_topicprefix + "setsetpoint"; break;
+      case 23: subscribetopic = mqtt_topicprefix + "setsetpoint"; break;
 #endif
-      case 20:  subscribetopic = mqtt_topicprefix + "startfirmwareupgrade"; break;
+      case 24:  subscribetopic = mqtt_topicprefix + "startfirmwareupgrade"; break;
       default: break;
     }
     if (subscribetopic == "") nextsubscribe++;
