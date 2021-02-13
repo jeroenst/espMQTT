@@ -3380,6 +3380,11 @@ void processCmdRemoteDebug()
     connectToMqtt();
   }
 
+  if (lastCmd == "mqttdisconnect")
+  {
+    disconnectMqtt();
+  }
+
   if (lastCmd == "showmainstate")
   {
     DEBUG("wificonnected=%d\n", mainstate.wificonnected);
@@ -3399,7 +3404,7 @@ void processCmdRemoteDebug()
     delay(1000);
     ESP.restart();
     delay(1000);
-  }
+   }
 
 #ifdef  ESPMQTT_WATERMETER
   if (lastCmd == "help") DEBUG("  watermeterreadeeprom\n  watermeterwriteeeprom\n");
@@ -3432,6 +3437,14 @@ void processCmdRemoteDebug()
       DEBUG_D("EEPROM %d=%s\n", i, eepromdata.c_str());
     }
   }
+
+#ifdef ESPMQTT_OPENTHERM
+  if (lastCmd == "resetopentherm")
+  {
+    DEBUG_D("Resetting opentherm...\n");
+    opentherm_reset();
+  }
+#endif
 }
 
 void eeprom_load_variables()
@@ -3523,7 +3536,9 @@ void eeprom_load_variables()
 }
 
 void setup() {
-
+#ifndef SERIALLOG
+  Serial.setDebugOutput(false);
+#endif
   ESP.wdtDisable(); // Use hardware watchdog of 6 seconds to prevent auto reboot when function takes more time..
   EEPROM.begin(512);
 

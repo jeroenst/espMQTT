@@ -1,14 +1,9 @@
 #include "espMQTT.h"
-#include <Wire.h>
+#include "opentherm.h"
 WiFiServer otserver(25238);
 
 uint32_t wdresettimeout = 0;
-uint32_t resendtimeout = 0;
-
-int8_t maxmodulationlevelset = -2;
-int8_t maxchwatertemperatureset = -1;
-double outsidetemperatureset = NaN;
-double thermostatcontinueset = NaN;
+uint8_t resetstate = 1;
 
 void(*_opentherm_callback)(String, String);
 
@@ -55,37 +50,21 @@ float opentherm_message_tofloat(String otmessage)
   return opentherm_twobytestofloat(strtol(otmessage.substring(5, 7).c_str(), 0, 16), strtol(otmessage.substring(7, 9).c_str(), 0, 16));
 }
 
-void opentherm_watchdog_kick()
-{
-  // Kick OTGW Watchdog
-  uint32_t wdtimeout = 0;
-  if (wdtimeout < millis())
-  {
-    wdtimeout = millis() + 1000;
-    Wire.beginTransmission(38); // Watchdog i2c address on otgw is 38 (0x26), see https://gitlab.com/guiguid/ESPEasy/blob/a7494e1decfcbd6591dbf3742231933778a92e3d/TinyI2CWatchdog/TinyI2CWatchdog.ino
-    Wire.write(0xA5);
-    Wire.endTransmission();
-  }
-}
 
-void opentherm_watchdog_reset()
+void opentherm_reset()
 {
-  Wire.beginTransmission(38); // Watchdog i2c address on otgw is 38 (0x26), see https://gitlab.com/guiguid/ESPEasy/blob/a7494e1decfcbd6591dbf3742231933778a92e3d/TinyI2CWatchdog/TinyI2CWatchdog.ino
-  Wire.write(0x85);
-  Wire.endTransmission();
+  resetstate = 1;
 }
 
 void opentherm_init(void(*callback)(String, String))
 {
-  _opentherm_callback = callback;
-  otserver.begin();
-
+  Serial.setDebugOutput(false);
   Serial.setRxBufferSize(2048);
   Serial.begin(9600);  //Init serial 9600 baud
-  Serial.setDebugOutput(false);
-  Serial.print("invalidate\r\n");
+  Serial.print("\r\n");
 
-  Wire.begin();
+  _opentherm_callback = callback;
+  otserver.begin();
 }
 
 int opentherm_handle()
@@ -289,16 +268,65 @@ int opentherm_handle()
   }
 
   // If otgw chip doesn't respond to commands reset system
-  if ((wdresettimeout != 0) && (millis() > wdresettimeout))
+  if ((wdresettimeout > 0) && (millis() > wdresettimeout))
   {
-      DEBUG_W("OTGW Chip not responding, Resetting by opentherm i2c watchdog...");
-      opentherm_watchdog_kick();
-      opentherm_watchdog_reset();
-      wdresettimeout = 0;
-      resendtimeout = 5000; // After 5 seconds resend values
-    }
+    wdresettimeout = 0;
+    resetstate = 1;
   }
 
+  static uint32_t resettimer = 0;
+  switch (resetstate)
+  {
+    case 1:
+      digitalWrite(D5, 1);
+      pinMode(D5, OUTPUT);
+      resettimer = millis() + 100;
+      resetstate++;
+    break;
+    case 2:
+      if (resettimer < millis())
+      {
+        digitalWrite(D5, 0);
+        resettimer = millis() + 100;        
+        resetstate++;
+      }
+    break;
+    case 3:
+      if (resettimer < millis())
+      {
+        digitalWrite(D5, 1);
+        resettimer = millis() + 2000;        
+        resetstate++;
+      }
+    break;
+    case 4:
+      if (resettimer < millis())
+      {
+        opentherm_setchwatertemperature(-1);
+        resettimer = millis() + 1000;        
+        resetstate++;
+      }
+    break;
+    case 5:
+      if (resettimer < millis())
+      {
+        opentherm_setmaxmodulationlevel(-1);
+        resettimer = millis() + 1000;        
+        resetstate++;
+      }
+    break;
+    case 6:
+      if (resettimer < millis())
+      {
+        opentherm_setoutsidetemperature(-100);
+        resettimer = millis() + 1000;        
+        resetstate++;
+      }
+    break;
+    default:
+    break;
+  }
+  
   return returnvalue;
 }
 
@@ -308,50 +336,71 @@ void opentherm_setthermosttattemporary(double value)
   static double oldvalue = -1;
   if (oldvalue != value)
   {
-    oldvalue = value;
-    opentherm_serialprint("TT=" + String(value, 1));
-    wdresettimeout = millis() + 5000;
+    if (value < 0) value = oldvalue;
+    if ((value > 10) && (value < 30))
+    {
+      oldvalue = value;
+      opentherm_serialprint("TT=" + String(value, 1));
+      wdresettimeout = millis() + 5000;
+    }
   }
 }
 
 void opentherm_setthermosttatcontinue(double value)
 {
-  if (thermostatcontinueset != value)
+  static double oldvalue = -1;
+  if (oldvalue != value)
   {
-    thermostatcontinueset = value;
-    opentherm_serialprint("TC=" + String(value, 1));
-    wdresettimeout = millis() + 5000;
+    if (value < 0) value = oldvalue;
+    if ((value > 10) && (value < 30))
+    {
+      oldvalue = value;
+      opentherm_serialprint("TC=" + String(value, 1));
+      wdresettimeout = millis() + 5000;
+    }
   }
 }
 
 void opentherm_setchwatertemperature(int8_t value)
 {
-  if ((chwatertemperatureset != value) && (value >= 0) && (value <= 100))
+  static int8_t oldvalue = -1;
+  if (oldvalue != value)
   {
-    chwatertemperatureset = value;
-    opentherm_serialprint("CS=" + String(value));
-    wdresettimeout = millis() + 5000;
+    if (value < 0) value = oldvalue;
+    if ((value >= 0) && (value <= 100))
+    {
+      oldvalue = value;
+      opentherm_serialprint("CS=" + String(value));
+      wdresettimeout = millis() + 5000;
+    }
   }
 }
 
 void opentherm_setmaxmodulationlevel(int8_t value)
 {
   
-  if ((maxmodulationlevelset != value) && (value >= -1) && (value <= 100))
+  static int8_t oldvalue = -1;
+  if (oldvalue != value)
   {
-    maxmodulationlevelset = value;
-    if (value > -1) opentherm_serialprint("MM=" + String(value));
+    if (value < 0) value = oldvalue;
+    if ((value > 0) && (value < 100)) opentherm_serialprint("MM=" + String(value));
     else opentherm_serialprint("MM=T");
+    oldvalue = value;
     wdresettimeout = millis() + 5000;
   }
 }
 
 void opentherm_setoutsidetemperature(double value)
 {
-  if (outsidetemperatureset != value)
+  static double oldvalue = -100;
+  if (oldvalue != value)
   {
-    outsidetemperatureset = value;
-    opentherm_serialprint("OT=" + String(value, 1));
-    wdresettimeout = millis() + 5000;
+    if (value == -100) value = oldvalue;
+    if ((value > -50) && (value < 60))
+    {
+      oldvalue = value;
+      opentherm_serialprint("OT=" + String(value, 1));
+      wdresettimeout = millis() + 5000;
+    }
   }
 }

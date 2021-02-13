@@ -5,4 +5,4 @@ void opentherm_setthermosttatcontinue(double value);
 void opentherm_setchwatertemperature(int8_t value);
 void opentherm_setmaxmodulationlevel(int8_t value);
 void opentherm_setoutsidetemperature(double value);
-void opentherm_watchdog_kick();
+void opentherm_reset();
