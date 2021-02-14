@@ -72,6 +72,7 @@ int opentherm_handle()
   static WiFiClient otclient;
   static String serialbuffer = "";
   int returnvalue = 0;
+  static int8_t otgwcommstate = 0;
   if (!otclient || !otclient.connected()) otclient = otserver.available();
   else
   {
@@ -110,6 +111,7 @@ int opentherm_handle()
       topic = "thermostat/setpoint";
       otvalue = otmessage.substring(4);
       wdresettimeout = 0;
+      otgwcommstate = 2;
     }
 
     else if (otmessage.substring(0, 4) == "TT: ")
@@ -117,6 +119,7 @@ int opentherm_handle()
       topic = "thermostat/setpoint";
       otvalue = otmessage.substring(4);
       wdresettimeout = 0;
+      otgwcommstate = 2;
     }
 
     else if (otmessage.substring(0, 4) == "TO: ")
@@ -124,6 +127,7 @@ int opentherm_handle()
       topic = "outside/temperature";
       otvalue = otmessage.substring(4);
       wdresettimeout = 0;
+      otgwcommstate = 2;
     }
 
     else if (otmessage.substring(0, 4) == "CS: ")
@@ -131,6 +135,7 @@ int opentherm_handle()
       topic = "otgw/ch/water/setpoint";
       otvalue = otmessage.substring(4);
       wdresettimeout = 0;
+      otgwcommstate = 2;
     }
 
     else if (otmessage.substring(0, 4) == "MM: ")
@@ -138,6 +143,7 @@ int opentherm_handle()
       topic = "otgw/maxmodulationlevel";
       otvalue = otmessage.substring(4);
       wdresettimeout = 0;
+      otgwcommstate = 2;
     }
 
     else if (otmessage.substring(0, 4) == "OT: ")
@@ -145,13 +151,16 @@ int opentherm_handle()
       topic = "otgw/outsidetemperature";
       otvalue = otmessage.substring(4);
       wdresettimeout = 0;
+      otgwcommstate = 2;
     }
 
     else if (otmessage[0] == 'B')
     {
+      if (otgwcommstate < 1) otgwcommstate = 1;
       long otmsgtype = (strtol(otmessage.substring(1, 3).c_str(), 0, 16) >> 4) & 7;
       if (otmsgtype == 4) // Check if messagetype is read ack
       {
+        if (otgwcommstate < 1) otgwcommstate = 1;
         long otcommand = strtol(otmessage.substring(3, 5).c_str(), 0, 16);
         switch (otcommand)
         {
@@ -241,6 +250,7 @@ int opentherm_handle()
       long otmsgtype = (strtol(otmessage.substring(1, 3).c_str(), 0, 16) >> 4) & 7;
       if (otmsgtype == 1) // Check if messagetype is write data
       {
+        if (otgwcommstate < 1) otgwcommstate = 1;
         long otcommand = strtol(otmessage.substring(3, 5).c_str(), 0, 16);
         switch (otcommand)
         {
@@ -272,6 +282,14 @@ int opentherm_handle()
   {
     wdresettimeout = 0;
     resetstate = 1;
+    otgwcommstate = 0;
+  }
+
+  static uint8_t oldotgwcommstate = -1;
+  if (otgwcommstate != oldotgwcommstate)
+  {
+    oldotgwcommstate = otgwcommstate;
+    _opentherm_callback("otgw/commstate", String(otgwcommstate));
   }
 
   static uint32_t resettimer = 0;
