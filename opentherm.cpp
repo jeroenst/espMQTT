@@ -2,6 +2,10 @@
 #include "opentherm.h"
 WiFiServer otserver(25238);
 
+#ifndef D5
+#define D5 14
+#endif
+
 uint32_t wdresettimeout = 0;
 uint8_t resetstate = 1;
 
