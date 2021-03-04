@@ -33,7 +33,7 @@
 // #define ESPMQTT_AMGPELLETSTOVE
 // #define ESPMQTT_BATHROOM
 // #define ESPMQTT_BEDROOM2
-#define ESPMQTT_OPENTHERM
+// #define ESPMQTT_OPENTHERM
 // #define ESPMQTT_SMARTMETER
 // #define ESPMQTT_GROWATT
 // #define ESPMQTT_SDM120
@@ -66,7 +66,7 @@
 // #define ESPMQTT_SONOFFPOW
 // #define ESPMQTT_SONOFFPOWR2 // tv&washingmachine&server&dishwasher
 // #define ESPMQTT_SONOFFTH
-// #define ESPMQTT_GENERIC8255
+#define ESPMQTT_GENERIC8255
 // #define ESPMQTT_BHT002
 // #define ESPMQTT_TUYA_2GANGDIMMERV2
 
@@ -1015,11 +1015,12 @@ void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
 
 void startWifiAP()
 {
+  DEBUG_E("Starting WiFi Accesspoint\n");
   WiFi.disconnect();
   if (WiFi.softAP(WiFi.hostname().c_str(), DEFAULT_PASSWORD, 6, 0))
   {
     mainstate.accesspoint = true;
-    DEBUG_E("Failed setting WiFi.softAP()");
+    DEBUG_E("WiFi Accesspoint Activated\n");
     static uint8 routermode = 0;
     wifi_softap_set_dhcps_offer_option(OFFER_ROUTER, &routermode);
     WiFi.mode(WIFI_AP);
@@ -1031,7 +1032,6 @@ void startWifiAP()
       tuya_apmode();
 #endif
   }
-  else connectToWifi();
 }
 
 void connectToWifi()
