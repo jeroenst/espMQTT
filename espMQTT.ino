@@ -66,9 +66,11 @@
 // #define ESPMQTT_SONOFFPOW
 // #define ESPMQTT_SONOFFPOWR2 // tv&washingmachine&server&dishwasher
 // #define ESPMQTT_SONOFFTH
-#define ESPMQTT_GENERIC8255
+// #define ESPMQTT_GENERIC8255
 // #define ESPMQTT_BHT002
 // #define ESPMQTT_TUYA_2GANGDIMMERV2
+//#define ESPMQTT_QSWIFISWITCH1C
+#define ESPMQTT_QSWIFISWITCH2C
 
 #define ESPMQTT_VERSION "TEST"
 #else
@@ -154,6 +156,22 @@ SDM sdm(serSDM, 2400);
 #define APONBOOT
 #define QSWIFIDIMMERCHANNELS 2
 #include "qswifidimmer.h"
+#endif
+
+#ifdef  ESPMQTT_QSWIFISWITCH1C
+#define FIRMWARE_TARGET "QSWIFISWITCH1C"
+#define APONBOOT
+#define QSWIFISWITCHCHANNELS 1
+#include "qswifiswitch.h"
+QsWifiSwitch qswifiswitch(QSWIFISWITCHCHANNELS);
+#endif
+
+#ifdef  ESPMQTT_QSWIFISWITCH2C
+#define FIRMWARE_TARGET "QSWIFISWITCH2C"
+#define APONBOOT
+#define QSWIFISWITCHCHANNELS 2
+#include "qswifiswitch.h"
+QsWifiSwitch qswifiswitch(QSWIFISWITCHCHANNELS);
 #endif
 
 #ifdef  ESPMQTT_BHT002
@@ -1153,6 +1171,13 @@ void mqttdosubscriptions(int32_t packetId = -1)
       case 23: subscribetopic = mqtt_topicprefix + "setsetpoint"; break;
 #endif
       case 24:  subscribetopic = mqtt_topicprefix + "startfirmwareupgrade"; break;
+#ifdef ESPMQTT_QSWIFISWITCH1C
+      case 25:  subscribetopic = mqtt_topicprefix + "setrelay"; break;
+#endif
+#ifdef ESPMQTT_QSWIFISWITCH2C
+      case 26:  subscribetopic = mqtt_topicprefix + "setrelay/0"; break;
+      case 27:  subscribetopic = mqtt_topicprefix + "setrelay/1"; break;
+#endif
       default: break;
     }
     if (subscribetopic == "") nextsubscribe++;
@@ -1298,6 +1323,15 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties,
   if (topicstring == mqtt_topicprefix + "setdimstate/0") qswifidimmer_setdimstate(payloadstring.toInt(), 0);
   if (topicstring == mqtt_topicprefix + "setdimstate/1") qswifidimmer_setdimstate(payloadstring.toInt(), 1);
 #endif
+#ifdef ESPMQTT_QSWIFISWITCH1C
+  if (topicstring == mqtt_topicprefix + "setrelay") qswifiswitch.setRelay(payloadstring.toInt());
+#endif
+#ifdef ESPMQTT_QSWIFISWITCH2C
+  if (topicstring == mqtt_topicprefix + "setrelay/0") qswifiswitch.setRelay(0, payloadstring.toInt());
+  if (topicstring == mqtt_topicprefix + "setrelay/1") qswifiswitch.setRelay(1, payloadstring.toInt());
+#endif
+
+
   if (topicstring == mqtt_topicprefix + "startfirmwareupgrade")
   {
     triggers.firmwareupgrade = payloadstring;
@@ -1619,6 +1653,11 @@ void loop()
 
 #ifdef QSWIFIDIMMERCHANNELS
   qswifidimmer_handle();
+  yield();
+#endif
+
+#ifdef QSWIFISWITCHCHANNELS
+  qswifiswitch.handle();
   yield();
 #endif
 
@@ -3256,6 +3295,27 @@ void qswifidimmer_switchcallback(uint8_t dimchannel, bool switchstate)
 }
 #endif
 
+#if (QSWIFISWITCHCHANNELS == 1)
+void qswifiswitch_relaycallback(uint8_t , bool state)
+{
+  putdatamap ("relaystate", String(state));
+}
+void qswifiswitch_switchcallback(uint8_t , bool switchstate)
+{
+  putdatamap ("switchstate", String(switchstate));
+}
+#endif
+#if (QSWIFISWITCHCHANNELS == 2)
+void qswifiswitch_relaycallback(uint8_t channel, bool state)
+{
+  putdatamap ("relaystate/" + String(channel), String(state));
+}
+void qswifiswitch_switchcallback(uint8_t channel, bool switchstate)
+{
+  putdatamap ("switchstate/" + String(channel), String(switchstate));
+}
+#endif
+
 void ducoboxcallback (String topic, String payload)
 {
   putdatamap(topic, payload);
@@ -3802,6 +3862,13 @@ void setup() {
   putdatamap("dimoffset/0", String(qswifidimmer_getdimoffset(0)));
   putdatamap("dimoffset/1", String(qswifidimmer_getdimoffset(1)));
 #endif
+#endif
+
+#ifdef QSWIFISWITCHCHANNELS
+  qswifiswitch.setSwitchCallback(qswifiswitch_switchcallback);
+  qswifiswitch.setRelayCallback(qswifiswitch_relaycallback);
+  qswifiswitch.setRelay(0,0);
+  qswifiswitch.setRelay(1,0);
 #endif
 }
 
