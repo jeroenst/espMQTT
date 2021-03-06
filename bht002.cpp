@@ -1,4 +1,6 @@
 // Created with information from: https://github.com/klausahrenberg/WThermostatBeca/
+// https://github.com/fashberg/WThermostatBeca/blob/master/WThermostat/WBecaDevice.h
+
 
 #include "espMQTT.h"
 #include "bht002.h"
