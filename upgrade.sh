@@ -7,15 +7,15 @@ echo "Upgrading $2..."
 
 ping -c 1 $2 > /dev/null #wakeup device because sometimes it won't respond to espota
 
-until python3 ~/Arduino/hardware/esp8266com/esp8266/tools/espota.py -i $2 -p 8266 --auth=$1 -f ./builds/v$VERSION/$3_$VERSION.bin
+until python3 ~/Arduino/hardware/esp8266com/esp8266/tools/espota.py -d -r -i $2 -p 8266 --auth=$1 -f ./builds/v$VERSION/$3_$VERSION.bin
 do
 	echo "Uploading failed, trying again...."
 	sleep 2
 done
 
 printf "Waiting for $2 to become back online..."
-sleep 10
-while ! nc -w5 -z $2 80  &> /dev/null
+sleep 5
+while ! nc -w2 -z $2 80  &> /dev/null
 do
     printf "."
 done
@@ -79,6 +79,8 @@ then
 	upgrade $1 QSWIFIDIMMER05 ESPMQTT_QSWIFIDIMMERD02
 	upgrade $1 sonoff_dishwasher ESPMQTT_SONOFFPOWR2
 	upgrade $1 blitzwolf_coffee ESPMQTT_BLITZWOLF
+	upgrade $1 QSWIFISWITCH01 ESPMQTT_QSWIFISWITCH2C
+	upgrade $1 esp_livingroom ESPMQTT_LIVINGROOM
 	exit 0
 fi
 
