@@ -2363,16 +2363,10 @@ void loop()
     // try to do this as less as posisble because during scan the esp is unreachable for about a second.
     if ((!mainstate.accesspoint))
     {
-      if ((uptime > 0) && ((uptime % 600) == 0) || (((uptime % 30) == 0) && ((WiFi.status() != WL_CONNECTED) || (WiFi.RSSI() < -70))))
+      if ((uptime > 0) && (((uptime % 600) == 0) || (((uptime % 30) == 0) && ((WiFi.status() != WL_CONNECTED) || (WiFi.RSSI() < -70)))))
       {
-        static uint32_t wifilastscan = 0;
-        // prevent scanning more than once per 30 seconds and wait 2 seconds before first scan
-        if (((uptime > 10) && (wifilastscan == 0)) || ((wifilastscan + 30 < uptime)))
-        {
-          DEBUG_D("Starting Wifi Scan...\n");
-          WiFi.scanNetworksAsync(wifiScanReady);
-          wifilastscan = uptime;
-        }
+        DEBUG_D("Starting Wifi Scan...\n");
+        WiFi.scanNetworksAsync(wifiScanReady);
       }
     }
 
