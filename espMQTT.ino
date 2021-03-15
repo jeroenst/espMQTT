@@ -3152,7 +3152,15 @@ void handleWWWSettings()
       if (webserver.argName(i) == "mqtttopicprefix") mqtt_topicprefix = webserver.arg(i);
       if (webserver.argName(i) == "mqttport") mqtt_port = String(webserver.arg(i)).toInt();
       if (webserver.argName(i) == "mqttssl") mqtt_ssl = 1;
-      if (webserver.argName(i) == "webpassword") esp_password = webserver.arg(i);
+      if (webserver.argName(i) == "webpassword")
+      {
+        if (esp_password != webserver.arg(i))
+        {
+          esp_password = webserver.arg(i);
+          ArduinoOTA.setPassword(esp_password.c_str());
+          Debug.setPassword(esp_password);
+        }
+      }
       if (webserver.argName(i) == "hostname") esp_hostname = webserver.arg(i);
 #ifdef  ESPMQTT_WATERMETER
       if (webserver.argName(i) == "watermeterliter")
