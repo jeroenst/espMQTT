@@ -47,7 +47,7 @@
 // #define ESPMQTT_SOIL
 // #define ESPMQTT_DIMMER
 // #define ESPMQTT_RELAY
-// #define ESPMQTT_LIVINGROOM
+#define ESPMQTT_LIVINGROOM
 
 /* ESP8285 */
 // #define ESPMQTT_ZMAI90
@@ -69,8 +69,8 @@
 // #define ESPMQTT_GENERIC8255
 // #define ESPMQTT_BHT002
 // #define ESPMQTT_TUYA_2GANGDIMMERV2
-//#define ESPMQTT_QSWIFISWITCH1C
-#define ESPMQTT_QSWIFISWITCH2C
+// #define ESPMQTT_QSWIFISWITCH1C
+// #define ESPMQTT_QSWIFISWITCH2C
 
 #define ESPMQTT_VERSION "TEST"
 #else
@@ -1034,7 +1034,6 @@ void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
 void startWifiAP()
 {
   DEBUG_E("Starting WiFi Accesspoint\n");
-  WiFi.disconnect();
   if (WiFi.softAP(WiFi.hostname().c_str(), DEFAULT_PASSWORD, 6, 0))
   {
     mainstate.accesspoint = true;
@@ -1060,7 +1059,6 @@ void connectToWifi()
     if (!mainstate.wificonnected && !mainstate.accesspoint)
     {
       DEBUG_I("Connecting to Wi-Fi: SSID='%s' HOSTNAME='%s'...\n", wifissid.c_str(), esp_hostname.c_str());
-      WiFi.disconnect();
 
       WiFi.setAutoReconnect(false); // We handle reconnect our self
       WiFi.setSleepMode(WIFI_NONE_SLEEP); // When sleep is on regular disconnects occur https://github.com/esp8266/Arduino/issues/5083
@@ -1391,7 +1389,7 @@ void connectToMqtt()
     mqttClient.setCredentials(mqtt_username.c_str(), mqtt_password.c_str());
     mqttClient.setServer(mqtt_server.c_str(), mqtt_port);
     mqttClient.setWill(willtopic.c_str(), 0, 1, "offline");
-    mqttClient.setSecure(mqtt_ssl);
+      mqttClient.setSecure(mqtt_ssl);
     mqttClient.connect();
     mqttReconnectTimer.once(30, connectToMqtt); // retry over 30 seconds if connection can not be established
   }
@@ -1892,7 +1890,6 @@ void loop()
       if ((strongestwifiid >= 0) && ((WiFi.RSSI() >= 0) || (currentwifiid == -1) || ((currentwifiid != strongestwifiid) && (currentwifirssi + 10 < strongestwifirssi))))
       {
         DEBUG_I ("Switching to stronger AP %d (%s, %s, %s)\n", strongestwifiid, WiFi.SSID().c_str(), WiFi.psk().c_str(), WiFi.BSSIDstr(strongestwifiid).c_str());
-        WiFi.disconnect(false);
         WiFi.begin(wifissid.c_str(), wifipsk.c_str(), WiFi.channel(strongestwifiid), WiFi.BSSID(strongestwifiid), 1);
       }
     }
