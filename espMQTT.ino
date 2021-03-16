@@ -33,7 +33,7 @@
 // #define ESPMQTT_AMGPELLETSTOVE
 // #define ESPMQTT_BATHROOM
 // #define ESPMQTT_BEDROOM2
-// #define ESPMQTT_OPENTHERM
+#define ESPMQTT_OPENTHERM
 // #define ESPMQTT_SMARTMETER
 // #define ESPMQTT_GROWATT
 // #define ESPMQTT_SDM120
@@ -47,7 +47,7 @@
 // #define ESPMQTT_SOIL
 // #define ESPMQTT_DIMMER
 // #define ESPMQTT_RELAY
-#define ESPMQTT_LIVINGROOM
+// #define ESPMQTT_LIVINGROOM
 
 /* ESP8285 */
 // #define ESPMQTT_ZMAI90
@@ -635,6 +635,7 @@ struct dataMapStruct {
   String payload = "";
   bool send = true;
   bool onair = false;
+  bool publishregular = false;
 };
 
 int wifichannel = 0;
@@ -753,7 +754,7 @@ void ICACHE_RAM_ATTR hlw8012_cf_interrupt() {
 #endif
 
 
-void publishdatamap(int32_t packetId = -1, bool publishall = false, bool init = false);
+void publishdatamap(int32_t packetId = -1, bool publishall = false, bool init = false, bool publishregular = false);
 
 String getRandomString(int len) {
   static const char alphanum[] =
@@ -787,7 +788,7 @@ void showdatamap()
   }
 }
 
-void putdatamap(String topic, String value, bool sendupdate = true, bool forcesend = false)
+void putdatamap(String topic, String value, bool sendupdate = true, bool forcesend = false, bool publishregular = true)
 {
   dataMapStruct datamapstruct = dataMap->get(topic);
 
@@ -805,6 +806,7 @@ void putdatamap(String topic, String value, bool sendupdate = true, bool forcese
     }
     datamapstruct.onair = false;
     datamapstruct.send = sendupdate;
+    datamapstruct.publishregular = publishregular;
     datamapstruct.payload = value;
     dataMap->put(topic, datamapstruct);
   }
@@ -994,41 +996,41 @@ void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
   sprintf(uptimestr, "%d:%02d:%02d:%02d", uptime / 86400, (uptime / 3600) % 24, (uptime / 60) % 60, uptime % 60);
   if (writestaticvalues)
   {
-    putdatamap("hostname", WiFi.hostname(), sendupdate);
+    putdatamap("hostname", WiFi.hostname(), sendupdate, false, false);
     String firmwarename = __FILE__;
     firmwarename = firmwarename.substring(firmwarename.lastIndexOf("/") + 1);
     firmwarename = firmwarename.substring(firmwarename.lastIndexOf("\\") + 1);
     firmwarename = firmwarename.substring(0, firmwarename.lastIndexOf("."));
-    putdatamap("firmware/name", firmwarename, sendupdate);
-    putdatamap("firmware/target", FIRMWARE_TARGET, sendupdate);
-    putdatamap("firmware/sourcefile", String(__FILE__).substring(String(__FILE__).lastIndexOf('/') + 1), sendupdate);
-    putdatamap("firmware/version", ESPMQTT_VERSION, sendupdate);
-    putdatamap("firmware/compiletime", String(__DATE__) + " " + __TIME__, sendupdate);
-    putdatamap("firmware/upgradekey", getRandomString(10));
+    putdatamap("firmware/name", firmwarename, sendupdate, false, false);
+    putdatamap("firmware/target", FIRMWARE_TARGET, sendupdate, false, false);
+    putdatamap("firmware/sourcefile", String(__FILE__).substring(String(__FILE__).lastIndexOf('/') + 1), sendupdate, false, false);
+    putdatamap("firmware/version", ESPMQTT_VERSION, sendupdate, false, false);
+    putdatamap("firmware/compiletime", String(__DATE__) + " " + __TIME__, sendupdate, false, false);
+    putdatamap("firmware/upgradekey", getRandomString(10), sendupdate, false, false);
     putdatamap("status", "online", sendupdate);
-    putdatamap("flash/id", String(ESP.getFlashChipId()), sendupdate);
-    putdatamap("flash/size/real", String(ESP.getFlashChipRealSize()), sendupdate);
-    putdatamap("flash/size/ide", String(ESP.getFlashChipSize()), sendupdate);
+    putdatamap("flash/id", String(ESP.getFlashChipId()), sendupdate, false, false);
+    putdatamap("flash/size/real", String(ESP.getFlashChipRealSize()), sendupdate, false, false);
+    putdatamap("flash/size/ide", String(ESP.getFlashChipSize()), sendupdate, false, false);
     FlashMode_t ideMode = ESP.getFlashChipMode();
-    putdatamap("flash/mode", (ideMode == FM_QIO ? "QIO" : ideMode == FM_QOUT ? "QOUT" : ideMode == FM_DIO ? "DIO" : ideMode == FM_DOUT ? "DOUT" : "UNKNOWN"), sendupdate);
-    putdatamap("flash/speed", String(ESP.getFlashChipSpeed()), sendupdate);
-    putdatamap("system/chipid", String(chipid), sendupdate);
+    putdatamap("flash/mode", (ideMode == FM_QIO ? "QIO" : ideMode == FM_QOUT ? "QOUT" : ideMode == FM_DIO ? "DIO" : ideMode == FM_DOUT ? "DOUT" : "UNKNOWN"), sendupdate, false, false);
+    putdatamap("flash/speed", String(ESP.getFlashChipSpeed()), sendupdate, false, false);
+    putdatamap("system/chipid", String(chipid), sendupdate, false, false);
   }
-  putdatamap("system/uptime", String(uptimestr), uptime % 60 == 0);
-  putdatamap("system/freeram", String(system_get_free_heap_size()), uptime % 60 == 0);
-  putdatamap("wifi/state", WiFi.status() == WL_CONNECTED ? "connected" : "disconnected", sendupdate);
-  putdatamap("wifi/localip", WiFi.localIP().toString(), sendupdate);
-  putdatamap("wifi/mac", String(WiFi.macAddress()), sendupdate);
-  putdatamap("wifi/ssid", String(WiFi.SSID()), sendupdate);
-  putdatamap("wifi/bssid", String(WiFi.BSSIDstr()), sendupdate);
-  putdatamap("wifi/rssi", String(WiFi.RSSI()), (((abs(getdatamap("wifi/rssi").toInt() - WiFi.RSSI()) > 5) && (uptime % 10 == 0)) || (uptime % 60 == 0)));
-  putdatamap("wifi/channel", String(wifichannel), sendupdate);
-  putdatamap("mqtt/server", String(mqtt_server), sendupdate);
-  putdatamap("mqtt/port", String(mqtt_port), sendupdate);
-  putdatamap("mqtt/ssl", String(mqtt_ssl), sendupdate);
-  putdatamap("mqtt/state", mqttClient.connected() ? "connected" : "disconnected", sendupdate);
-  putdatamap("mqtt/clientid", String(mqttClient.getClientId()), sendupdate);
-  putdatamap("mqtt/user", mqtt_username, sendupdate);
+  putdatamap("system/uptime", String(uptimestr), uptime % 60 == 0, false, false);
+  putdatamap("system/freeram", String(system_get_free_heap_size()), uptime % 60 == 0, false, false);
+  putdatamap("wifi/state", WiFi.status() == WL_CONNECTED ? "connected" : "disconnected", sendupdate, false, false);
+  putdatamap("wifi/localip", WiFi.localIP().toString(), sendupdate, false, false);
+  putdatamap("wifi/mac", String(WiFi.macAddress()), sendupdate, false, false);
+  putdatamap("wifi/ssid", String(WiFi.SSID()), sendupdate, false, false);
+  putdatamap("wifi/bssid", String(WiFi.BSSIDstr()), sendupdate, false, false);
+  putdatamap("wifi/rssi", String(WiFi.RSSI()), (((abs(getdatamap("wifi/rssi").toInt() - WiFi.RSSI()) > 5) && (uptime % 10 == 0)) || (uptime % 60 == 0)), false, false);
+  putdatamap("wifi/channel", String(wifichannel), sendupdate, false, false);
+  putdatamap("mqtt/server", String(mqtt_server), sendupdate, false, false);
+  putdatamap("mqtt/port", String(mqtt_port), sendupdate, false, false);
+  putdatamap("mqtt/ssl", String(mqtt_ssl), sendupdate, false, false);
+  putdatamap("mqtt/state", mqttClient.connected() ? "connected" : "disconnected", sendupdate, false, false);
+  putdatamap("mqtt/clientid", String(mqttClient.getClientId()), sendupdate, false, false);
+  putdatamap("mqtt/user", mqtt_username, sendupdate, false, false);
 }
 
 void startWifiAP()
@@ -2375,6 +2377,14 @@ void loop()
       updateexternalip();
     }
 
+    // Every 10 minutes (+/- 60 seconds) publish all mqtt data
+    static int8_t dividefactor = random(-60, 60);
+    if ((uptime > 60) && (((uptime + dividefactor) % 600) == 0))
+    {
+      DEBUG_I ("Regular publishing datamap...\n");
+      publishdatamap(-1,false,false,true);
+    }
+
     if ((uptime % 60) == 0)
     {
       char uptimestr[20];
@@ -2716,7 +2726,7 @@ void sonoff_handle()
 
 
 // Publish datamap publishes the datamap one by one to mqtt broker to prevent buffer overflow
-void publishdatamap(int32_t packetId, bool publishall, bool init)
+void publishdatamap(int32_t packetId, bool publishall, bool init, bool publishregular)
 {
   static uint16_t datamappointer = 0;
   static int32_t nextpacketId = -1;
@@ -2731,7 +2741,7 @@ void publishdatamap(int32_t packetId, bool publishall, bool init)
 
   if ((packetId != -1) || publishall) DEBUG_V("Publishdatamap packetId=%d publishall=%d datamappointer=%d datamapsize=%d nextpacketid=%d waitingforack=%d\n", packetId, publishall, datamappointer, dataMap->size(), nextpacketId, waitingforack);
 
-  if (publishall)
+  if (publishall || publishregular)
   {
     int32_t publishallpointer = 0;
     while (publishallpointer < dataMap->size())
@@ -2739,7 +2749,8 @@ void publishdatamap(int32_t packetId, bool publishall, bool init)
       String topic = dataMap->getKey(publishallpointer);
       dataMapStruct data = dataMap->getData(publishallpointer);
       data.onair = false;
-      data.send = true;
+      if (publishall) data.send = true;
+      if (publishregular) data.send = data.publishregular;
       dataMap->put(topic, data);
       publishallpointer++;
       //DEBUG("publishallpointer=%d datamapsize=%d\n",publishallpointer, dataMap->size());
@@ -2747,9 +2758,9 @@ void publishdatamap(int32_t packetId, bool publishall, bool init)
     datamappointer = 0;
   }
 
+  // If connected to mqtt and waiting for ack wait for packetid which has to be acked
   if (mqttClient.connected())
   {
-
     if (waitingforack)
     {
       if (packetId == 0)
@@ -2784,6 +2795,7 @@ void publishdatamap(int32_t packetId, bool publishall, bool init)
       }
     }
 
+    // If not waiting for ack search for next item in datamap which has to be send
     if (!waitingforack)
     {
       if (datamappointer < dataMap->size())
@@ -3884,7 +3896,7 @@ static void handleDataExternalIpServer(void*, AsyncClient* client, void *data, s
     }
 
   }
-  putdatamap("wifi/externalip", datastring);
+  putdatamap("wifi/externalip", datastring, true, true, false);
   client->close();
 }
 
