@@ -3488,10 +3488,8 @@ void processCmdRemoteDebug()
 
   if (lastCmd == "showeeprommap")
   {
-    int eeprompointer = 0;
     for (int i = 0; i < eepromMap->size(); i++)
     {
-      uint8_t checksum = 20;
       String eepromdata = eepromMap->get(i);
       DEBUG_D("EEPROM %d=%s\n", i, eepromdata.c_str());
     }
