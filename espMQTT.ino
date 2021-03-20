@@ -1007,8 +1007,8 @@ void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
     putdatamap("firmware/version", ESPMQTT_VERSION, sendupdate, false, false);
     putdatamap("firmware/compiletime", String(__DATE__) + " " + __TIME__, sendupdate, false, false);
     putdatamap("firmware/upgradekey", getRandomString(10), sendupdate, false, false);
-    putdatamap("status", "online", sendupdate);
-    putdatamap("status/upgrade", "not checked");
+    putdatamap("status", "online", sendupdate, false, false);
+    putdatamap("status/upgrade", "not checked", sendupdate, false, false);
     putdatamap("flash/id", String(ESP.getFlashChipId()), sendupdate, false, false);
     putdatamap("flash/size/real", String(ESP.getFlashChipRealSize()), sendupdate, false, false);
     putdatamap("flash/size/ide", String(ESP.getFlashChipSize()), sendupdate, false, false);
@@ -1810,13 +1810,13 @@ void loop()
         if (upgradeversion == ESPMQTT_VERSION)
         {
           DEBUG_I ("Upgrade canceled, version is the same\n");
-          putdatamap("status/upgrade", "same firmware version");
+          putdatamap("status/upgrade", "up to date, same firmware version");
           putdatamap("status", "online");
         }
         else if (getdatamap("firmware/upgradekey") != upgradekey)
         {
           DEBUG_I ("Upgrade canceled, upgradekey is incorrect\n");
-          putdatamap("status/upgrade", "incorrect upgradekey");
+          putdatamap("status/upgrade", "error, incorrect upgradekey");
         }
         else
         {
@@ -1828,12 +1828,12 @@ void loop()
           {
             case HTTP_UPDATE_FAILED:
               DEBUG_E("Firmware upgrade failed: %s.\n", ESPhttpUpdate.getLastErrorString().c_str());
-              putdatamap("status/upgrade", String("Http error: " + ESPhttpUpdate.getLastErrorString()));
+              putdatamap("status/upgrade", String("error http: " + ESPhttpUpdate.getLastErrorString()));
               putdatamap("status", "online");
               break;
             case HTTP_UPDATE_NO_UPDATES:
               DEBUG_E("Firmware upgrade check finished, no new version available.");
-              putdatamap("status/upgrade", "same version");
+              putdatamap("status/upgrade", "up to date, same firmware version");
               putdatamap("status", "online");
               break;
             case HTTP_UPDATE_OK:
