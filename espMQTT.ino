@@ -33,7 +33,7 @@
 // #define ESPMQTT_AMGPELLETSTOVE
 // #define ESPMQTT_BATHROOM
 // #define ESPMQTT_BEDROOM2
-#define ESPMQTT_OPENTHERM
+// #define ESPMQTT_OPENTHERM
 // #define ESPMQTT_SMARTMETER
 // #define ESPMQTT_GROWATT
 // #define ESPMQTT_SDM120
@@ -47,7 +47,7 @@
 // #define ESPMQTT_SOIL
 // #define ESPMQTT_DIMMER
 // #define ESPMQTT_RELAY
-// #define ESPMQTT_LIVINGROOM
+#define ESPMQTT_LIVINGROOM
 
 /* ESP8285 */
 // #define ESPMQTT_ZMAI90
@@ -1008,6 +1008,7 @@ void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
     putdatamap("firmware/compiletime", String(__DATE__) + " " + __TIME__, sendupdate, false, false);
     putdatamap("firmware/upgradekey", getRandomString(10), sendupdate, false, false);
     putdatamap("status", "online", sendupdate);
+    putdatamap("status/upgrade", "not checked");
     putdatamap("flash/id", String(ESP.getFlashChipId()), sendupdate, false, false);
     putdatamap("flash/size/real", String(ESP.getFlashChipRealSize()), sendupdate, false, false);
     putdatamap("flash/size/ide", String(ESP.getFlashChipSize()), sendupdate, false, false);
@@ -1051,6 +1052,13 @@ void startWifiAP()
       tuya_apmode();
 #endif
   }
+}
+
+void stopWifiAP()
+{
+  DEBUG_I("Stopping accesspoint, connecting to accesspoint.\n");
+  mainstate.accesspoint = false;
+  connectToWifi();
 }
 
 void connectToWifi()
@@ -1802,33 +1810,37 @@ void loop()
         if (upgradeversion == ESPMQTT_VERSION)
         {
           DEBUG_I ("Upgrade canceled, version is the same\n");
-          putdatamap("status", "upgradesameversion");
+          putdatamap("status/upgrade", "same firmware version");
           putdatamap("status", "online");
         }
         else if (getdatamap("firmware/upgradekey") != upgradekey)
         {
           DEBUG_I ("Upgrade canceled, upgradekey is incorrect\n");
-          putdatamap("status", "upgradefailed");
+          putdatamap("status/upgrade", "incorrect upgradekey");
         }
         else
         {
           DEBUG_I ("Starting upgrade from:%s\n", upgradeurl.c_str());
+          putdatamap("status/upgrade", "upgrading");
           WiFiClient upgradeclient;
           t_httpUpdate_return ret = ESPhttpUpdate.update(upgradeclient, upgradeurl, ESPMQTT_VERSION);
           switch (ret)
           {
             case HTTP_UPDATE_FAILED:
               DEBUG_E("Firmware upgrade failed: %s.\n", ESPhttpUpdate.getLastErrorString().c_str());
-              putdatamap("status", "upgradefailed");
+              putdatamap("status/upgrade", String("Http error: " + ESPhttpUpdate.getLastErrorString()));
+              putdatamap("status", "online");
               break;
             case HTTP_UPDATE_NO_UPDATES:
               DEBUG_E("Firmware upgrade check finished, no new version available.");
-              putdatamap("status", "upgradefailed");
+              putdatamap("status/upgrade", "same version");
+              putdatamap("status", "online");
               break;
             case HTTP_UPDATE_OK:
               DEBUG_E("Firmware upgrade done!\n"); // may not be called since we reboot the ESP
-              putdatamap("status", "upgradedone");
-              break;
+              putdatamap("status/upgrade", "upgrade finished");
+              putdatamap("status", "rebooting");
+            break;
           }
         }
       }
@@ -2432,8 +2444,7 @@ void loop()
     }
     if (uptime == 660)
     {
-      DEBUG_I("Stopping accesspoint");
-      connectToWifi();
+      stopWifiAP();
     }
 #endif
 
