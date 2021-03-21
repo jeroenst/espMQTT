@@ -1070,12 +1070,12 @@ void connectToWifi()
     {
       DEBUG_I("Connecting to Wi-Fi: SSID='%s' HOSTNAME='%s'...\n", wifissid.c_str(), esp_hostname.c_str());
 
+      WiFi.persistent(false); // Don't save wifi credentials, we save this our self because of switching to stronger accesspoints
       WiFi.setAutoReconnect(false); // We handle reconnect our self
       WiFi.setSleepMode(WIFI_NONE_SLEEP); // When sleep is on regular disconnects occur https://github.com/esp8266/Arduino/issues/5083
       WiFi.setOutputPower(20);        // 10dBm == 10mW, 14dBm = 25mW, 17dBm = 50mW, 20dBm = 100mW
       WiFi.hostname(esp_hostname);
       WiFi.mode(WIFI_STA);
-      WiFi.begin(wifissid, wifipsk); // First connect to any available AP, later scan for stronger AP
 
       ArduinoOTA.setHostname(esp_hostname.c_str());
       ArduinoOTA.setPassword(esp_password.c_str());
@@ -1083,6 +1083,8 @@ void connectToWifi()
 
       mainstate.accesspoint = false;
       mainstate.defaultpassword = false;
+
+      WiFi.scanNetworksAsync(wifiScanReady); // Search for strongest accesspoint and connect
     }
   }
   else 
