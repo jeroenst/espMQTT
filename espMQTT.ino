@@ -1860,7 +1860,7 @@ void loop()
 
     for (int i = 0; i < wifinetworksfound; i++)
     {
-      if (WiFi.SSID(i) == WiFi.SSID())
+      if (WiFi.SSID(i) == wifissid.c_str())
       {
         if (strongestwifirssi < WiFi.RSSI(i))
         {
