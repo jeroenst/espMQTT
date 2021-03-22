@@ -801,8 +801,8 @@ void putdatamap(String topic, String value, bool sendupdate = true, bool forceup
       if (datamapstruct.payload == "upgrading")
       {
         // When upgrading only accept upgradefailed or upgradedone as value
-        if ((value != "upgrade_exit") || (value != "rebooting")) return;
-        if (value != "upgrade_exit") value = "online";
+        if ((value != "upgrade_exit") && (value != "rebooting")) return;
+        if (value == "upgrade_exit") value = "online";
       }
     }
     datamapstruct.onair = false;
