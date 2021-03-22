@@ -788,20 +788,21 @@ void showdatamap()
   }
 }
 
-void putdatamap(String topic, String value, bool sendupdate = true, bool forcesend = false, bool publishregular = true)
+void putdatamap(String topic, String value, bool sendupdate = true, bool forceupdate = false, bool publishregular = true)
 {
   dataMapStruct datamapstruct = dataMap->get(topic);
 
-  if ((datamapstruct.payload != value) || forcesend)
+  if ((datamapstruct.payload != value) || forceupdate)
   {
     // Do not output debug for uptime
-    if (topic != "system/uptime") DEBUG_D ("DATAMAP %s=%s (sendupdate=%d, oldval=%s oldsend=%d forcesend=%d)\n", topic.c_str(), value.c_str(), sendupdate, datamapstruct.payload.c_str(), datamapstruct.send, forcesend);
+    if (topic != "system/uptime") DEBUG_D ("DATAMAP %s=%s (sendupdate=%d, oldval=%s oldsend=%d forceupdate=%d)\n", topic.c_str(), value.c_str(), sendupdate, datamapstruct.payload.c_str(), datamapstruct.send, forceupdate);
     if (topic == "status")
     {
       if (datamapstruct.payload == "upgrading")
       {
         // When upgrading only accept upgradefailed or upgradedone as value
-        if ((value != "upgradefailed") && (value != "upgradedone") && (value != "upgradesameversion")) return;
+        if ((value != "upgrade_exit") || (value != "rebooting")) return;
+        if (value != "upgrade_exit") value = "online";
       }
     }
     datamapstruct.onair = false;
@@ -990,9 +991,10 @@ void obd2_handle()
 }
 #endif
 
-void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
+void update_systeminfo(bool writestaticvalues = false)
 {
   char uptimestr[20];
+  const bool sendupdate = true;
   sprintf(uptimestr, "%d:%02d:%02d:%02d", uptime / 86400, (uptime / 3600) % 24, (uptime / 60) % 60, uptime % 60);
   if (writestaticvalues)
   {
@@ -1016,15 +1018,15 @@ void update_systeminfo(bool writestaticvalues = false, bool sendupdate = true)
     putdatamap("flash/mode", (ideMode == FM_QIO ? "QIO" : ideMode == FM_QOUT ? "QOUT" : ideMode == FM_DIO ? "DIO" : ideMode == FM_DOUT ? "DOUT" : "UNKNOWN"), sendupdate, false, false);
     putdatamap("flash/speed", String(ESP.getFlashChipSpeed()), sendupdate, false, false);
     putdatamap("system/chipid", String(chipid), sendupdate, false, false);
+    putdatamap("wifi/mac", String(WiFi.macAddress()), sendupdate, false, false);
   }
-  putdatamap("system/uptime", String(uptimestr), uptime % 60 == 0, false, false);
-  putdatamap("system/freeram", String(system_get_free_heap_size()), uptime % 60 == 0, false, false);
+  putdatamap("system/uptime", String(uptimestr), uptime % 60 == 0, true, false);
+  if (uptime % 60 == 0) putdatamap("system/freeram", String(system_get_free_heap_size()), sendupdate, false, false);
   putdatamap("wifi/state", WiFi.status() == WL_CONNECTED ? "connected" : "disconnected", sendupdate, false, false);
   putdatamap("wifi/localip", WiFi.localIP().toString(), sendupdate, false, false);
-  putdatamap("wifi/mac", String(WiFi.macAddress()), sendupdate, false, false);
   putdatamap("wifi/ssid", String(WiFi.SSID()), sendupdate, false, false);
   putdatamap("wifi/bssid", String(WiFi.BSSIDstr()), sendupdate, false, false);
-  putdatamap("wifi/rssi", String(WiFi.RSSI()), (((abs(getdatamap("wifi/rssi").toInt() - WiFi.RSSI()) > 5) && (uptime % 10 == 0)) || (uptime % 60 == 0)), false, false);
+  if ((abs(getdatamap("wifi/rssi").toInt() - WiFi.RSSI()) > 5) || (uptime % 60 == 0)) putdatamap("wifi/rssi", String(WiFi.RSSI()), sendupdate, false, false);
   putdatamap("wifi/channel", String(wifichannel), sendupdate, false, false);
   putdatamap("mqtt/server", String(mqtt_server), sendupdate, false, false);
   putdatamap("mqtt/port", String(mqtt_port), sendupdate, false, false);
@@ -1813,12 +1815,13 @@ void loop()
         {
           DEBUG_I ("Upgrade canceled, version is the same\n");
           putdatamap("status/upgrade", "up to date, same firmware version");
-          putdatamap("status", "online");
+          putdatamap("status", "upgrade_exit");
         }
         else if (getdatamap("firmware/upgradekey") != upgradekey)
         {
           DEBUG_I ("Upgrade canceled, upgradekey is incorrect\n");
           putdatamap("status/upgrade", "error, incorrect upgradekey");
+          putdatamap("status", "upgrade_exit");
         }
         else
         {
@@ -1831,12 +1834,12 @@ void loop()
             case HTTP_UPDATE_FAILED:
               DEBUG_E("Firmware upgrade failed: %s.\n", ESPhttpUpdate.getLastErrorString().c_str());
               putdatamap("status/upgrade", String("error http: " + ESPhttpUpdate.getLastErrorString()));
-              putdatamap("status", "online");
+              putdatamap("status", "upgrade_exit");
               break;
             case HTTP_UPDATE_NO_UPDATES:
               DEBUG_E("Firmware upgrade check finished, no new version available.");
               putdatamap("status/upgrade", "up to date, same firmware version");
-              putdatamap("status", "online");
+              putdatamap("status", "upgrade_exit");
               break;
             case HTTP_UPDATE_OK:
               DEBUG_E("Firmware upgrade done!\n"); // may not be called since we reboot the ESP
@@ -1898,7 +1901,7 @@ void loop()
       yield(); // Prevent crash because of to many debug data to send
     }
 
-    DEBUG_D("CurrentAp ID=%d SSID=%s BSSID=%s RSSI=%d(%d), Strongest AP ID=%d SSID=%s, BSSID=%s RSSI=%d(%d)\n", currentwifiid, WiFi.SSID().c_str(), WiFi.BSSIDstr().c_str(), currentwifirssi, WiFi.RSSI(), strongestwifiid, WiFi.SSID(strongestwifiid).c_str(), WiFi.BSSIDstr(strongestwifiid).c_str(), WiFi.RSSI(strongestwifiid), strongestwifirssi);
+    DEBUG_D("CurrentAp ID=%d SSID=%s BSSID=%s RSSI=%d(%d), Strongest AP ID=%d SSID=%s, BSSID=%s RSSI=%d(%d)\n", currentwifiid, wifissid.c_str(), WiFi.BSSIDstr().c_str(), currentwifirssi, WiFi.RSSI(), strongestwifiid, WiFi.SSID(strongestwifiid).c_str(), WiFi.BSSIDstr(strongestwifiid).c_str(), WiFi.RSSI(strongestwifiid), strongestwifirssi);
     yield(); // Prevent crash because of to many debug data to send
 
     if (!mainstate.accesspoint)
