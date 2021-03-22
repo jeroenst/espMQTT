@@ -80,14 +80,16 @@ int opentherm_handle()
   if (!otclient || !otclient.connected()) otclient = otserver.available();
   else
   {
-    while (otclient.available())
+    if (otclient.available())
     {
       yield();
       Serial.print((char)otclient.read());
     }
   }
 
-  while (Serial.available() > 0) {
+  yield();
+
+  if (Serial.available() > 0) {
     yield();
     char otchar = char(Serial.read());
     serialbuffer += otchar;
@@ -97,8 +99,9 @@ int opentherm_handle()
     }
   }
 
+  yield();
 
-  while (serialbuffer.indexOf(10) >= 0)
+  if (serialbuffer.indexOf(10) >= 0)
   {
     int eolchar = serialbuffer.indexOf(10);
     String otmessage = serialbuffer.substring(0, eolchar - 1);
@@ -281,6 +284,8 @@ int opentherm_handle()
     }
   }
 
+  yield();
+
   // If otgw chip doesn't respond to commands reset system
   if ((wdresettimeout > 0) && (millis() > wdresettimeout))
   {
@@ -348,6 +353,8 @@ int opentherm_handle()
     default:
     break;
   }
+  
+  yield();
   
   return returnvalue;
 }
