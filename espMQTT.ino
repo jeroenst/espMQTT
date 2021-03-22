@@ -32,7 +32,7 @@
 // #define ESPMQTT_WEATHER
 // #define ESPMQTT_AMGPELLETSTOVE
 // #define ESPMQTT_BATHROOM
-// #define ESPMQTT_BEDROOM2
+#define ESPMQTT_BEDROOM2
 // #define ESPMQTT_OPENTHERM
 // #define ESPMQTT_SMARTMETER
 // #define ESPMQTT_GROWATT
@@ -47,7 +47,7 @@
 // #define ESPMQTT_SOIL
 // #define ESPMQTT_DIMMER
 // #define ESPMQTT_RELAY
-#define ESPMQTT_LIVINGROOM
+// #define ESPMQTT_LIVINGROOM
 
 /* ESP8285 */
 // #define ESPMQTT_ZMAI90
@@ -1051,7 +1051,7 @@ void startWifiAP()
     ArduinoOTA.setPassword(esp_password.c_str());
     Debug.setPassword(esp_password);
 #ifdef ESPMQTT_TUYA_2GANGDIMMERV2
-      tuya_apmode();
+    tuya_apmode();
 #endif
   }
 }
@@ -1089,7 +1089,7 @@ void connectToWifi()
       WiFi.scanNetworksAsync(wifiScanReady); // Search for strongest accesspoint and connect
     }
   }
-  else 
+  else
   {
     startWifiAP();
   }
@@ -1403,7 +1403,7 @@ void connectToMqtt()
     mqttClient.setCredentials(mqtt_username.c_str(), mqtt_password.c_str());
     mqttClient.setServer(mqtt_server.c_str(), mqtt_port);
     mqttClient.setWill(willtopic.c_str(), 0, 1, "offline");
-      mqttClient.setSecure(mqtt_ssl);
+    mqttClient.setSecure(mqtt_ssl);
     mqttClient.connect();
     mqttReconnectTimer.once(30, connectToMqtt); // retry over 30 seconds if connection can not be established
   }
@@ -1441,7 +1441,7 @@ void initSerial()
 #elif defined ( ESPMQTT_ZMAI90)
   Serial.setDebugOutput(false);
   Serial.begin(9600, SERIAL_8E1);
-#elif defined (ESPMQTT_SMARTMETER) || defined (QSWIFIDIMMERCHANNELS) || defined (ESPMQTT_BHT002) 
+#elif defined (ESPMQTT_SMARTMETER) || defined (QSWIFIDIMMERCHANNELS) || defined (ESPMQTT_BHT002)
   // do nothing, smartmeter initializes serial in init function.
 #elif defined (ESPMQTT_NOSERIAL_DEBUG)
   // do not initialize serial
@@ -1449,11 +1449,6 @@ void initSerial()
   Serial.begin(115200); //Init serial 115200 baud
 #endif
 
-#if defined(MH_Z19)
-  //  Serial.swap();
-  putdatamap ("mhz19/co2", "-");
-  putdatamap ("mhz19/temperature", "-");
-#endif
 }
 #ifdef DHTPIN
 void update_dht()
@@ -1735,7 +1730,7 @@ void loop()
 #endif
 
 #ifdef ESPMQTT_TUYA_2GANGDIMMERV2
-  tuya_disconnected();
+    tuya_disconnected();
 #endif
   }
   yield();
@@ -1750,7 +1745,7 @@ void loop()
     mqttdosubscriptions();
     updateexternalip();
 #ifdef ESPMQTT_TUYA_2GANGDIMMERV2
-      tuya_connectedMQTT();
+    tuya_connectedMQTT();
 #endif
   }
   yield();
@@ -1845,7 +1840,7 @@ void loop()
               DEBUG_E("Firmware upgrade done!\n"); // may not be called since we reboot the ESP
               putdatamap("status/upgrade", "upgrade finished");
               putdatamap("status", "rebooting");
-            break;
+              break;
           }
         }
       }
@@ -2249,11 +2244,11 @@ void loop()
   static int mhz19temp = 0;
   switch (MHZ19_handle(&mhz19ppm, &mhz19temp))
   {
-    case 1:
+    case 0:
       putdatamap ("mhz19/co2", String(mhz19ppm));
       putdatamap ("mhz19/temperature", String(mhz19temp));
       break;
-    case -1:
+    case 2:
       putdatamap ("mhz19/co2", "-");
       putdatamap ("mhz19/temperature", "-");
       break;
@@ -2399,7 +2394,7 @@ void loop()
     if ((uptime > 60) && (((uptime + dividefactor) % 600) == 0))
     {
       DEBUG_I ("Regular publishing datamap...\n");
-      publishdatamap(-1,false,false,true);
+      publishdatamap(-1, false, false, true);
     }
 
     if ((uptime % 60) == 0)
@@ -3031,9 +3026,9 @@ void systemTimerCallback()
 }
 
 #ifdef MH_Z19
-int8_t MHZ19_handle(int *ppm, int *temp)
+uint8_t MHZ19_handle(int *ppm, int *temp)
 {
-  static unsigned long requesttime = 0;
+  static unsigned long requesttime = 5000;
   static unsigned long readtime = 0;
   if (requesttime < millis())
   {
@@ -3047,26 +3042,69 @@ int8_t MHZ19_handle(int *ppm, int *temp)
     if (MHZ19_read(ppm, temp))
     {
       DEBUG_I("MHZ19 ppm=%d temp=%d\n", *ppm, *temp);
-      return 1;
+      if (ppm == 0) return 1;
+      else return 0;
     }
     else
     {
       DEBUG_E("MHZ19 read error!\n");
-      return -1;
+      return 2;
     }
   }
-  return false;
+  return 1;
+}
+
+
+void MHZ19_init()
+{
+  putdatamap ("mhz19/co2", "-");
+  putdatamap ("mhz19/temperature", "-");
+  MHZ19_setabs(true);
+}
+
+uint8_t MHZ19_checksum(uint8_t cmd[], uint8_t length)
+{
+  uint8_t sum = 0x00;
+  for (int i = 1; i < length; i++)
+  {
+    sum += cmd[i];
+  }
+  sum = 0xff - sum + 0x01;
+  return sum;
+}
+
+void MHZ19_write(uint8_t cmd[], uint8_t length)
+{
+  uint8_t checksum = MHZ19_checksum(cmd, length);
+  Serial.write (cmd, length);
+  Serial.write (checksum);
+  Serial.flush();
+}
+
+void MHZ19_setabs(bool enabled)
+{
+  DEBUG_V("Sending MHZ19 ABS enable=%d...\n", enabled);
+  if (enabled)
+  {
+    //Set abs enable
+    uint8_t cmd[8] = {0xff, 0x01, 0x79, 0xA0, 0x00, 0x00, 0x00, 0x00};
+    MHZ19_write(cmd, 8);
+  }
+  else
+  {
+    uint8_t cmd[8] = {0xff, 0x01, 0x79, 0x00, 0x00, 0x00, 0x00, 0x00};
+    MHZ19_write(cmd, 8);
+  }
 }
 
 void MHZ19_send_request_cmd()
 {
-  uint8_t cmd[9] = {0xFF, 0x01, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00, 0x79};
+  uint8_t cmd[9] = {0xFF, 0x01, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00};
   // command to ask for data
 
   DEBUG_V("Sending MHZ19 request packet...\n");
 
-  Serial.flush();
-  Serial.write(cmd, 9); //request PPM CO2
+  MHZ19_write(cmd, 8);
 }
 
 bool MHZ19_read(int *ppm, int *temp)
@@ -3491,7 +3529,7 @@ void processCmdRemoteDebug()
     delay(1000);
     ESP.restart();
     delay(1000);
-   }
+  }
 
 #ifdef  ESPMQTT_WATERMETER
   if (lastCmd == "help") DEBUG("  watermeterreadeeprom\n  watermeterwriteeeprom\n");
@@ -3557,7 +3595,7 @@ void eeprom_load_variables()
   {
     mainstate.defaultpassword = false;
   }
-  
+
   DEBUG_D("mqtt password=%s\n", mqtt_password.c_str());
 
   if (!eeprom_read(&esp_password, 3))
@@ -3644,9 +3682,10 @@ void setup() {
 
   configTime(MYTZ, "nl.pool.ntp.org");
   yield();
-  
+
   eeprom_load_variables();
 
+  update_systeminfo(true);
 
   connectToWifi();
 
@@ -3699,7 +3738,7 @@ void setup() {
   });
 
   ArduinoOTA.onProgress([](unsigned int, unsigned int) {
-        ESP.wdtFeed();
+    ESP.wdtFeed();
   });
 
   ArduinoOTA.setHostname(esp_hostname.c_str());
@@ -3892,8 +3931,12 @@ void setup() {
 #ifdef QSWIFISWITCHCHANNELS
   qswifiswitch.setSwitchCallback(qswifiswitch_switchcallback);
   qswifiswitch.setRelayCallback(qswifiswitch_relaycallback);
-  qswifiswitch.setRelay(0,0);
-  qswifiswitch.setRelay(1,0);
+  qswifiswitch.setRelay(0, 0);
+  qswifiswitch.setRelay(1, 0);
+#endif
+
+#ifdef MH_Z19
+  MHZ19_init();
 #endif
 }
 
