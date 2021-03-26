@@ -18,6 +18,10 @@ void watermeter_setliters(uint32_t liters)
 
 double watermeter_getflow()
 {
+   if (_watermeter_lmin <= 0.5)
+   {
+      _watermeter_lmin = 0;
+   }
    return _watermeter_lmin;
 }
 
@@ -53,10 +57,10 @@ bool watermeter_handle()
   }
   oldinputpinstate = inputpinstate;
 
-  if ((_watermeter_lmin > 0) && (lmincountdownmillis < millis()))
+  if ((_watermeter_lmin > 0.0) && (lmincountdownmillis < millis()))
   {
       _watermeter_lmin = _watermeter_lmin / 2;
-      lmincountdownmillis = millis() + (60000 / _watermeter_lmin) + 1000;
+      lmincountdownmillis = millis() + (60000.0 / _watermeter_lmin) + 1000;
       if (_watermeter_lmin <= 0.5)
       {
         _watermeter_lmin = 0;
