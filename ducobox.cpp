@@ -1,7 +1,9 @@
 #include "espMQTT.h"
 #include "ducobox.h"
+#define ducobox_setfan_internal_count 2
 
 WiFiServer ducoserver(2233);
+static uint8_t _ducobox_fanspeedoverride = 255;
 static uint8_t _ducobox_relay0 = 0;
 static uint8_t _ducobox_relay1 = 0;
 static uint8_t _ducobox_refreshtime = 30;
@@ -38,21 +40,21 @@ void ducobox_writeserial(String message)
 
 void ducobox_setfan_internal(uint8_t id, uint8_t value)
 {
+  if ((value != 255) && (value > 100)) value = 100;
+
   DEBUG_V ("ducobox_setfan_internal: id=%d, value=%d\n", id, value);
-#define ducobox_setfan_internal_count 2
-  static uint8_t fanspeed[ducobox_setfan_internal_count] = {0, 0};
+  static uint8_t newfanspeed = 255;
+  static uint8_t fanspeed[ducobox_setfan_internal_count] = {255, 255};
   if (id < ducobox_setfan_internal_count)
   {
     fanspeed[id] = value;
-    uint8_t newfanspeed = 0;
+    _ducobox_fanspeedoverride = 0;
 
     for (uint8_t i = 0; i < ducobox_setfan_internal_count; i++)
     {
-      if (fanspeed[i] > newfanspeed) newfanspeed = fanspeed[i];
+      if (fanspeed[i] > _ducobox_fanspeedoverride) _ducobox_fanspeedoverride = fanspeed[i];
+      if (newfanspeed == 255) _ducobox_fanspeedoverride = fanspeed[i];
     }
-
-    digitalWrite(_ducobox_relay0, newfanspeed == 1 ? 1 : 0);
-    digitalWrite(_ducobox_relay1, newfanspeed > 1 ? 1 : 0);
   }
 }
 
@@ -192,34 +194,31 @@ void _ducobox_handleserial(String ducomessage)
         ducobox_writeserial("sensorinfo");       // Request internal sensors
         break;
       case 5:
-        _ducobox_callback("status", "ready");
-        ducocmd = 0;
-
         static uint8_t fanspeed = 0;
-        switch (fanspeed)
-        {
-          case 0:
-            if (_ducobox_co2 >= 1000) fanspeed = 1;
-            break;
-          case 1:
-            if (_ducobox_co2 < 900) fanspeed = 0;
-            if (_ducobox_co2 >= 1200) fanspeed = 2;
-            break;
-          case 2:
-            if (_ducobox_co2 < 1000) fanspeed = 1;
-            break;
-        }
-        if (_ducobox_co2 == 0) fanspeed = 1; // When no co2 reading do some extra ventilation to prevent high co2...
-
+        if (_ducobox_co2 < 800) fanspeed = 255; // 255 = auto
+        else if (_ducobox_co2 > 1200) fanspeed = 100;
+        else fanspeed = ((_ducobox_co2 - 800) / 40)*10;
+        if (fanspeed > 100) fanspeed = 100; 
         ducobox_setfan_internal(0, fanspeed);
 
-        /* Setting fanspeed by serial command is disabled because it can break the onboard flash of the ducobox when used to many times (>10.000)
-          oldminfanspeed = setminfanspeed;
-          String cmd = "fanparaset 2 " + String(setminfanspeed) + "\r\n";
+        static uint8 _ducobox_fanspeedoverride_old = 255;
+        if (_ducobox_fanspeedoverride != _ducobox_fanspeedoverride_old)
+        {
+          _ducobox_fanspeedoverride_old = _ducobox_fanspeedoverride;
+          String cmd = "nodesetoverrule 1 " + String(_ducobox_fanspeedoverride) + "\r\n";
           ducobox_writeserial(cmd.c_str());
-          nextupdatetime = millis() + 2000; // Next update over 2 seconds
-        */
+          _nextupdatetime = millis() + 2000; // Next update over 2 seconds
+        }
+        else
+        {
+          _ducobox_callback("status", "ready");
+          ducocmd = 0;
+        }
         break;
+      case 6:
+        _ducobox_callback("status", "ready");
+        ducocmd = 0;
+      break;
     }
   }
 }
