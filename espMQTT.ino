@@ -2777,6 +2777,7 @@ void publishdatamap(int32_t packetId, bool publishall, bool init, bool publishre
       if (packetId == 0)
       {
         // If packetId == 0 resend because packet was not acked
+        DEBUG_V("Not received mqtt ack id=%d\n", packetId);
         waitingforack = true;
         String topic = dataMap->getKey(datamappointer);
         String sendtopic = String("home/" + esp_hostname + "/" + topic);
@@ -2793,6 +2794,7 @@ void publishdatamap(int32_t packetId, bool publishall, bool init, bool publishre
       if (packetId == nextpacketId)
       {
         // Packet succesfull delivered proceed to next item
+        DEBUG_V("Received mqtt ack id=%d\n", packetId);
         String topic = dataMap->getKey(datamappointer);
         dataMapStruct data = dataMap->getData(datamappointer);
         if (data.onair)
@@ -3782,7 +3784,7 @@ void setup() {
 #ifdef ONEWIREPIN
   oneWireSensors.setWaitForConversion(false);
   oneWireSensors.setResolution(12);
-
+m
 #ifdef  ESPMQTT_OPENTHERM
   if (!oneWireSensors.getAddress(onewire_dcwSupplyWaterThermometer, 0)) {
     DEBUG_E("Unable to find address for onewire_dcwSupplyWaterThermometer\n");
