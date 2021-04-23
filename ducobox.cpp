@@ -207,7 +207,6 @@ void _ducobox_handleserial(String ducomessage)
           _ducobox_fanspeedoverride_old = _ducobox_fanspeedoverride;
           String cmd = "nodesetoverrule 1 " + String(_ducobox_fanspeedoverride) + "\r\n";
           ducobox_writeserial(cmd.c_str());
-          _nextupdatetime = millis() + 2000; // Next update over 2 seconds
         }
         else
         {
