@@ -3784,7 +3784,7 @@ void setup() {
 #ifdef ONEWIREPIN
   oneWireSensors.setWaitForConversion(false);
   oneWireSensors.setResolution(12);
-m
+
 #ifdef  ESPMQTT_OPENTHERM
   if (!oneWireSensors.getAddress(onewire_dcwSupplyWaterThermometer, 0)) {
     DEBUG_E("Unable to find address for onewire_dcwSupplyWaterThermometer\n");
