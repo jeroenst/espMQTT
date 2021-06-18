@@ -51,7 +51,7 @@
 
 /* ESP8285 */
 // #define ESPMQTT_ZMAI90
-#define ESPMQTT_DUCOBOX
+// #define ESPMQTT_DUCOBOX
 // #define ESPMQTT_SONOFFS20 // coffeelamp & sonoffs20_00X
 // #define ESPMQTT_SONOFFBULB
 // #define ESPMQTT_GARDEN //ESP8285 TUIN & MARIANNE & LUIFEL
@@ -67,6 +67,7 @@
 // #define ESPMQTT_SONOFFPOWR2 // tv&washingmachine&server&dishwasher
 // #define ESPMQTT_SONOFFTH
 // #define ESPMQTT_GENERIC8255
+#define ESPMQTT_BBQTEMP
 // #define ESPMQTT_BHT002
 // #define ESPMQTT_TUYA_2GANGDIMMERV2
 // #define ESPMQTT_QSWIFISWITCH1C
@@ -190,10 +191,30 @@ QsWifiSwitch qswifiswitch(QSWIFISWITCHCHANNELS);
 #endif
 
 #ifdef  ESPMQTT_GENERIC8255
-#define FIRMWARE_TARGET "GENERIC8266"
+#define FIRMWARE_TARGET "GENERIC8255"
 #define SERIALLOG
 #define APONBOOT
+#define ESPLED D4
 #endif
+
+#ifdef  ESPMQTT_BBQTEMP
+#define FIRMWARE_TARGET "BBQTEMP"
+#define SERIALLOG
+#define APONBOOT
+//#define ESPLED D4
+#include <SPI.h>
+#define ESPMQTT_BBQTEMP_CS0 2
+#define ESPMQTT_BBQTEMP_CS1 16
+
+#define SMALLOLED
+#define I2C_SDA D2
+#define I2C_SCL D1
+#define OLED_ADDRESS 0x3c
+#define OLEDX 32
+#define OLEDSMALL
+
+#endif
+
 
 #ifdef  ESPMQTT_GENERIC8266
 #define FIRMWARE_TARGET "GENERIC8266"
@@ -812,7 +833,35 @@ void putdatamap(String topic, String value, bool sendupdate = true, bool forceup
     dataMap->put(topic, datamapstruct);
   }
 }
+#ifdef  ESPMQTT_BBQTEMP
+double MAX6675_readCelsius(uint8_t cs) 
+{
+    uint16_t v;
+    SPI.beginTransaction(SPISettings(100, MSBFIRST, SPI_MODE0));
+    digitalWrite(cs, LOW);
+    delay(10);
+    v = SPI.transfer(0x00);
+    v <<= 8;
+    v |= SPI.transfer(0x00);    
+    digitalWrite(cs, HIGH);
+    delay(10);
+    SPI.endTransaction();
 
+    if (v & 0x4) {
+        // uh oh, no thermocouple attached!
+        return NAN; 
+    }
+
+    v >>= 3;
+
+    return v*0.25;
+}
+
+#endif
+
+
+
+#ifdef ESPMQTT_OBD2
 void obd2_writeserial (String data)
 {
   DEBUG ("Writing to ODB2:\"%s\"\n", data.c_str());
@@ -820,7 +869,6 @@ void obd2_writeserial (String data)
   Serial.write(data.c_str());
 }
 
-#ifdef ESPMQTT_OBD2
 void obd2_handle()
 {
   static unsigned long nextupdatetime = millis() + 10000; // Wait 10 second after startup before sending first cmd...
@@ -1552,6 +1600,13 @@ void write_oled_display()
 #endif
 #endif
 
+#if defined(ESPMQTT_BBQTEMP)
+  display.setFont(ArialMT_Plain_16);
+  display.drawString(OLEDX, lcdline += 20, "1:" + getdatamap("temperature/0"));
+  display.drawString(OLEDX, lcdline += 16, "2:" + getdatamap("temperature/1"));
+#endif
+
+
   display.display();
 #endif
 }
@@ -1730,7 +1785,7 @@ void loop()
 #endif
 
 #ifdef ESPMQTT_TUYA_2GANGDIMMERV2
-    tuya_disconnected();
+    //tuya_disconnected(); // Don't do this, the device starts beeping....
 #endif
   }
   yield();
@@ -2413,6 +2468,13 @@ void loop()
       yield();
     }
 
+
+#ifdef  ESPMQTT_BBQTEMP
+    double temp = MAX6675_readCelsius(ESPMQTT_BBQTEMP_CS0);
+    putdatamap("temperature/0", temp == NAN ? "-" : String(temp,1));
+    temp = MAX6675_readCelsius(ESPMQTT_BBQTEMP_CS1);
+    putdatamap("temperature/1", temp == NAN ? "-" : String(temp,1));
+#endif
 
 #ifdef  ESPMQTT_SONOFFPOWR2
     static uint64_t deciwattsec = 0;
@@ -3940,6 +4002,15 @@ void setup() {
 #ifdef MH_Z19
   MHZ19_init();
 #endif
+
+#ifdef ESPMQTT_BBQTEMP
+    SPI.begin();
+    pinMode(ESPMQTT_BBQTEMP_CS0, OUTPUT);
+    pinMode(ESPMQTT_BBQTEMP_CS1, OUTPUT);
+    digitalWrite(ESPMQTT_BBQTEMP_CS0, HIGH);
+    digitalWrite(ESPMQTT_BBQTEMP_CS1, HIGH);
+#endif
+
 }
 
 
