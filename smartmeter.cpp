@@ -8,7 +8,7 @@ void smartmeter_init(void(*callback)(String,String))
   _smartmeter_callback = callback;
   
 
-  Serial.setRxBufferSize(2048); 
+  Serial.setRxBufferSize(100); 
   Serial.begin(115200);  //Init serial 115200 baud
   Serial.setDebugOutput(false);
 
@@ -19,19 +19,22 @@ void smartmeter_init(void(*callback)(String,String))
 int8_t smartmeter_handle()
 {
   float value = 0;
-  static double kwh = 0;
+  static float kwh = 0;
   int8_t returnvalue = 0;
   int day, month, year, hour, minute, second;
   char summerwinter;
-  static char buffer[1000];
-  static uint16_t bufpos = 0;
+  static char buffer[100];
+  static uint8_t bufpos = 0;
   static int watt = 0;
 
-  if (Serial.available()) {
+  while (Serial.available()) {
     char input = Serial.read() & 127;
     // Fill buffer up to and including a new line (\n)
-    buffer[bufpos] = input;
-    bufpos++;
+    if (bufpos < 100)
+    {
+      buffer[bufpos] = input;
+      bufpos++;
+    }
     buffer[bufpos] = 0;
 
     if (input == '\n')

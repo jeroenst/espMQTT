@@ -34,7 +34,7 @@
 // #define ESPMQTT_BATHROOM
 // #define ESPMQTT_BEDROOM2
 // #define ESPMQTT_OPENTHERM
-// #define ESPMQTT_SMARTMETER
+#define ESPMQTT_SMARTMETER
 // #define ESPMQTT_GROWATT
 // #define ESPMQTT_SDM120
 // #define ESPMQTT_DDM18SD
@@ -48,6 +48,7 @@
 // #define ESPMQTT_DIMMER
 // #define ESPMQTT_RELAY
 // #define ESPMQTT_LIVINGROOM
+// #define ESPMQTT_BBQTEMP
 
 /* ESP8285 */
 // #define ESPMQTT_ZMAI90
@@ -67,7 +68,6 @@
 // #define ESPMQTT_SONOFFPOWR2 // tv&washingmachine&server&dishwasher
 // #define ESPMQTT_SONOFFTH
 // #define ESPMQTT_GENERIC8255
-#define ESPMQTT_BBQTEMP
 // #define ESPMQTT_BHT002
 // #define ESPMQTT_TUYA_2GANGDIMMERV2
 // #define ESPMQTT_QSWIFISWITCH1C
@@ -1069,7 +1069,7 @@ void update_systeminfo(bool writestaticvalues = false)
     putdatamap("wifi/mac", String(WiFi.macAddress()), sendupdate, false, false);
   }
   putdatamap("system/uptime", String(uptimestr), uptime % 60 == 0, true, false);
-  if (uptime % 60 == 0) putdatamap("system/freeram", String(system_get_free_heap_size()), sendupdate, false, false);
+  putdatamap("system/freeram", String(system_get_free_heap_size()), (uptime % 60 == 0), false, false);
   putdatamap("wifi/state", WiFi.status() == WL_CONNECTED ? "connected" : "disconnected", sendupdate, false, false);
   putdatamap("wifi/localip", WiFi.localIP().toString(), sendupdate, false, false);
   putdatamap("wifi/ssid", String(WiFi.SSID()), sendupdate, false, false);
@@ -1471,7 +1471,7 @@ void disconnectMqtt()
 
 void initSerial()
 {
-  Serial.setRxBufferSize(2048);
+  Serial.setRxBufferSize(100);
 #if defined(MH_Z19) || defined( ESPMQTT_OPENTHERM) || defined( ESPMQTT_GROWATT)
   Serial.setDebugOutput(false);
   Serial.begin(9600);  //Init serial 9600 baud
