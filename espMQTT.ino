@@ -679,7 +679,7 @@ SimpleMap<int, String> *eepromMap = new SimpleMap<int, String>([](int &a, int &b
 
 bool updatemqtt = 0;
 
-static const char webpage_P[] PROGMEM = "<!DOCTYPE html><html><meta charset=\"UTF-8\"><meta name=\"google\" content=\"notranslate\"><meta http-equiv=\"Content-Language\" content=\"en\"><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><style>table{width: 400px; margin: auto;}</style></head><body><CENTER><div align='center' style='width:400px; margin:auto'><CENTER><H1><p id='header'></p></H1></CENTER><p id='table'></p><A HREF='settings'>Settings</A></div></CENTER><script>function refreshsite(){var obj,dbParam,xmlhttp,myObj,x,txt ='';xmlhttp=new XMLHttpRequest();xmlhttp.onreadystatechange=function(){if(this.readyState==4&&this.status==200){myObj=JSON.parse(this.responseText);txt+='<TABLE>';for (x in myObj){if(x=='hostname')document.getElementById('header').innerHTML=myObj[x].toUpperCase();txt+='<tr><td>'+x.split('/').join(' ')+'</td><td>'+myObj[x]+'</td></tr>';}txt+='</table>';document.getElementById('table').innerHTML = txt;}};xmlhttp.open('POST','data.json',true);xmlhttp.setRequestHeader('Content-type','application/x-www-form-urlencoded');xmlhttp.send();}refreshsite();window.setInterval(refreshsite, 5000);</script></body></html>";
+static const char webpage_P[] PROGMEM = "<!DOCTYPE html><html><meta charset=\"UTF-8\"><meta name=\"google\" content=\"notranslate\"><meta http-equiv=\"Content-Language\" content=\"en\"><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><style>table{width: 400px; margin: auto;}</style></head><body><CENTER><div align='center' style='width:400px; margin:auto'><CENTER><H1><p id='header'></p></H1></CENTER><p id='table'></p><A HREF='settings'>Settings</A></div></CENTER><script>function refreshsite(){var obj,dbParam,xmlhttp,myObj,x,txt ='';xmlhttp=new XMLHttpRequest();xmlhttp.onreadystatechange=function(){if(this.readyState==4&&this.status==200){myObj=JSON.parse(this.responseText);txt+='<TABLE>';for (x in myObj){if(x=='hostname')document.getElementById('header').innerHTML=myObj[x].toUpperCase();txt+='<tr><td>'+x.split('/').join(' ')+'</td><td>'+myObj[x]+'</td></tr>';}txt+='</table>';document.getElementById('table').innerHTML = txt;}};xmlhttp.open('GET','data.json',true);xmlhttp.setRequestHeader('Content-type','application/x-www-form-urlencoded');xmlhttp.send();}refreshsite();window.setInterval(refreshsite, 5000);</script></body></html>";
 
 extern "C" {
   //#include "user_interface.h"
@@ -3351,42 +3351,76 @@ void handleWWWSettings()
     }
 
 
-    String webpage = "";
-    webpage += "<HTML><HEAD><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"></HEAD><BODY><CENTER><div align=\"left\" style=\"width:400px; margin:auto\">";
-    webpage += String("<CENTER><H1>") + WiFi.hostname() + "</H1></CENTER><form action=\"/settings\" method=\"post\" autocomplete=\"off\"><TABLE style=\"width:400px; margin:auto\">";
-    webpage += String("<TR><TD>Hostname</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"") + String(EEPROMSTRINGSIZE - 2) + "\" name=\"hostname\" value=\"" + WiFi.hostname() + "\"></TD></TR>";
-    webpage += String("<TR><TD>Wifi SSID</TD><TD><select style=\"width:200\" name=\"wifissid\">") + wifiselectoptions + "</select></TD></TR>";
-    webpage += String("<TR><TD>wifi Key</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"64\" name=\"wifipsk\" value=\"") + String(WiFi.psk()) + "\"></TD></TR>";
-    webpage += String("<TR><TD>MQTT Server</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttserver\" value=\"") + mqtt_server + "\"></TD></TR>";
-    webpage += String("<TR><TD>MQTT Port</TD><TD><input style=\"width:200\" type=\"number\" maxlength=\"5\" name=\"mqttport\" value=\"") + String(mqtt_port) + "\"></TD></TR>";
-    webpage += String("<TR><TD>MQTT Ssl</TD><TD ALIGN=\"left\"><input type=\"checkbox\" name=\"mqttssl\" ") + (mqtt_ssl ? "checked" : "") + "></TD></TR>";
-    webpage += String("<TR><TD>MQTT Username</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttusername\" value=\"") + mqtt_username + "\"></TD></TR>";
-    webpage += String("<TR><TD>MQTT Password</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttpassword\" value=\"") + mqtt_password + "\"></TD></TR>";
-    webpage += String("<TR><TD>MQTT Topic Prefix</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"50\" name=\"mqtttopicprefix\" value=\"") + mqtt_topicprefix + "\"></TD></TR>";
-    webpage += String("<TR><TD>ESP Password</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"webpassword\" value=\"") + esp_password + "\"></TD></TR>";
+    webserver.setContentLength(CONTENT_LENGTH_UNKNOWN);
+    webserver.send (200, "text/html","<HTML><HEAD><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"></HEAD><BODY><CENTER><div align=\"left\" style=\"width:400px; margin:auto\">");
+    webserver.sendContent ("<CENTER><H1>");
+    webserver.sendContent (WiFi.hostname());
+    webserver.sendContent ("</H1></CENTER><form action=\"/settings\" method=\"post\" autocomplete=\"off\"><TABLE style=\"width:400px; margin:auto\">");
+    webserver.sendContent ("<TR><TD>Hostname</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"");
+    webserver.sendContent (String(EEPROMSTRINGSIZE - 2));
+    webserver.sendContent ("\" name=\"hostname\" value=\"");
+    webserver.sendContent (WiFi.hostname());
+    webserver.sendContent ("\"></TD></TR>");
+    webserver.sendContent ("<TR><TD>Wifi SSID</TD><TD><select style=\"width:200\" name=\"wifissid\">");
+    webserver.sendContent (wifiselectoptions);
+    webserver.sendContent ("</select></TD></TR>");
+    webserver.sendContent ("<TR><TD>wifi Key</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"64\" name=\"wifipsk\" value=\"");
+    webserver.sendContent (String(WiFi.psk()));
+    webserver.sendContent ("\"></TD></TR>");
+    webserver.sendContent ("<TR><TD>MQTT Server</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttserver\" value=\"");
+    webserver.sendContent (mqtt_server);
+    webserver.sendContent ("\"></TD></TR>");
+    webserver.sendContent ("<TR><TD>MQTT Port</TD><TD><input style=\"width:200\" type=\"number\" maxlength=\"5\" name=\"mqttport\" value=\"");
+    webserver.sendContent (String(mqtt_port) + "\"></TD></TR>");
+    webserver.sendContent ("<TR><TD>MQTT Ssl</TD><TD ALIGN=\"left\"><input type=\"checkbox\" name=\"mqttssl\" ");
+    webserver.sendContent (mqtt_ssl ? "checked" : "");
+    webserver.sendContent ("></TD></TR>");
+    webserver.sendContent ("<TR><TD>MQTT Username</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttusername\" value=\"");
+    webserver.sendContent (mqtt_username);
+    webserver.sendContent ("\"></TD></TR>");
+    webserver.sendContent ("<TR><TD>MQTT Password</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttpassword\" value=\"");
+    webserver.sendContent (mqtt_password);
+    webserver.sendContent ("\"></TD></TR>");
+    webserver.sendContent ("<TR><TD>MQTT Topic Prefix</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"50\" name=\"mqtttopicprefix\" value=\"");
+    webserver.sendContent (mqtt_topicprefix);
+    webserver.sendContent ("\"></TD></TR>");
+    webserver.sendContent ("<TR><TD>ESP Password</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"webpassword\" value=\"");
+    webserver.sendContent (esp_password);
+    webserver.sendContent ("\"></TD></TR>");
 #ifdef  ESPMQTT_WATERMETER
-    webpage += String("<TR><TD>Watermeter Liter</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"64\" name=\"watermeterliter\" value=\"") + getdatamap("water/liter") + "\"></TD></TR>";
+    webserver.sendContent ("<TR><TD>Watermeter Liter</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"64\" name=\"watermeterliter\" value=\"");
+    webserver.sendContent (getdatamap("water/liter"));
+    webserver.sendContent (+ "\"></TD></TR>");
 #endif
 #ifdef  ESPMQTT_QSWIFIDIMMERD01
-    webpage += String("<TR><TD>Dimmer Offset</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"3\" name=\"qswifidimoffset\" value=\"") + getdatamap("dimoffset") + "\"></TD></TR>";
+    webserver.sendContent ("<TR><TD>Dimmer Offset</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"3\" name=\"qswifidimoffset\" value=\"");
+    webserver.sendContent (getdatamap("dimoffset"));
+    webserver.sendContent ("\"></TD></TR>");
 #endif
 #ifdef  ESPMQTT_QSWIFIDIMMERD02
-    webpage += String("<TR><TD>Dimmer Offset 0</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"3\" name=\"qswifidimoffset0\" value=\"") + getdatamap("dimoffset/0") + "\"></TD></TR>";
-    webpage += String("<TR><TD>Dimmer Offset 1</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"3\" name=\"qswifidimoffset1\" value=\"") + getdatamap("dimoffset/1") + "\"></TD></TR>";
+    webserver.sendContent ("<TR><TD>Dimmer Offset 0</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"3\" name=\"qswifidimoffset0\" value=\"");
+    webserver.sendContent (getdatamap("dimoffset/0"));
+    webserver.sendContent ("\"></TD></TR>");
+    webserver.sendContent ("<TR><TD>Dimmer Offset 1</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"3\" name=\"qswifidimoffset1\" value=\"");
+    webserver.sendContent (getdatamap("dimoffset/1"));
+    webserver.sendContent ("\"></TD></TR>");
 #endif
-    webpage += "</TABLE><BR><CENTER><input type=\"submit\" value=\"Save Settings\"></form><BR><BR><form action=\"/settings\" method=\"post\" autocomplete=\"off\"><input type=\"hidden\" name=\"rebootdevice\" value=\"1\"><input type=\"submit\" value=\"Reboot Device\"></form><BR><BR><A HREF=\"/\">Return to main page</A></CENTER></div></BODY></HTML>";
-    webserver.send(200, "text/html", webpage);
+    webserver.sendContent ("</TABLE><BR><CENTER><input type=\"submit\" value=\"Save Settings\"></form><BR><BR><form action=\"/settings\" method=\"post\" autocomplete=\"off\"><input type=\"hidden\" name=\"rebootdevice\" value=\"1\"><input type=\"submit\" value=\"Reboot Device\"></form><BR><BR><A HREF=\"/\">Return to main page</A></CENTER></div></BODY></HTML>");    
+    webserver.sendContent (""); // end chunked data
   }
 }
 
 void handleJsonData() {
   String json = "{";
+  webserver.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  webserver.send(200, "text/html", "{");
   for (int i = 0; i < dataMap->size(); i++)
   {
-    json += "\"" + dataMap->getKey(i) + "\":\"" + dataMap->getData(i).payload + "\",";
+    webserver.sendContent ("\"" + dataMap->getKey(i) + "\":\"" + dataMap->getData(i).payload);
+    if (i < dataMap->size() - 1) webserver.sendContent("\",");
   }
-  json.remove(json.length() - 1);
-  json += "}";
+  webserver.sendContent("\"}");
+  webserver.sendContent("");
   webserver.send(200, "text/html", json);
 }
 
