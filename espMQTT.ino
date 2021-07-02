@@ -746,9 +746,7 @@ String mqtt_topicprefix = "";
 int mqtt_port = 1883;
 bool mqtt_ssl = 0;
 String esp_password = DEFAULT_PASSWORD;
-String esp_hostname = "";
 String esp_orig_hostname = "";
-//#include "esp8266_peri.h"
 RemoteDebug Debug;
 String wifissid = "";
 String wifipsk = "";
@@ -834,27 +832,27 @@ void putdatamap(String topic, String value, bool sendupdate = true, bool forceup
   }
 }
 #ifdef  ESPMQTT_BBQTEMP
-double MAX6675_readCelsius(uint8_t cs) 
+double MAX6675_readCelsius(uint8_t cs)
 {
-    uint16_t v;
-    SPI.beginTransaction(SPISettings(100, MSBFIRST, SPI_MODE0));
-    digitalWrite(cs, LOW);
-    delay(10);
-    v = SPI.transfer(0x00);
-    v <<= 8;
-    v |= SPI.transfer(0x00);    
-    digitalWrite(cs, HIGH);
-    delay(10);
-    SPI.endTransaction();
+  uint16_t v;
+  SPI.beginTransaction(SPISettings(100, MSBFIRST, SPI_MODE0));
+  digitalWrite(cs, LOW);
+  delay(10);
+  v = SPI.transfer(0x00);
+  v <<= 8;
+  v |= SPI.transfer(0x00);
+  digitalWrite(cs, HIGH);
+  delay(10);
+  SPI.endTransaction();
 
-    if (v & 0x4) {
-        // uh oh, no thermocouple attached!
-        return NAN; 
-    }
+  if (v & 0x4) {
+    // uh oh, no thermocouple attached!
+    return NAN;
+  }
 
-    v >>= 3;
+  v >>= 3;
 
-    return v*0.25;
+  return v * 0.25;
 }
 
 #endif
@@ -2471,9 +2469,9 @@ void loop()
 
 #ifdef  ESPMQTT_BBQTEMP
     double temp = MAX6675_readCelsius(ESPMQTT_BBQTEMP_CS0);
-    putdatamap("temperature/0", temp == NAN ? "-" : String(temp,1));
+    putdatamap("temperature/0", temp == NAN ? "-" : String(temp, 1));
     temp = MAX6675_readCelsius(ESPMQTT_BBQTEMP_CS1);
-    putdatamap("temperature/1", temp == NAN ? "-" : String(temp,1));
+    putdatamap("temperature/1", temp == NAN ? "-" : String(temp, 1));
 #endif
 
 #ifdef  ESPMQTT_SONOFFPOWR2
@@ -3352,7 +3350,7 @@ void handleWWWSettings()
 
 
     webserver.setContentLength(CONTENT_LENGTH_UNKNOWN);
-    webserver.send (200, "text/html","<HTML><HEAD><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"></HEAD><BODY><CENTER><div align=\"left\" style=\"width:400px; margin:auto\">");
+    webserver.send (200, "text/html", "<HTML><HEAD><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"></HEAD><BODY><CENTER><div align=\"left\" style=\"width:400px; margin:auto\">");
     webserver.sendContent ("<CENTER><H1>");
     webserver.sendContent (WiFi.hostname());
     webserver.sendContent ("</H1></CENTER><form action=\"/settings\" method=\"post\" autocomplete=\"off\"><TABLE style=\"width:400px; margin:auto\">");
@@ -3405,7 +3403,7 @@ void handleWWWSettings()
     webserver.sendContent (getdatamap("dimoffset/1"));
     webserver.sendContent ("\"></TD></TR>");
 #endif
-    webserver.sendContent ("</TABLE><BR><CENTER><input type=\"submit\" value=\"Save Settings\"></form><BR><BR><form action=\"/settings\" method=\"post\" autocomplete=\"off\"><input type=\"hidden\" name=\"rebootdevice\" value=\"1\"><input type=\"submit\" value=\"Reboot Device\"></form><BR><BR><A HREF=\"/\">Return to main page</A></CENTER></div></BODY></HTML>");    
+    webserver.sendContent ("</TABLE><BR><CENTER><input type=\"submit\" value=\"Save Settings\"></form><BR><BR><form action=\"/settings\" method=\"post\" autocomplete=\"off\"><input type=\"hidden\" name=\"rebootdevice\" value=\"1\"><input type=\"submit\" value=\"Reboot Device\"></form><BR><BR><A HREF=\"/\">Return to main page</A></CENTER></div></BODY></HTML>");
     webserver.sendContent (""); // end chunked data
   }
 }
@@ -4038,11 +4036,11 @@ void setup() {
 #endif
 
 #ifdef ESPMQTT_BBQTEMP
-    SPI.begin();
-    pinMode(ESPMQTT_BBQTEMP_CS0, OUTPUT);
-    pinMode(ESPMQTT_BBQTEMP_CS1, OUTPUT);
-    digitalWrite(ESPMQTT_BBQTEMP_CS0, HIGH);
-    digitalWrite(ESPMQTT_BBQTEMP_CS1, HIGH);
+  SPI.begin();
+  pinMode(ESPMQTT_BBQTEMP_CS0, OUTPUT);
+  pinMode(ESPMQTT_BBQTEMP_CS1, OUTPUT);
+  digitalWrite(ESPMQTT_BBQTEMP_CS0, HIGH);
+  digitalWrite(ESPMQTT_BBQTEMP_CS1, HIGH);
 #endif
 
 }
