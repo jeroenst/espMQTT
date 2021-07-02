@@ -63,7 +63,7 @@ void opentherm_reset()
 void opentherm_init(void(*callback)(String, String))
 {
   Serial.setDebugOutput(false);
-  Serial.setRxBufferSize(2048);
+  Serial.setRxBufferSize(100);
   Serial.begin(9600);  //Init serial 9600 baud
   Serial.print("\r\n");
 

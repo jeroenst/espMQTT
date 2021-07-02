@@ -283,7 +283,7 @@ void ducobox_init(uint8_t ducobox_relay0, uint8_t ducobox_relay1, uint8_t ducobo
   _ducobox_relay0 = ducobox_relay0;
   _ducobox_relay1 = ducobox_relay1;
   _ducobox_refreshtime = ducobox_refreshtime;
-  Serial.setRxBufferSize(2048);
+  Serial.setRxBufferSize(100);
   Serial.setDebugOutput(false);
   Serial.begin(115200); //Init serial 115200 baud
   ducoserver.begin();

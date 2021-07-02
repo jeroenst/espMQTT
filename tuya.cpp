@@ -56,7 +56,7 @@ void tuya_commandCharsToSerial(unsigned int length, unsigned char* command)
 void tuya_init(void(*callback)(String, String))
 {
   Serial.begin(9600, SERIAL_8N1);
-  Serial.setRxBufferSize(2048);
+  Serial.setRxBufferSize(100);
   _tuya_callback = callback;
 
   unsigned char tuyaCommand[] = { 0x55, 0xAA, 0x00, 0x08, 0x00, 0x00};

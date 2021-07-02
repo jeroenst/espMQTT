@@ -21,7 +21,7 @@ static float _growatt_fan_pid_preverror = 0;
 void growatt_init(void(*callback)(String,String), int fanpin)
 {
   _growatt_callback = callback;
-  Serial.setRxBufferSize(2048); 
+  Serial.setRxBufferSize(100); 
   Serial.begin(9600);  //Init serial 9600 baud
   Serial.setDebugOutput(false);
   _growatt_callback("grid/today/kwh", "0.0");
