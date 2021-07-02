@@ -570,6 +570,7 @@ Adafruit_NeoPixel neopixelleds = Adafruit_NeoPixel(2, NEOPIXELPIN, NEO_RGB + NEO
 #define FIRMWARE_TARGET "SMARTMETER"
 #define FLASHBUTTON D3
 #define ESPLED D4
+#define NODEMCULEDPIN D0
 #include "smartmeter.h"
 #endif
 
@@ -3521,6 +3522,12 @@ void smartmetercallback (String topic, String payload)
   static uint32 nextupdatetime = 0;
   static bool sendupdate = 0;
 
+  if (topic == "status")
+  {
+    if (payload == "receiving") digitalWrite(NODEMCULEDPIN, 1);
+    else digitalWrite(NODEMCULEDPIN, 0);
+  }
+  
   if ((nextupdatetime < uptime) && (topic == "status") && (payload == "receiving")) // wait for start of new packet from smartmeter
   {
     sendupdate = 1;
