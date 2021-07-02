@@ -154,7 +154,7 @@ SDM sdm(serSDM, 2400);
 
 #ifdef  ESPMQTT_QSWIFIDIMMERD02
 #define FIRMWARE_TARGET "QSWIFIDIMMERD02"
-#define APONBOOT
+#define APONBOOTf
 #define QSWIFIDIMMERCHANNELS 2
 #include "qswifidimmer.h"
 #endif
@@ -746,7 +746,7 @@ String mqtt_topicprefix = "";
 int mqtt_port = 1883;
 bool mqtt_ssl = 0;
 String esp_password = DEFAULT_PASSWORD;
-String esp_orig_hostname = "";
+String esp_hostname = "";
 RemoteDebug Debug;
 String wifissid = "";
 String wifipsk = "";
