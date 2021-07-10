@@ -33,10 +33,10 @@
 // #define ESPMQTT_AMGPELLETSTOVE
 // #define ESPMQTT_BATHROOM
 // #define ESPMQTT_BEDROOM2
-#define ESPMQTT_OPENTHERM
+// #define ESPMQTT_OPENTHERM
 // #define ESPMQTT_SMARTMETER
 // #define ESPMQTT_GROWATT
-// #define ESPMQTT_SDM120
+#define ESPMQTT_SDM120
 // #define ESPMQTT_DDM18SD
 // #define ESPMQTT_WATERMETER
 // #define ESPMQTT_DDNS
@@ -2366,7 +2366,7 @@ void loop()
         else putdatamap("status", "ready");
         break;
       case 14:
-        if (uptime % 10) sdmreadcounter = 0;
+        if (uptime % 5 == 0) sdmreadcounter = 0;
         break;
     }
     if (sdmreadcounter < 14)
