@@ -1098,7 +1098,7 @@ void startWifiAP()
     ArduinoOTA.setPassword(esp_password.c_str());
     Debug.setPassword(esp_password);
 #ifdef ESPMQTT_TUYA_2GANGDIMMERV2
-    tuya_apmode();
+    //tuya_apmode();
 #endif
   }
 }
@@ -3372,8 +3372,7 @@ void handleWWWSettings()
     webserver.sendContent ("<TR><TD>MQTT Port</TD><TD><input style=\"width:200\" type=\"number\" maxlength=\"5\" name=\"mqttport\" value=\"");
     webserver.sendContent (String(mqtt_port) + "\"></TD></TR>");
     webserver.sendContent ("<TR><TD>MQTT Ssl</TD><TD ALIGN=\"left\"><input type=\"checkbox\" name=\"mqttssl\" ");
-    webserver.sendContent (mqtt_ssl ? "checked" : "");
-    webserver.sendContent ("></TD></TR>");
+    webserver.sendContent (String(mqtt_ssl ? "checked" : "") + ("></TD></TR>"));
     webserver.sendContent ("<TR><TD>MQTT Username</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttusername\" value=\"");
     webserver.sendContent (mqtt_username);
     webserver.sendContent ("\"></TD></TR>");
