@@ -29,16 +29,13 @@ build ()
   echo ''
 
   set -x
-  
+
+
+
   $HOME/arduino_ide/arduino-builder \
   -compile \
-  -hardware $HOME/arduino_ide/hardware \
-  -hardware $HOME/.arduino15/packages \
   -hardware $HOME/Arduino/hardware \
   -tools $HOME/arduino_ide/tools-builder \
-  -tools $HOME/arduino_ide/hardware/tools/avr \
-  -tools $HOME/.arduino15/packages \
-  -built-in-libraries $HOME/arduino_ide/libraries \
   -libraries $HOME/Arduino/libraries \
   -fqbn=$FQBN \
   -ide-version=10812 \
