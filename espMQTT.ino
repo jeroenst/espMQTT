@@ -36,6 +36,7 @@
 // #define ESPMQTT_OPENTHERM
 // #define ESPMQTT_SMARTMETER
 // #define ESPMQTT_GROWATT
+#define ESPMQTT_GROWATT_MODBUS
 // #define ESPMQTT_SDM120
 // #define ESPMQTT_DDM18SD
 // #define ESPMQTT_WATERMETER
@@ -57,11 +58,11 @@
 // #define ESPMQTT_SONOFFBULB
 // #define ESPMQTT_GARDEN //ESP8285 TUIN & MARIANNE & LUIFEL
 // #define ESPMQTT_SONOFF_FLOORHEATING
-// #define SPMQTT_IRRIGATION
+// #define ESPMQTT_IRRIGATION
 // #define ESPMQTT_BLITZWOLF
 // #define ESPMQTT_QSWIFIDIMMERD01
 // #define ESPMQTT_QSWIFIDIMMERD02
-#define ESPMQTT_SONOFF4CH //ESP8285
+// #define ESPMQTT_SONOFF4CH //ESP8285
 // #define ESPMQTT_SONOFFDUAL
 // #define ESPMQTT_SONOFFS20_PRINTER
 // #define ESPMQTT_SONOFFPOW
@@ -260,6 +261,18 @@ QsWifiSwitch qswifiswitch(QSWIFISWITCHCHANNELS);
 #include "growatt.h"
 #undef SERIALLOG
 #endif
+
+#ifdef  ESPMQTT_GROWATT_MODBUS
+#define FIRMWARE_TARGET "GROWATT_MODBUS"
+#define NODEMCULEDPIN D0
+#define FLASHBUTTON D3
+#define ESPLED D4
+#define FANPIN D1
+#include "growattmodbus.h"
+#undef SERIALLOG
+#endif
+
+
 
 #ifdef  ESPMQTT_SOIL
 #define FIRMWARE_TARGET "SOIL"
@@ -2332,6 +2345,11 @@ void loop()
   yield();
 #endif
 
+#ifdef  ESPMQTT_GROWATT_MODBUS
+  growattModbus_handle();
+  yield();
+#endif
+
 #ifdef FLASHBUTTON
   flashbutton_handle();
   yield();
@@ -3641,6 +3659,19 @@ void growattcallback (String topic, String payload)
   putdatamap(topic, payload);
 }
 #endif
+
+#ifdef  ESPMQTT_GROWATT_MODBUS
+void growattModbuscallback (String topic, String payload)
+{
+  if (topic == "status")
+  {
+    if (payload == "ready") digitalWrite(NODEMCULEDPIN, 0);
+    else digitalWrite(NODEMCULEDPIN, 1);
+  }
+  putdatamap(topic, payload);
+}
+#endif
+
 #ifdef  ESPMQTT_SMARTMETER
 void smartmetercallback (String topic, String payload)
 {
@@ -4083,6 +4114,10 @@ void setup() {
 
 #ifdef  ESPMQTT_GROWATT
   growatt_init(growattcallback, FANPIN);
+#endif
+
+#ifdef  ESPMQTT_GROWATT_MODBUS
+  growattModbus_init(growattModbuscallback, FANPIN);
 #endif
 
 #ifdef  ESPMQTT_AMGPELLETSTOVE
