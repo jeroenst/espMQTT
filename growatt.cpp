@@ -81,8 +81,8 @@ void growatt_handle()
 
     if (!RxPowerDataOk)
     {
-      _growatt_callback("inverterstatus", "offline");
-      _growatt_callback("inverterstatus/value", "-");
+      _growatt_callback("inverter/status", "offline");
+      _growatt_callback("inverter/status/value", "-");
       _growatt_callback("pv/1/volt", "-");
       _growatt_callback("pv/2/volt", "-");
       _growatt_callback("pv/watt", "-");
@@ -134,8 +134,8 @@ void growatt_handle()
         {
           DEBUG_D("Received power data from Growatt Inverter...\n");
           intvalue = RxBuffer[6];
-          _growatt_callback("inverterstatus/value", String(intvalue));
-          _growatt_callback("inverterstatus", intvalue == 0 ? "waiting" : intvalue == 1 ? "ready" : intvalue == 3 ? "fault" : "unknown");
+          _growatt_callback("inverter/status/value", String(intvalue));
+          _growatt_callback("inverter/status", intvalue == 0 ? "waiting" : intvalue == 1 ? "ready" : intvalue == 3 ? "fault" : "unknown");
           value = double((uint16_t(RxBuffer[7]) << 8) + RxBuffer[8]) / 10;
           pv1volt = value;
           _growatt_callback("pv/1/volt", String(value, 1));
@@ -188,7 +188,7 @@ void growatt_handle()
           value = double((uint32_t(RxBuffer[15]) << 24) + (uint32_t(RxBuffer[16]) << 16) + (uint16_t(RxBuffer[17]) << 8) + RxBuffer[18]) / 10;
           _growatt_callback("grid/total/kwh", String(value, 1));
           intvalue = ((uint32_t(RxBuffer[19]) << 24) + (uint32_t(RxBuffer[20]) << 16) + (uint16_t(RxBuffer[21]) << 8) + RxBuffer[22]);
-          _growatt_callback("grid/total/hour", String(intvalue));
+          _growatt_callback("inverter/hours", String(intvalue));
           _growatt_callback("status", "ready");
         }
         RxBufferPointer = 0;
