@@ -38,7 +38,7 @@ void growatt_init(void(*callback)(String,String), int fanpin)
 
   _growatt_callback("grid/today/kwh", "-");
   _growatt_callback("grid/total/kwh", "-");
-  _growatt_callback("grid/total/hour", "-");
+  _growatt_callback("inverter/hours", "-");
 }
 
 void growatt_send_command(uint8_t c1)
