@@ -35,8 +35,8 @@
 // #define ESPMQTT_BEDROOM2
 // #define ESPMQTT_OPENTHERM
 // #define ESPMQTT_SMARTMETER
-// #define ESPMQTT_GROWATT
-#define ESPMQTT_GROWATT_MODBUS
+#define ESPMQTT_GROWATT
+// #define ESPMQTT_GROWATT_MODBUS
 // #define ESPMQTT_SDM120
 // #define ESPMQTT_DDM18SD
 // #define ESPMQTT_WATERMETER
@@ -788,34 +788,6 @@ const char* getDataValue(const char *dataName)
   }
   return "";
 }
-
-
-/*
-    putdatamap("system/chipid", String(chipid), sendupdate, false, false);
-    putdatamap("wifi/mac", String(WiFi.macAddress()), sendupdate, false, false);
-  }
-  putdatamap("system/uptime", String(uptimestr), uptime % 60 == 0, true, false);
-  putdatamap("system/freeram", String(system_get_free_heap_size()), (uptime % 60 == 0), false, false);
-  putdatamap("wifi/state", WiFi.status() == WL_CONNECTED ? "connected" : "disconnected", sendupdate, false, false);
-  putdatamap("wifi/localip", WiFi.localIP().toString(), sendupdate, false, false);
-  putdatamap("wifi/ssid", String(WiFi.SSID()), sendupdate, false, false);
-  putdatamap("wifi/bssid", String(WiFi.BSSIDstr()), sendupdate, false, false);
-  if ((abs(getdatamap("wifi/rssi").toInt() - WiFi.RSSI()) > 5) || (uptime % 60 == 0)) putdatamap("wifi/rssi", String(WiFi.RSSI()), sendupdate, false, false);
-  putdatamap("wifi/channel", String(wifichannel), sendupdate, false, false);
-  putdatamap("mqtt/server", String(mqtt_server), sendupdate, false, false);
-  putdatamap("mqtt/port", String(mqtt_port), sendupdate, false, false);
-  putdatamap("mqtt/ssl", String(mqtt_ssl), sendupdate, false, false);
-  putdatamap("mqtt/state", mqttClient.connected() ? "connected" : "disconnected", sendupdate, false, false);
-  putdatamap("mqtt/clientid", String(mqttClient.getClientId()), sendupdate, false, false);
-  putdatamap("mqtt/user", mqtt_username, sendupdate, false, false);
-
- */ 
-
-String getDataValuesAsJson()
-{
-  
-}
-
 
 bool updatemqtt = 0;
 
