@@ -73,6 +73,7 @@ void growatt_handle()
   static uint8_t RxBufferPointer = 0;
   static bool RxPowerDataOk = 0;
   static double pv1volt = 0;
+  static double pvwatt = 0;
 
   if (millis() > nextupdatetime)
   {
@@ -94,6 +95,7 @@ void growatt_handle()
       _growatt_callback("fault/type", "-");
       _growatt_callback("temperature", "-");
       _growatt_callback("status", "commerror");
+      _growatt_callback("grid/today/kwh", "-");
       if (_growatt_fanpin >= 0)
       {
          _growatt_callback("fanspeed", "0");
@@ -144,6 +146,7 @@ void growatt_handle()
           value = double((uint16_t(RxBuffer[11]) << 8) + RxBuffer[12]) / 10;
           _growatt_callback("pv/watt", String(value, 1));
           value = double((uint16_t(RxBuffer[13]) << 8) + RxBuffer[14]) / 10;
+          pvwatt = value;
           _growatt_callback("grid/volt", String(value, 1));
           value = double((uint16_t(RxBuffer[15]) << 8) + RxBuffer[16]) / 10;
           _growatt_callback("grid/amp", String(value, 1));
@@ -184,7 +187,7 @@ void growatt_handle()
         {
           DEBUG_D("Received energy data from Growatt Inverter...\n");
           value = double((uint16_t(RxBuffer[13]) << 8) + RxBuffer[14]) / 10;
-          if (pv1volt > 100) _growatt_callback("grid/today/kwh", String(value, 1)); // Only reset today value when pv 1 volt is above 100 volt (steady voltage) otherwise this gets resets during shutdown
+          if (pvwatt > 1) _growatt_callback("grid/today/kwh", String(value, 1)); // Only reset today value when pvwatt above 1 watt otherwise this gets resets during shutdown
           value = double((uint32_t(RxBuffer[15]) << 24) + (uint32_t(RxBuffer[16]) << 16) + (uint16_t(RxBuffer[17]) << 8) + RxBuffer[18]) / 10;
           _growatt_callback("grid/total/kwh", String(value, 1));
           intvalue = ((uint32_t(RxBuffer[19]) << 24) + (uint32_t(RxBuffer[20]) << 16) + (uint16_t(RxBuffer[21]) << 8) + RxBuffer[22]);
