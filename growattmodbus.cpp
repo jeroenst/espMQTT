@@ -44,7 +44,7 @@ bool update_growatt() {
 
   _growattModbus_callback("status", "querying");
 
-  result = node.readInputRegisters(0, 32);
+  result = node.readInputRegisters(0, 33);
   // do something with data if read is successful
   if (result == node.ku8MBSuccess){
 
