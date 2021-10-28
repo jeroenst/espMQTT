@@ -59,16 +59,16 @@ bool update_growatt() {
     }
     
     
-    _growattModbus_callback("status", String(glueFloat(node.getResponseBuffer(1), node.getResponseBuffer(2)),1));    
+    _growattModbus_callback("status", String(node.getResponseBuffer(0),0));    
 
     _growattModbus_callback("pv/watt", String(glueFloat(node.getResponseBuffer(1), node.getResponseBuffer(2)),1));    
 
-    _growattModbus_callback("pv/1/volt", String(glueFloat(0, node.getResponseBuffer(3)),3));    
-    _growattModbus_callback("pv/1/amp",  String(glueFloat(0, node.getResponseBuffer(4)),3));    
+    _growattModbus_callback("pv/1/volt", String(glueFloat(0, node.getResponseBuffer(3)),1));    
+    _growattModbus_callback("pv/1/amp",  String(glueFloat(0, node.getResponseBuffer(4)),1));    
     _growattModbus_callback("pv/1/watt", String(glueFloat(node.getResponseBuffer(5), node.getResponseBuffer(6)),1));
 
-    _growattModbus_callback("pv/2/volt", String(glueFloat(0, node.getResponseBuffer(7)),3));    
-    _growattModbus_callback("pv/2/amp",  String(glueFloat(0, node.getResponseBuffer(8)),3));    
+    _growattModbus_callback("pv/2/volt", String(glueFloat(0, node.getResponseBuffer(7)),1));    
+    _growattModbus_callback("pv/2/amp",  String(glueFloat(0, node.getResponseBuffer(8)),1));    
     _growattModbus_callback("pv/2/watt", String(glueFloat(node.getResponseBuffer(9), node.getResponseBuffer(10)),1));
     
     _growattModbus_callback("grid/watt", String(glueFloat(node.getResponseBuffer(11), node.getResponseBuffer(12)),1));
