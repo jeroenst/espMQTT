@@ -1,9 +1,9 @@
 #include "espMQTT.h"
 #include "smartmeter.h"
 
-void(*_smartmeter_callback)(String,String);
+void(*_smartmeter_callback)(char *,String);
 
-void smartmeter_init(void(*callback)(String,String))
+void smartmeter_init(void(*callback)(char *,String))
 {
   _smartmeter_callback = callback;
   

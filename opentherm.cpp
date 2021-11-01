@@ -9,9 +9,9 @@ WiFiServer otserver(25238);
 uint32_t wdresettimeout = 0;
 uint8_t resetstate = 1;
 
-void(*_opentherm_callback)(String, String);
+void(*_opentherm_callback)(char *, String);
 
-void opentherm_callback(String topic, String payload)
+void opentherm_callback(char * topic, String payload)
 {
   yield();
   _opentherm_callback(topic, payload);
@@ -60,7 +60,7 @@ void opentherm_reset()
   resetstate = 1;
 }
 
-void opentherm_init(void(*callback)(String, String))
+void opentherm_init(void(*callback)(char *, String))
 {
   Serial.setDebugOutput(false);
   Serial.setRxBufferSize(100);
@@ -110,7 +110,7 @@ int opentherm_handle()
     DEBUG_V("%sSERIAL RX:%s %s\n", COLOR_GREEN, COLOR_RESET, otmessage.c_str());
     yield();
     String otvalue = "";
-    String topic = "";
+    char *topic;
     uint16_t otintvalue = 0;
 
     if (otmessage.substring(0, 4) == "TC: ")
@@ -277,7 +277,7 @@ int opentherm_handle()
       }
     }
 
-    if (topic != "")
+    if (String(topic) != "")
     {
       _opentherm_callback(topic, otvalue);
       returnvalue++;

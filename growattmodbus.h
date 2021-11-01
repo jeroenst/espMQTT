@@ -1,5 +1,5 @@
-void growattModbus_init(void(*callback)(String,String), int fanpin = -1);
+void growattModbus_init(void(*callback)(char *,String), int fanpin = -1);
 void growattModbus_handle();
 
-#define GROWATTMODBUS_POLL_TIMER 3
+#define GROWATTMODBUS_POLL_TIMER 1
 #define GROWATTMODBUS_POLL_TIMER_ERROR 10

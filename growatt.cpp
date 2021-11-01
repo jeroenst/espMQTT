@@ -8,7 +8,7 @@
 #define _GROWAT_PWM_RANGE (PWMRANGE-GROWATT_FANSPEED_OFFSET)
 #define _GROWATT_FAN_PWM_FREQ 32
 
-void(*_growatt_callback)(String,String);
+void(*_growatt_callback)(char *,String);
 static int _growatt_fanpin = 0;
 static int _growatt_fanspeed = 0;
 static float _growatt_fan_pid_p = 0;
@@ -18,7 +18,7 @@ static float _growatt_fan_pid_error = 0;
 static float _growatt_fan_pid_preverror = 0;
 
 
-void growatt_init(void(*callback)(String,String), int fanpin)
+void growatt_init(void(*callback)(char *,String), int fanpin)
 {
   _growatt_callback = callback;
   Serial.setRxBufferSize(100); 

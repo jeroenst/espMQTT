@@ -15,7 +15,7 @@ static String _serialsendqueue = "";
 static unsigned long _nextupdatetime = 0;
 static bool recvok = 1;
 
-void(*_ducobox_callback)(String, String);
+void(*_ducobox_callback)(char *, String);
 
 void _ducobox_writeserialqueue()
 // The ducobox can't handle serial data at full speed, so send char followed by a pause before next char
@@ -85,8 +85,7 @@ void _ducobox_handleserial(String ducomessage)
       ducovalue = ducomessage.substring(19);
       ducovalue = ducovalue.substring(0, ducovalue.indexOf(' '));
 
-      topic = "1/fanspeed";
-      _ducobox_callback(topic, ducovalue);
+      _ducobox_callback("1/fanspeed", ducovalue);
       //ducocmd = 1;
     }
   }
@@ -98,8 +97,7 @@ void _ducobox_handleserial(String ducomessage)
     {
       ducovalue = ducomessage.substring(ducomessage.indexOf(":") + 2);
       ducovalue = ducovalue.substring(0, ducovalue.indexOf(" ["));
-      topic = "1/minfanspeed";
-      _ducobox_callback(topic, ducovalue);
+      _ducobox_callback("1/minfanspeed", ducovalue);
       //ducocmd = 2;
     }
   }
@@ -277,7 +275,7 @@ void ducobox_handle()
   }
 }
 
-void ducobox_init(uint8_t ducobox_relay0, uint8_t ducobox_relay1, uint8_t ducobox_refreshtime, void(*callback)(String, String))
+void ducobox_init(uint8_t ducobox_relay0, uint8_t ducobox_relay1, uint8_t ducobox_refreshtime, void(*callback)(char *, String))
 {
   _ducobox_callback = callback;
   _ducobox_relay0 = ducobox_relay0;

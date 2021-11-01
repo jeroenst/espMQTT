@@ -9,9 +9,9 @@ static String amgtempcmd = "";
 static uint8_t amgcmdnr = 0;
 static bool cooldown_phase_1 = false;
 
-void(*_amgpelletstove_callback)(String, String);
+void(*_amgpelletstove_callback)(char *, String);
 
-void amgpelletstove_init(void(*callback)(String, String))
+void amgpelletstove_init(void(*callback)(char *, String))
 {
   _amgpelletstove_callback = callback;
   Serial.setDebugOutput(false);

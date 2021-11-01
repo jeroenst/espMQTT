@@ -35,8 +35,8 @@
 // #define ESPMQTT_BEDROOM2
 // #define ESPMQTT_OPENTHERM
 // #define ESPMQTT_SMARTMETER
-#define ESPMQTT_GROWATT
-// #define ESPMQTT_GROWATT_MODBUS
+// #define ESPMQTT_GROWATT
+#define ESPMQTT_GROWATT_MODBUS
 // #define ESPMQTT_SDM120
 // #define ESPMQTT_DDM18SD
 // #define ESPMQTT_WATERMETER
@@ -667,7 +667,7 @@ struct Mainstate {
 } mainstate;
 
 struct dataMapStruct {
-  String payload = "";
+  char *payload;
   bool send = true;
   bool onair = false;
   bool publishregular = false;
@@ -681,7 +681,7 @@ uint16_t mqttlastpublishedpacketid = 0;
 
 
 
-SimpleMap<String, dataMapStruct> *dataMap = new SimpleMap<String, dataMapStruct>([](String &a, String &b) -> int {
+SimpleMap<char*, dataMapStruct> *dataMap = new SimpleMap<char*, dataMapStruct>([](char* &a, char* &b) -> int {
   if (a == b) return 0;      // a and b are equal
   else if (a > b) return 1;  // a is bigger than b
   else return -1;            // a is smaller than b
@@ -904,7 +904,7 @@ String getRandomString(int len) {
 
 void updateexternalip();
 
-String getdatamap(String topic)
+String getdatamap(char *topic)
 {
   return dataMap->get(topic).payload;
   yield();
@@ -914,19 +914,19 @@ void showdatamap()
 {
   for (int i = 0; i < dataMap->size(); i++)
   {
-    DEBUG("%s=%s (send=%d, onair=%d)\n", dataMap->getKey(i).c_str(), dataMap->getData(i).payload.c_str(), dataMap->getData(i).send, dataMap->getData(i).onair);
+    DEBUG("%s=%s (send=%d, onair=%d)\n", dataMap->getKey(i), dataMap->getData(i).payload, dataMap->getData(i).send, dataMap->getData(i).onair);
     yield();
   }
 }
 
-void putdatamap(String topic, String value, bool sendupdate = true, bool forceupdate = false, bool publishregular = true)
+void putdatamap(char *topic, String value, bool sendupdate = true, bool forceupdate = false, bool publishregular = true)
 {
   dataMapStruct datamapstruct = dataMap->get(topic);
 
-  if ((datamapstruct.payload != value) || forceupdate)
+  if ((String(datamapstruct.payload) != value) || forceupdate)
   {
     // Do not output debug for uptime
-    if (topic != "system/uptime") DEBUG_D ("DATAMAP %s=%s (sendupdate=%d, oldval=%s oldsend=%d forceupdate=%d)\n", topic.c_str(), value.c_str(), sendupdate, datamapstruct.payload.c_str(), datamapstruct.send, forceupdate);
+    if (topic != "system/uptime") DEBUG_D ("DATAMAP %s=%s (sendupdate=%d, oldval=%s oldsend=%d forceupdate=%d)\n", topic, value.c_str(), sendupdate, datamapstruct.payload, datamapstruct.send, forceupdate);
     if (topic == "status")
     {
       if (datamapstruct.payload == "upgrading")
@@ -939,7 +939,20 @@ void putdatamap(String topic, String value, bool sendupdate = true, bool forceup
     datamapstruct.onair = false;
     datamapstruct.send = sendupdate;
     datamapstruct.publishregular = publishregular;
-    datamapstruct.payload = value;
+    
+    int n = value.length() + 1;
+ 
+    // declaring character array
+    char *char_array;
+    char_array = (char*) malloc(n*sizeof(char));
+ 
+    // copying the contents of the
+    // string to char array
+    strcpy(char_array, value.c_str());
+
+    free(datamapstruct.payload);
+    
+    datamapstruct.payload = char_array;
     dataMap->put(topic, datamapstruct);
   }
 }
@@ -1382,7 +1395,7 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties,
     payloadstring += char(payload[i]);
   }
   String topicstring = topic;
-  DEBUG_D("MQTT RECEIVED topic=%s payload=%s\n", topicstring.c_str(), payloadstring.c_str());
+  DEBUG_D("MQTT RECEIVED topic=%s payload=%s\n", topic, payloadstring.c_str());
 
 #ifdef SONOFFCH
   for (byte i = 0; i < SONOFFCH; i++)
@@ -2637,9 +2650,9 @@ void loop()
     uint8_t nrofsamples;
     circuitspowermeter_read(circuitnr, mW, mVA, mA, mV, 10);
     if (circuitnr == 0) putdatamap("mainsvoltage", String(mV / 1000));
-    putdatamap("circuit/" + String((circuitnr + 1)) + "/mA", String(mA));
-    putdatamap("circuit/" + String((circuitnr + 1)) + "/W", String(mW / 1000));
-    putdatamap("circuit/" + String((circuitnr + 1)) + "/VA", String(mVA / 1000));
+    //putdatamap("circuit/" + String((circuitnr + 1)) + "/mA", String(mA));
+    //putdatamap("circuit/" + String((circuitnr + 1)) + "/W", String(mW / 1000));
+    //putdatamap("circuit/" + String((circuitnr + 1)) + "/VA", String(mVA / 1000));
     if (circuitnr < 14) circuitnr++;
     else circuitnr = 0;
 #endif
@@ -2934,7 +2947,7 @@ void publishdatamap(int32_t packetId, bool publishall, bool init, bool publishre
     int32_t publishallpointer = 0;
     while (publishallpointer < dataMap->size())
     {
-      String topic = dataMap->getKey(publishallpointer);
+      char *topic = dataMap->getKey(publishallpointer);
       dataMapStruct data = dataMap->getData(publishallpointer);
       data.onair = false;
       if (publishall) data.send = true;
@@ -2956,7 +2969,7 @@ void publishdatamap(int32_t packetId, bool publishall, bool init, bool publishre
         // If packetId == 0 resend because packet was not acked
         DEBUG_V("Not received mqtt ack id=%d\n", packetId);
         waitingforack = true;
-        String topic = dataMap->getKey(datamappointer);
+        char *topic = dataMap->getKey(datamappointer);
         String sendtopic = String("home/" + esp_hostname + "/" + topic);
         dataMapStruct data = dataMap->getData(datamappointer);
         String payload = data.payload;
@@ -2972,7 +2985,7 @@ void publishdatamap(int32_t packetId, bool publishall, bool init, bool publishre
       {
         // Packet succesfull delivered proceed to next item
         DEBUG_V("Received mqtt ack id=%d\n", packetId);
-        String topic = dataMap->getKey(datamappointer);
+        char *topic = dataMap->getKey(datamappointer);
         dataMapStruct data = dataMap->getData(datamappointer);
         if (data.onair)
         {
@@ -2993,20 +3006,20 @@ void publishdatamap(int32_t packetId, bool publishall, bool init, bool publishre
         nextpacketId = -1;
         while ((datamappointer < dataMap->size()) && (nextpacketId == -1))
         {
-          String topic = dataMap->getKey(datamappointer);
+          char *topic = dataMap->getKey(datamappointer);
           dataMapStruct data = dataMap->getData(datamappointer);
           //DEBUG ("datamappointer=%d datamapsize=%d send=%d\n", datamappointer, dataMap->size(), data.send);
           if (data.send)
           {
             String sendtopic = String(mqtt_topicprefix + topic);
-            nextpacketId = mqttClient.publish(sendtopic.c_str(), 1, true, data.payload.c_str());
+            nextpacketId = mqttClient.publish(sendtopic.c_str(), 1, true, data.payload);
             if (nextpacketId > 0)
             {
               waitingforack = true;
               data.onair = true;
               dataMap->put(topic, data);
             }
-            DEBUG_D ("MQTT PUBLISHING DATAMAP %s=%s (nextpacketId=%d)\n", topic.c_str(), data.payload.c_str(), nextpacketId);
+            DEBUG_D ("MQTT PUBLISHING DATAMAP %s=%s (nextpacketId=%d)\n", topic, data.payload, nextpacketId);
           }
           else
           {
@@ -3530,7 +3543,7 @@ void handleJsonData() {
   webserver.send(200, "text/html", "{");
   for (int i = 0; i < dataMap->size(); i++)
   {
-    webserver.sendContent ("\"" + dataMap->getKey(i) + "\":\"" + dataMap->getData(i).payload);
+    webserver.sendContent ("\"" + String(dataMap->getKey(i)) + "\":\"" + dataMap->getData(i).payload);
     if (i < dataMap->size() - 1) webserver.sendContent("\",");
   }
   webserver.sendContent("\"}");
@@ -3593,35 +3606,35 @@ void qswifiswitch_switchcallback(uint8_t channel, bool switchstate)
 }
 #endif
 
-void ducoboxcallback (String topic, String payload)
+void ducoboxcallback (char *topic, String payload)
 {
   putdatamap(topic, payload);
 }
 
-void amgpelletstovecallback (String topic, String payload)
+void amgpelletstovecallback (char *topic, String payload)
 {
   putdatamap(topic, payload);
 }
 
-void bht002callback (String topic, String payload)
-{
-  putdatamap(topic, payload);
-  yield();
-}
-
-void tuyacallback (String topic, String payload)
+void bht002callback (char *topic, String payload)
 {
   putdatamap(topic, payload);
   yield();
 }
 
-void openthermcallback (String topic, String payload)
+void tuyacallback (char *topic, String payload)
+{
+  putdatamap(topic, payload);
+  yield();
+}
+
+void openthermcallback (char *topic, String payload)
 {
   putdatamap(topic, payload);
 }
 
 #ifdef  ESPMQTT_GROWATT
-void growattcallback (String topic, String payload)
+void growattcallback (char *topic, String payload)
 {
   if (topic == "status")
   {
@@ -3633,7 +3646,7 @@ void growattcallback (String topic, String payload)
 #endif
 
 #ifdef  ESPMQTT_GROWATT_MODBUS
-void growattModbuscallback (String topic, String payload)
+void growattModbuscallback (char *topic, String payload)
 {
   if (topic == "status")
   {
@@ -3645,7 +3658,7 @@ void growattModbuscallback (String topic, String payload)
 #endif
 
 #ifdef  ESPMQTT_SMARTMETER
-void smartmetercallback (String topic, String payload)
+void smartmetercallback (char *topic, String payload)
 {
   static uint32 nextupdatetime = 0;
   static bool sendupdate = 0;
