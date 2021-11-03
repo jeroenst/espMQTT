@@ -13,7 +13,7 @@ bool bht002_preventdeviceoff = true;
 bool bht002_wificonnected = false;
 bool bht002_initready = false;
 
-void(*_bht002_callback)(char *, String);
+void(*_bht002_callback)(const char *, String);
 
 void bht002_commandCharsToSerial(unsigned int length, unsigned char* command)
 {
@@ -66,7 +66,7 @@ void bht002_sendtime()
   bht002_commandCharsToSerial(14, cancelConfigCommand);
 }
 
-void bht002_init(void(*callback)(char *, String))
+void bht002_init(void(*callback)(const char *, String))
 {
   Serial.begin(9600, SERIAL_8N1);
   Serial.setRxBufferSize(200);

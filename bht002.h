@@ -1,4 +1,4 @@
-void bht002_init(void(*callback)(char *,String));
+void bht002_init(void(*callback)(const char *,String));
 void bht002_connected();
 void bht002_disconnected();
 void bht002_handle();

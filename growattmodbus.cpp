@@ -10,9 +10,9 @@
 
 ModbusMaster node;
 
-void(*_growattModbus_callback)(char *, String);
+void(*_growattModbus_callback)(const char*, String);
 
-void growattModbus_init(void(*callback)(char *, String), int fanpin)
+void growattModbus_init(void(*callback)(const char *, String), int fanpin)
 {
   _growattModbus_callback = callback;
   Serial.setRxBufferSize(10);
@@ -44,7 +44,9 @@ bool update_growatt() {
 
   switch (itteration)
   {
+    default:
     case 0:
+      itteration = 0;
       _growattModbus_callback("status", "querying");
       result = node.readInputRegisters(0, 11);
       break;

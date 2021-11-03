@@ -35,8 +35,8 @@
 // #define ESPMQTT_BEDROOM2
 // #define ESPMQTT_OPENTHERM
 // #define ESPMQTT_SMARTMETER
-// #define ESPMQTT_GROWATT
-#define ESPMQTT_GROWATT_MODBUS
+#define ESPMQTT_GROWATT
+// #define ESPMQTT_GROWATT_MODBUS
 // #define ESPMQTT_SDM120
 // #define ESPMQTT_DDM18SD
 // #define ESPMQTT_WATERMETER
@@ -238,7 +238,7 @@ QsWifiSwitch qswifiswitch(QSWIFISWITCHCHANNELS);
 #define FLASHBUTTON D3
 #define ESPLED D4
 #include "amgpelletstove.h"
-#undef SERIALLOG
+//#undef SERIALLOG
 #endif
 
 #ifdef  ESPMQTT_WEATHER
@@ -681,7 +681,7 @@ uint16_t mqttlastpublishedpacketid = 0;
 
 
 
-SimpleMap<char*, dataMapStruct> *dataMap = new SimpleMap<char*, dataMapStruct>([](char* &a, char* &b) -> int {
+SimpleMap<const char*, dataMapStruct> *dataMap = new SimpleMap<const char*, dataMapStruct>([](const char* &a, const char* &b) -> int {
   if (a == b) return 0;      // a and b are equal
   else if (a > b) return 1;  // a is bigger than b
   else return -1;            // a is smaller than b
@@ -695,42 +695,42 @@ SimpleMap<int, String> *eepromMap = new SimpleMap<int, String>([](int &a, int &b
 
 
 static const char *dataNames[] PROGMEM =
-        { "hostname", 
-          "firmware/name", 
-          "firmware/target", 
-          "firmware/sourcefile", 
-          "firmware/version", 
-          "firmware/compiletime", 
-          "status", 
-          "status/upgrade", 
-          "flash/id", 
-          "flash/size/real", 
-          "flash/size/ide",
-          "flash/mode", 
-          "flash/speed",
-          "system/chipid",
-          "system/uptime",
-          "system/freeram",
-          "wifi/mac",
-          "wifi/state",
-          "wifi/localip",
-          "wifi/ssid",
-          "wifi/bssid",
-          "wifi/rssi",
-          "wifi/externalip",
-          "mqtt/server",
-          "mqtt/port",
-          "mqtt/sll",
-          "mqtt/state",
-          "mqtt/user",
-          "mqtt/clientid",
-          "mqtt/user"
-        };
-          
+{ "hostname",
+  "firmware/name",
+  "firmware/target",
+  "firmware/sourcefile",
+  "firmware/version",
+  "firmware/compiletime",
+  "status",
+  "status/upgrade",
+  "flash/id",
+  "flash/size/real",
+  "flash/size/ide",
+  "flash/mode",
+  "flash/speed",
+  "system/chipid",
+  "system/uptime",
+  "system/freeram",
+  "wifi/mac",
+  "wifi/state",
+  "wifi/localip",
+  "wifi/ssid",
+  "wifi/bssid",
+  "wifi/rssi",
+  "wifi/externalip",
+  "mqtt/server",
+  "mqtt/port",
+  "mqtt/sll",
+  "mqtt/state",
+  "mqtt/user",
+  "mqtt/clientid",
+  "mqtt/user"
+};
+
 
 struct {
- char status[10] = "online";
- char status_upgrade[10] = "online";
+  char status[10] = "online";
+  char status_upgrade[10] = "online";
 } dataValues;
 
 const char* getDataValue(const char *dataName)
@@ -748,7 +748,7 @@ const char* getDataValue(const char *dataName)
     bool sendupdate = false;
     bool forceupdate = false;
     bool publishregular = false;
-    
+
   } status[20];
 
   if (!initialized)
@@ -768,7 +768,7 @@ const char* getDataValue(const char *dataName)
     status[10].value = flash_size_ide;
     status[11].value = flash_mode;
 
-    
+
     strcat(compiletime, __DATE__);
     strcat(compiletime, " ");
     strcat(compiletime, __TIME__);
@@ -904,7 +904,7 @@ String getRandomString(int len) {
 
 void updateexternalip();
 
-String getdatamap(char *topic)
+String getdatamap(const char *topic)
 {
   return dataMap->get(topic).payload;
   yield();
@@ -919,42 +919,46 @@ void showdatamap()
   }
 }
 
-void putdatamap(char *topic, String value, bool sendupdate = true, bool forceupdate = false, bool publishregular = true)
+void putdatamap(const char *topic, String value, bool sendupdate = true, bool forceupdate = false, bool publishregular = true)
 {
   dataMapStruct datamapstruct = dataMap->get(topic);
 
-  if ((String(datamapstruct.payload) != value) || forceupdate)
+  if (dataMap->has(topic))
   {
-    // Do not output debug for uptime
-    if (topic != "system/uptime") DEBUG_D ("DATAMAP %s=%s (sendupdate=%d, oldval=%s oldsend=%d forceupdate=%d)\n", topic, value.c_str(), sendupdate, datamapstruct.payload, datamapstruct.send, forceupdate);
-    if (topic == "status")
+    if ((strcmp (datamapstruct.payload , value.c_str()) == 0) && !forceupdate) return;
+
+    if (strcmp(topic, "status") == 0)
     {
-      if (datamapstruct.payload == "upgrading")
+      if (strcmp (datamapstruct.payload, "upgrading") == 0)
       {
         // When upgrading only accept upgradefailed or upgradedone as value
         if ((value != "upgrade_exit") && (value != "rebooting")) return;
         if (value == "upgrade_exit") value = "online";
       }
     }
-    datamapstruct.onair = false;
-    datamapstruct.send = sendupdate;
-    datamapstruct.publishregular = publishregular;
-    
-    int n = value.length() + 1;
- 
-    // declaring character array
-    char *char_array;
-    char_array = (char*) malloc(n*sizeof(char));
- 
-    // copying the contents of the
-    // string to char array
-    strcpy(char_array, value.c_str());
-
-    free(datamapstruct.payload);
-    
-    datamapstruct.payload = char_array;
-    dataMap->put(topic, datamapstruct);
   }
+
+  // Do not output debug for uptime
+  if (strcmp(topic, "system/uptime") != 0) DEBUG_D ("DATAMAP %s=%s (sendupdate=%d, oldval=%s oldsend=%d forceupdate=%d)\n", topic, value.c_str(), sendupdate, datamapstruct.payload, datamapstruct.send, forceupdate);
+
+  datamapstruct.onair = false;
+  datamapstruct.send = sendupdate;
+  datamapstruct.publishregular = publishregular;
+
+  int n = value.length() + 1;
+
+  // declaring character array
+  char *char_array;
+  char_array = (char*) malloc(n * sizeof(char));
+
+  // copying the contents of the
+  // string to char array
+  strcpy(char_array, value.c_str());
+
+  free(datamapstruct.payload);
+
+  datamapstruct.payload = char_array;
+  dataMap->put(topic, datamapstruct);
 }
 #ifdef  ESPMQTT_BBQTEMP
 double MAX6675_readCelsius(uint8_t cs)
@@ -2886,7 +2890,10 @@ void sonoff_handle()
     inverse = true;
 #endif
     String relaystate = digitalRead(sonoff_relays[i]) != inverse ? "1" : "0";
-    putdatamap ("relay/" + String(i), relaystate);
+    if (i == 0) putdatamap ("relay/0", relaystate);
+    if (i == 1) putdatamap ("relay/1", relaystate);
+    if (i == 2) putdatamap ("relay/2", relaystate);
+    if (i == 3) putdatamap ("relay/3", relaystate);
   }
 
 #ifdef HLW8012_CF_PIN
@@ -2947,7 +2954,7 @@ void publishdatamap(int32_t packetId, bool publishall, bool init, bool publishre
     int32_t publishallpointer = 0;
     while (publishallpointer < dataMap->size())
     {
-      char *topic = dataMap->getKey(publishallpointer);
+      const char *topic = dataMap->getKey(publishallpointer);
       dataMapStruct data = dataMap->getData(publishallpointer);
       data.onair = false;
       if (publishall) data.send = true;
@@ -2969,7 +2976,7 @@ void publishdatamap(int32_t packetId, bool publishall, bool init, bool publishre
         // If packetId == 0 resend because packet was not acked
         DEBUG_V("Not received mqtt ack id=%d\n", packetId);
         waitingforack = true;
-        char *topic = dataMap->getKey(datamappointer);
+        const char *topic = dataMap->getKey(datamappointer);
         String sendtopic = String("home/" + esp_hostname + "/" + topic);
         dataMapStruct data = dataMap->getData(datamappointer);
         String payload = data.payload;
@@ -2985,7 +2992,7 @@ void publishdatamap(int32_t packetId, bool publishall, bool init, bool publishre
       {
         // Packet succesfull delivered proceed to next item
         DEBUG_V("Received mqtt ack id=%d\n", packetId);
-        char *topic = dataMap->getKey(datamappointer);
+        const char *topic = dataMap->getKey(datamappointer);
         dataMapStruct data = dataMap->getData(datamappointer);
         if (data.onair)
         {
@@ -3006,7 +3013,7 @@ void publishdatamap(int32_t packetId, bool publishall, bool init, bool publishre
         nextpacketId = -1;
         while ((datamappointer < dataMap->size()) && (nextpacketId == -1))
         {
-          char *topic = dataMap->getKey(datamappointer);
+          const char *topic = dataMap->getKey(datamappointer);
           dataMapStruct data = dataMap->getData(datamappointer);
           //DEBUG ("datamappointer=%d datamapsize=%d send=%d\n", datamappointer, dataMap->size(), data.send);
           if (data.send)
@@ -3567,8 +3574,16 @@ void qswifidimmer_callback (uint8_t , uint8_t dimvalue, bool dimstate)
 #if (QSWIFIDIMMERCHANNELS == 2)
 void qswifidimmer_callback (uint8_t dimchannel, uint8_t dimvalue, bool dimstate)
 {
-  putdatamap ("dimvalue/" + String(dimchannel), String(dimvalue));
-  putdatamap ("dimstate/" + String(dimchannel), String(dimstate));
+  if (dimchannel == 0)
+  {
+    putdatamap ("dimvalue/0", String(dimvalue));
+    putdatamap ("dimstate/0", String(dimstate));
+  }
+  if (dimchannel == 1)
+  {
+    putdatamap ("dimvalue/1", String(dimvalue));
+    putdatamap ("dimstate/1", String(dimstate));
+  }
 }
 #endif
 
@@ -3581,7 +3596,8 @@ void qswifidimmer_switchcallback(uint8_t , bool switchstate)
 #if (QSWIFIDIMMERCHANNELS == 2)
 void qswifidimmer_switchcallback(uint8_t dimchannel, bool switchstate)
 {
-  putdatamap ("switchstate/" + String(dimchannel), String(switchstate));
+  if (dimchannel == 0) putdatamap ("switchstate/0", String(switchstate));
+  if (dimchannel == 1) putdatamap ("switchstate/0", String(switchstate));
 }
 #endif
 
@@ -3598,43 +3614,45 @@ void qswifiswitch_switchcallback(uint8_t , bool switchstate)
 #if (QSWIFISWITCHCHANNELS == 2)
 void qswifiswitch_relaycallback(uint8_t channel, bool state)
 {
-  putdatamap ("relaystate/" + String(channel), String(state));
+  if (channel == 0) putdatamap ("relaystate/0", String(state));
+  if (channel == 1) putdatamap ("relaystate/1", String(state));
 }
 void qswifiswitch_switchcallback(uint8_t channel, bool switchstate)
 {
-  putdatamap ("switchstate/" + String(channel), String(switchstate));
+  if (channel == 0) putdatamap ("switchstate/0", String(switchstate));
+  if (channel == 1) putdatamap ("switchstate/1", String(switchstate));
 }
 #endif
 
-void ducoboxcallback (char *topic, String payload)
+void ducoboxcallback (const char *topic, String payload)
 {
   putdatamap(topic, payload);
 }
 
-void amgpelletstovecallback (char *topic, String payload)
+void amgpelletstovecallback (const char *topic, String payload)
 {
   putdatamap(topic, payload);
 }
 
-void bht002callback (char *topic, String payload)
-{
-  putdatamap(topic, payload);
-  yield();
-}
-
-void tuyacallback (char *topic, String payload)
+void bht002callback (const char *topic, String payload)
 {
   putdatamap(topic, payload);
   yield();
 }
 
-void openthermcallback (char *topic, String payload)
+void tuyacallback (const char *topic, String payload)
+{
+  putdatamap(topic, payload);
+  yield();
+}
+
+void openthermcallback (const char *topic, String payload)
 {
   putdatamap(topic, payload);
 }
 
 #ifdef  ESPMQTT_GROWATT
-void growattcallback (char *topic, String payload)
+void growattcallback (const char *topic, String payload)
 {
   if (topic == "status")
   {
@@ -3646,7 +3664,7 @@ void growattcallback (char *topic, String payload)
 #endif
 
 #ifdef  ESPMQTT_GROWATT_MODBUS
-void growattModbuscallback (char *topic, String payload)
+void growattModbuscallback (const char *topic, String payload)
 {
   if (topic == "status")
   {
@@ -3658,7 +3676,7 @@ void growattModbuscallback (char *topic, String payload)
 #endif
 
 #ifdef  ESPMQTT_SMARTMETER
-void smartmetercallback (char *topic, String payload)
+void smartmetercallback (const char *topic, String payload)
 {
   static uint32 nextupdatetime = 0;
   static bool sendupdate = 0;
@@ -3668,7 +3686,7 @@ void smartmetercallback (char *topic, String payload)
     if (payload == "receiving") digitalWrite(NODEMCULEDPIN, 1);
     else digitalWrite(NODEMCULEDPIN, 0);
   }
-  
+
   if ((nextupdatetime < uptime) && (topic == "status") && (payload == "receiving")) // wait for start of new packet from smartmeter
   {
     sendupdate = 1;
@@ -4198,7 +4216,7 @@ void setup() {
 }
 
 
-static void handleDataExternalIpServer(void*, AsyncClient* client, void *data, size_t len) {
+static void handleDataExternalIpServer(void*, AsyncClient * client, void *data, size_t len) {
   char *chardata = (char *)data;
   String datastring = "";
   for (unsigned int i = 0; i < len; i++)
@@ -4216,7 +4234,7 @@ static void handleDataExternalIpServer(void*, AsyncClient* client, void *data, s
   client->close();
 }
 
-void onConnectExternalIpServer(void*, AsyncClient* client) {
+void onConnectExternalIpServer(void*, AsyncClient * client) {
   client->add("GET /extip.php\r\n", 16);
   client->send();
 }

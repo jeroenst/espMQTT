@@ -15,7 +15,7 @@ static String _serialsendqueue = "";
 static unsigned long _nextupdatetime = 0;
 static bool recvok = 1;
 
-void(*_ducobox_callback)(char *, String);
+void(*_ducobox_callback)(const char *, String);
 
 void _ducobox_writeserialqueue()
 // The ducobox can't handle serial data at full speed, so send char followed by a pause before next char
@@ -275,7 +275,7 @@ void ducobox_handle()
   }
 }
 
-void ducobox_init(uint8_t ducobox_relay0, uint8_t ducobox_relay1, uint8_t ducobox_refreshtime, void(*callback)(char *, String))
+void ducobox_init(uint8_t ducobox_relay0, uint8_t ducobox_relay1, uint8_t ducobox_refreshtime, void(*callback)(const char *, String))
 {
   _ducobox_callback = callback;
   _ducobox_relay0 = ducobox_relay0;

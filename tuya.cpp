@@ -26,7 +26,7 @@ static uint8_t tuya_dimstate0 = 0;
 static uint8_t tuya_dimstate1 = 0;
 
 
-void(*_tuya_callback)(String, String);
+void(*_tuya_callback)(const char *, String);
 
 void tuya_commandCharsToSerial(unsigned int length, unsigned char* command)
 {
@@ -53,7 +53,7 @@ void tuya_commandCharsToSerial(unsigned int length, unsigned char* command)
   Serial.flush();
 }
 
-void tuya_init(void(*callback)(String, String))
+void tuya_init(void(*callback)(const char *, String))
 {
   Serial.begin(9600, SERIAL_8N1);
   Serial.setRxBufferSize(100);

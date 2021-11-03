@@ -1,4 +1,4 @@
-void tuya_init(void(*callback)(String,String));
+void tuya_init(void(*callback)(const char *,String));
 void tuya_handle();
 void tuya_connected();
 void tuya_connectedMQTT();
