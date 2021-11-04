@@ -12,6 +12,7 @@ ModbusMaster node;
 
 void(*_growattModbus_callback)(const char*, String);
 
+
 void growattModbus_init(void(*callback)(const char *, String), int fanpin)
 {
   _growattModbus_callback = callback;
@@ -24,6 +25,7 @@ void growattModbus_init(void(*callback)(const char *, String), int fanpin)
   _growattModbus_callback("grid/today/kwh", "-");
   _growattModbus_callback("grid/total/kwh", "-");
   _growattModbus_callback("inverter/hours", "-");
+  node.idle(yield);
 }
 
 
@@ -137,7 +139,7 @@ void growattModbus_handle()
 {
   static long long nextupdatetime = 0;
 
-  if (millis() > nextupdatetime)
+  if ((millis() > nextupdatetime) && (millis() > 5000))
   {
     if (update_growatt())
     {
