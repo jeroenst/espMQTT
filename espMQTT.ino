@@ -1880,7 +1880,7 @@ void loop()
     DEBUG_I("Connected to WiFi SSID=%s RSSI=%d\n", WiFi.SSID().c_str(), WiFi.RSSI());
     //syslogN("Connected to WiFi SSID=%s RSSI=%d\n", WiFi.SSID().c_str(), WiFi.RSSI());
     initMqtt();
-    connectToMqtt();
+    mqttReconnectTimer.once(1, connectToMqtt); // Wait 1 second before connecting mqtt
     MDNS.begin(esp_hostname);
     MDNS.addService("http", "tcp", 80);
 
