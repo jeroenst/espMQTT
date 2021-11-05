@@ -110,7 +110,7 @@ int opentherm_handle()
     DEBUG_V("%sSERIAL RX:%s %s\n", COLOR_GREEN, COLOR_RESET, otmessage.c_str());
     yield();
     String otvalue = "";
-    const char *topic;
+    const char *topic = "";
     uint16_t otintvalue = 0;
 
     if (otmessage.substring(0, 4) == "TC: ")
@@ -277,7 +277,7 @@ int opentherm_handle()
       }
     }
 
-    if (String(topic) != "")
+    if (strcmp(topic, ""))
     {
       _opentherm_callback(topic, otvalue);
       returnvalue++;
