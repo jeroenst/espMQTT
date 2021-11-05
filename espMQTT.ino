@@ -30,12 +30,12 @@
 
 /* ESP8266 */
 // #define ESPMQTT_WEATHER
-// #define ESPMQTT_AMGPELLETSTOVE
+#define ESPMQTT_AMGPELLETSTOVE
 // #define ESPMQTT_BATHROOM
 // #define ESPMQTT_BEDROOM2
 // #define ESPMQTT_OPENTHERM
 // #define ESPMQTT_SMARTMETER
-#define ESPMQTT_GROWATT
+// #define ESPMQTT_GROWATT
 // #define ESPMQTT_GROWATT_MODBUS
 // #define ESPMQTT_SDM120
 // #define ESPMQTT_DDM18SD
@@ -687,7 +687,7 @@ SimpleMap<const char*, dataMapStruct> *dataMap = new SimpleMap<const char*, data
   else return -1;            // a is smaller than b
 });
 
-SimpleMap<int, String> *eepromMap = new SimpleMap<int, String>([](int &a, int &b) -> int {
+SimpleMap<int, char *> *eepromMap = new SimpleMap<int, char *>([](int &a, int &b) -> int {
   if (a == b) return 0;      // a and b are equal
   else if (a > b) return 1;  // a is bigger than b
   else return -1;            // a is smaller than b
@@ -955,7 +955,10 @@ void putdatamap(const char *topic, String value, bool sendupdate = true, bool fo
   // string to char array
   strcpy(char_array, value.c_str());
 
-  free(datamapstruct.payload);
+  if (dataMap->has(topic))
+  {
+    free(datamapstruct.payload);
+  }
 
   datamapstruct.payload = char_array;
   dataMap->put(topic, datamapstruct);
@@ -3078,8 +3081,7 @@ byte oldeeprom_read()
   String data = "";
   while (oldeeprom_read(&data, eepromindex))
   {
-    eepromMap->put(eepromindex, data);
-    eepromindex++;
+    eeprom_write(data, eepromindex);
   }
   return eepromindex;
 }
@@ -3113,9 +3115,25 @@ void eeprom_write(String value, int eepromindex)
   DEBUG_D("eeprom_write %d,%s\n", eepromindex, value.c_str());
   for (int i = 0; i < eepromindex; i++)
   {
-    if (!eepromMap->has(i)) eepromMap->put(i, "");
+    char *eepromchararray;
+    if (!eepromMap->has(i))
+    {
+      eepromchararray = eepromMap->get(i);
+      free (eepromchararray);
+    }
   }
-  eepromMap->put(eepromindex, value);
+  int n = value.length() + 1;
+
+  // declaring character array
+  char *char_array;
+  char_array = (char*) malloc(n * sizeof(char));
+
+  // copying the contents of the
+  // string to char array
+  strcpy(char_array, value.c_str());
+
+
+  eepromMap->put(eepromindex, char_array);
 }
 
 uint8_t eeprom_read()
@@ -3142,7 +3160,7 @@ uint8_t eeprom_read()
       return 0;
       DEBUG_E("Error reading eeprom index %d (wrong checksum)!", index);
     }
-    eepromMap->put(index++, data);
+    eeprom_write(data, index++);
   }
   return 1;
 }
@@ -3655,7 +3673,7 @@ void openthermcallback (const char *topic, String payload)
 #ifdef  ESPMQTT_GROWATT
 void growattcallback (const char *topic, String payload)
 {
-  if (topic == "status")
+  if (strcmp(topic,"status") == 0)
   {
     if (payload == "ready") digitalWrite(NODEMCULEDPIN, 0);
     else digitalWrite(NODEMCULEDPIN, 1);
@@ -3667,7 +3685,7 @@ void growattcallback (const char *topic, String payload)
 #ifdef  ESPMQTT_GROWATT_MODBUS
 void growattModbuscallback (const char *topic, String payload)
 {
-  if (topic == "status")
+  if (strcmp(topic, "status"))
   {
     if (payload == "ready") digitalWrite(NODEMCULEDPIN, 0);
     else digitalWrite(NODEMCULEDPIN, 1);
@@ -3682,13 +3700,13 @@ void smartmetercallback (const char *topic, String payload)
   static uint32 nextupdatetime = 0;
   static bool sendupdate = 0;
 
-  if (topic == "status")
+  if (strcmp(topic, "status") == 0)
   {
-    if (payload == "receiving") digitalWrite(NODEMCULEDPIN, 1);
+    if (strcmp(payload, "receiving")) digitalWrite(NODEMCULEDPIN, 1);
     else digitalWrite(NODEMCULEDPIN, 0);
   }
 
-  if ((nextupdatetime < uptime) && (topic == "status") && (payload == "receiving")) // wait for start of new packet from smartmeter
+  if ((nextupdatetime < uptime) && (strcmp(topic, "status") == 0) && (strcmp(payload, "receiving") == 0)) // wait for start of new packet from smartmeter
   {
     sendupdate = 1;
     nextupdatetime = uptime + 8; // wait 8 seconds before accepting new values from smartmeter (some smartmeters keep sending out data)
@@ -3696,7 +3714,7 @@ void smartmetercallback (const char *topic, String payload)
 
   if (sendupdate) putdatamap(topic, payload);
 
-  if ((topic == "status") && (payload == "ready") && sendupdate) // stop processing when a complete packet was pushed to datamap
+  if ((strcmp(topic, "status") == 0) && (strcmp (payload, "ready") == 0) && sendupdate) // stop processing when a complete packet was pushed to datamap
   {
     sendupdate = 0;
   }
