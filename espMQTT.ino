@@ -30,7 +30,7 @@
 
 /* ESP8266 */
 // #define ESPMQTT_WEATHER
-#define ESPMQTT_AMGPELLETSTOVE
+// #define ESPMQTT_AMGPELLETSTOVE
 // #define ESPMQTT_BATHROOM
 // #define ESPMQTT_BEDROOM2
 // #define ESPMQTT_OPENTHERM
@@ -61,7 +61,7 @@
 // #define ESPMQTT_IRRIGATION
 // #define ESPMQTT_BLITZWOLF
 // #define ESPMQTT_QSWIFIDIMMERD01
-// #define ESPMQTT_QSWIFIDIMMERD02
+#define ESPMQTT_QSWIFIDIMMERD02
 // #define ESPMQTT_SONOFF4CH //ESP8285
 // #define ESPMQTT_SONOFFDUAL
 // #define ESPMQTT_SONOFFS20_PRINTER
@@ -3616,7 +3616,7 @@ void qswifidimmer_switchcallback(uint8_t , bool switchstate)
 void qswifidimmer_switchcallback(uint8_t dimchannel, bool switchstate)
 {
   if (dimchannel == 0) putdatamap ("switchstate/0", String(switchstate));
-  if (dimchannel == 1) putdatamap ("switchstate/0", String(switchstate));
+  if (dimchannel == 1) putdatamap ("switchstate/1", String(switchstate));
 }
 #endif
 
