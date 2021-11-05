@@ -3702,11 +3702,11 @@ void smartmetercallback (const char *topic, String payload)
 
   if (strcmp(topic, "status") == 0)
   {
-    if (strcmp(payload, "receiving")) digitalWrite(NODEMCULEDPIN, 1);
+    if (payload == "receiving") digitalWrite(NODEMCULEDPIN, 1);
     else digitalWrite(NODEMCULEDPIN, 0);
   }
 
-  if ((nextupdatetime < uptime) && (strcmp(topic, "status") == 0) && (strcmp(payload, "receiving") == 0)) // wait for start of new packet from smartmeter
+  if ((nextupdatetime < uptime) && (strcmp(topic, "status") == 0) && (payload == "receiving")) // wait for start of new packet from smartmeter
   {
     sendupdate = 1;
     nextupdatetime = uptime + 8; // wait 8 seconds before accepting new values from smartmeter (some smartmeters keep sending out data)
@@ -3714,7 +3714,7 @@ void smartmetercallback (const char *topic, String payload)
 
   if (sendupdate) putdatamap(topic, payload);
 
-  if ((strcmp(topic, "status") == 0) && (strcmp (payload, "ready") == 0) && sendupdate) // stop processing when a complete packet was pushed to datamap
+  if ((strcmp(topic, "status") == 0) && (payload == "ready") && sendupdate) // stop processing when a complete packet was pushed to datamap
   {
     sendupdate = 0;
   }
