@@ -960,6 +960,7 @@ void putdatamap(const char *topic, String value, bool sendupdate = true, bool fo
   datamapstruct.payload = char_array;
   dataMap->put(topic, datamapstruct);
 }
+
 #ifdef  ESPMQTT_BBQTEMP
 double MAX6675_readCelsius(uint8_t cs)
 {
