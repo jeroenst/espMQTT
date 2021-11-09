@@ -35,7 +35,7 @@ double glue(unsigned int d1, unsigned int d0) {
   return t;
 }
 
-bool update_growatt() {
+uint8_t update_growatt() {
   uint8_t result;
   static uint8_t itteration = 0;
 
@@ -110,7 +110,7 @@ bool update_growatt() {
     }
     node.clearResponseBuffer();
     itteration++;
-    return 0;
+    return itteration - 1;
   } else {
     _growattModbus_callback("inverter/status", "offline");
     _growattModbus_callback("inverter/status/value", "-");
@@ -129,7 +129,7 @@ bool update_growatt() {
     _growattModbus_callback("status", "commerror");
     node.clearResponseBuffer();
     itteration++;
-    return 1;
+    return 254;
   }
 }
 
@@ -139,13 +139,13 @@ void growattModbus_handle()
 
   if ((millis() > nextupdatetime) && (millis() > 5000))
   {
-    if (update_growatt())
+    if ((update_growatt() == 0) || (update_growatt() == 254))
     {
-      nextupdatetime = millis() + (GROWATTMODBUS_POLL_TIMER_ERROR * 1000);
+      nextupdatetime = millis() + (GROWATTMODBUS_POLL_LONG_TIMER * 1000);
     }
     else
     {
-      nextupdatetime = millis() + (GROWATTMODBUS_POLL_TIMER * 1000);
+      nextupdatetime = millis() + (GROWATTMODBUS_POLL_SHORT_TIMER * 1000);
     }
   }
 }
