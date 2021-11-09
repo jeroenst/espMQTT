@@ -2953,6 +2953,8 @@ void publishdatamap(int32_t packetId, bool publishall, bool init, bool publishre
 
   if ((packetId != -1) || publishall) DEBUG_V("Publishdatamap packetId=%d publishall=%d datamappointer=%d datamapsize=%d nextpacketid=%d waitingforack=%d\n", packetId, publishall, datamappointer, dataMap->size(), nextpacketId, waitingforack);
 
+  yield();
+
   if (publishall || publishregular)
   {
     int32_t publishallpointer = 0;
@@ -2966,9 +2968,12 @@ void publishdatamap(int32_t packetId, bool publishall, bool init, bool publishre
       dataMap->put(topic, data);
       publishallpointer++;
       //DEBUG("publishallpointer=%d datamapsize=%d\n",publishallpointer, dataMap->size());
+      yield();
     }
     datamappointer = 0;
   }
+
+  yield();
 
   // If connected to mqtt and waiting for ack wait for packetid which has to be acked
   if (mqttClient.connected())
@@ -3009,7 +3014,9 @@ void publishdatamap(int32_t packetId, bool publishall, bool init, bool publishre
       }
     }
 
-    // If not waiting for ack search for next item in datamap which has to be send
+    yield();
+
+  // If not waiting for ack search for next item in datamap which has to be send
     if (!waitingforack)
     {
       if (datamappointer < dataMap->size())
@@ -3031,6 +3038,7 @@ void publishdatamap(int32_t packetId, bool publishall, bool init, bool publishre
               dataMap->put(topic, data);
             }
             DEBUG_D ("MQTT PUBLISHING DATAMAP %s=%s (nextpacketId=%d)\n", topic, data.payload, nextpacketId);
+            yield();
           }
           else
           {
