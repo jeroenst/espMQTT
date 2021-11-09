@@ -35,7 +35,7 @@ double glue(unsigned int d1, unsigned int d0) {
   return t;
 }
 
-uint8_t update_growatt() {
+int8_t update_growatt() {
   uint8_t result;
   static uint8_t itteration = 0;
 
@@ -129,7 +129,7 @@ uint8_t update_growatt() {
     _growattModbus_callback("status", "commerror");
     node.clearResponseBuffer();
     itteration++;
-    return 254;
+    return -1;
   }
 }
 
@@ -139,7 +139,7 @@ void growattModbus_handle()
 
   if ((millis() > nextupdatetime) && (millis() > 5000))
   {
-    if ((update_growatt() == 0) || (update_growatt() == 254))
+    if (update_growatt() <= 0)
     {
       nextupdatetime = millis() + (GROWATTMODBUS_POLL_LONG_TIMER * 1000);
     }
