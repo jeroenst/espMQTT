@@ -38,6 +38,7 @@ void growattModbus_request() {
     case 0:
       growattModbus_itteration = 0;
       _growattModbus_callback("status", "querying");
+      modbus_request_function_code(1, 4, 0, 11);
       break;
     case 1:
       modbus_request_function_code(1, 4, 35, 5);
@@ -52,9 +53,9 @@ void growattModbus_request() {
 }
 
 int8_t growattModbus_read() {
-  
+
   modbus_handle();
-  
+
   // do something with data if read is successful
   if (modbus_rx_ready()) {
     growattModbus_RxReady = true;
@@ -106,25 +107,6 @@ int8_t growattModbus_read() {
     modbus_clear_buffer();
     growattModbus_itteration++;
     return growattModbus_itteration - 1;
-  } else {
-    _growattModbus_callback("inverter/status", "offline");
-    _growattModbus_callback("inverter/status/value", "-");
-    _growattModbus_callback("pv/watt", "-");
-    _growattModbus_callback("pv/1/volt", "-");
-    _growattModbus_callback("pv/1/amp", "-");
-    _growattModbus_callback("pv/1/watt", "-");
-    _growattModbus_callback("pv/2/volt", "-");
-    _growattModbus_callback("pv/2/amp", "-");
-    _growattModbus_callback("pv/2/watt", "-");
-    _growattModbus_callback("grid/volt", "-");
-    _growattModbus_callback("grid/amp", "-");
-    _growattModbus_callback("grid/frequency", "-");
-    _growattModbus_callback("grid/watt", "-");
-    _growattModbus_callback("inverter/temperature", "-");
-    _growattModbus_callback("status", "commerror");
-    modbus_clear_buffer();
-    growattModbus_itteration++;
-    return -1;
   }
 }
 
@@ -140,8 +122,26 @@ void growattModbus_handle()
     }
     else
     {
+      _growattModbus_callback("inverter/status", "offline");
+      _growattModbus_callback("inverter/status/value", "-");
+      _growattModbus_callback("pv/watt", "-");
+      _growattModbus_callback("pv/1/volt", "-");
+      _growattModbus_callback("pv/1/amp", "-");
+      _growattModbus_callback("pv/1/watt", "-");
+      _growattModbus_callback("pv/2/volt", "-");
+      _growattModbus_callback("pv/2/amp", "-");
+      _growattModbus_callback("pv/2/watt", "-");
+      _growattModbus_callback("grid/volt", "-");
+      _growattModbus_callback("grid/amp", "-");
+      _growattModbus_callback("grid/frequency", "-");
+      _growattModbus_callback("grid/watt", "-");
+      _growattModbus_callback("inverter/temperature", "-");
+      _growattModbus_callback("status", "commerror");
+      modbus_clear_buffer();
+      growattModbus_itteration = 0;
       nextupdatetime = millis() + (GROWATTMODBUS_POLL_LONG_TIMER * 1000);
     }
+    growattModbus_request();
   }
 
   growattModbus_read();

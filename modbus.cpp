@@ -58,7 +58,6 @@ void modbus_request_function_code(uint8_t deviceAddress, uint8_t functionCode, u
 
 uint8_t modbus_handle()
 {
-
   if (Serial.available())
   {
     if (modbus_RxBufferPointer < 250) {
@@ -135,7 +134,6 @@ double glue(unsigned int d1, unsigned int d0) {
   t += d0;
   return t;
 }
-
 
 double modbus_get_double(uint8_t startbytenr, uint16_t devide)
 {
