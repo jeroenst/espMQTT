@@ -9,6 +9,7 @@
 #include "modbus.h"
 
 bool growattModbus_RxReady = false;
+uint8_t growattModbus_itteration = 0;
 
 void(*_growattModbus_callback)(const char*, String);
 
@@ -23,9 +24,8 @@ void growattModbus_init(void(*callback)(const char *, String), int fanpin)
   _growattModbus_callback("grid/total/kwh", "-");
 }
 
-uint8_t growattModbus_itteration = 0;
 
-void growattModbus_request() {
+uint8_t growattModbus_request() {
   growattModbus_RxReady = false;
 
   if (growattModbus_itteration > 3) growattModbus_itteration = 0;
@@ -48,14 +48,16 @@ void growattModbus_request() {
       modbus_request_function_code(1, 4, 93, 1);
       break;
   }
+  return growattModbus_itteration;
 }
 
 int8_t growattModbus_read() 
 {
   // do something with data if read is successful
-  if (modbus_rx_ready()) {
+  if (modbus_rx_ready()) 
+  {
     growattModbus_RxReady = true;
-    switch (growattModbus_itteration)
+    switch (growattModbus_itteration++)
     {
       case 0:
         switch (modbus_get_register(0))
@@ -99,10 +101,10 @@ int8_t growattModbus_read()
         _growattModbus_callback("inverter/temperature", String((float)modbus_get_byte(4) / 10, 1));
         _growattModbus_callback("status", "ready");
         break;
+        growattModbus_itteration = 0;
     }
     modbus_clear_buffer();
-    growattModbus_itteration++;
-    return growattModbus_itteration - 1;
+    return growattModbus_itteration;
   }
   else return -1;
 }
@@ -115,7 +117,8 @@ void growattModbus_handle()
   {
     if (growattModbus_RxReady)
     {
-      nextupdatetime = millis() + (GROWATTMODBUS_POLL_SHORT_TIMER * 1000);
+      if (growattModbus_request() < 3) nextupdatetime = millis() + (GROWATTMODBUS_POLL_SHORT_TIMER * 1000);
+      else nextupdatetime = millis() + (GROWATTMODBUS_POLL_LONG_TIMER * 1000);
     }
     else
     {
@@ -138,7 +141,6 @@ void growattModbus_handle()
       growattModbus_itteration = 0;
       nextupdatetime = millis() + (GROWATTMODBUS_POLL_LONG_TIMER * 1000);
     }
-    growattModbus_request();
   }
 
   modbus_handle();

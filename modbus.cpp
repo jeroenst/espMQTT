@@ -59,6 +59,16 @@ void modbus_request_function_code(uint8_t deviceAddress, uint8_t functionCode, u
   modbus_RxBufferPointer = 0;
 }
 
+void modbus_request_holding_register(uint8_t deviceAddress, uint16_t startRegister, uint16_t numberOfRegisters)
+{
+  modbus_request_function_code(deviceAddress, 3, startRegister, numberOfRegisters);
+}
+
+void modbus_request_input_register(uint8_t deviceAddress, uint16_t startRegister, uint16_t numberOfRegisters)
+{
+  modbus_request_function_code(deviceAddress, 4, startRegister, numberOfRegisters);  
+}
+
 uint8_t modbus_handle()
 {
   if (Serial.available())
@@ -154,6 +164,7 @@ void modbus_clear_buffer()
   modbux_RxReady = 0;
 }
 
+// This function creates a double from 2 16 bit values
 double glue(unsigned int d1, unsigned int d0) {
   double t;
   t = d1 << 16;
