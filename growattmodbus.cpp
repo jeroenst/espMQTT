@@ -140,6 +140,7 @@ void growattModbus_handle()
       modbus_clear_buffer();
       growattModbus_itteration = 0;
       nextupdatetime = millis() + (GROWATTMODBUS_POLL_LONG_TIMER * 1000);
+      growattModbus_RxReady = true;
     }
   }
 
