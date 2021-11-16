@@ -53,6 +53,3 @@
 [submodule "scripts/mqttupgrade/phpMQTT"]
 	path = scripts/mqttupgrade/phpMQTT
 	url = https://github.com/jeroenst/phpMQTT.git
-[submodule "libraries/modbusmaster-esp8266"]
-	path = libraries/modbusmaster-esp8266
-	url = https://github.com/tekk/modbusmaster-esp8266
