@@ -16,7 +16,7 @@ void(*_growattModbus_callback)(const char*, String);
 void growattModbus_init(void(*callback)(const char *, String), int fanpin)
 {
   _growattModbus_callback = callback;
-  Serial.setRxBufferSize(10);
+  Serial.setRxBufferSize(100);
   Serial.begin(9600);  //Init serial 9600 baud
   Serial.setDebugOutput(false);
 
