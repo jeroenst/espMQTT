@@ -25,11 +25,11 @@ void modbus_request_function_code(uint8_t deviceAddress, uint8_t functionCode, u
 
   modbusDeviceAddress = deviceAddress;
   TxBuffer[0] = deviceAddress; // adres
-  TxBuffer[1] = functionCode; // type (03 holding register)
+  TxBuffer[1] = functionCode; // type
   TxBuffer[2] = startAddress >> 8; // H startaddress
-  TxBuffer[3] = startAddress && 0xF; // L startaddress
+  TxBuffer[3] = startAddress && 0xFF; // L startaddress
   TxBuffer[4] = numberOfAddresses >> 8; // H number of addresses
-  TxBuffer[5] = numberOfAddresses && 0xF; // L number of addresses
+  TxBuffer[5] = numberOfAddresses && 0xFF; // L number of addresses
 
   //Calc the raw_msg_data_byte CRC code
   uint16_t crc = 0xFFFF;
