@@ -13,7 +13,7 @@
 #include "espMQTT.h"
 
 uint8_t modbusDeviceAddress = 0;
-uint8_t *modbus_RxBuffer;
+uint8_t *modbus_RxBuffer = NULL;
 uint8_t modbus_RxBufferPointer = 0;
 bool modbux_RxReady = false;
 
@@ -54,6 +54,8 @@ void modbus_request_function_code(uint8_t deviceAddress, uint8_t functionCode, u
     DEBUG_V ("Sending to modbus Device: 0x%02x\n", TxBuffer[i]);
     Serial.write(TxBuffer[i]);
   }
+
+  modbus_RxBufferPointer = 0;
 }
 
 uint8_t modbus_handle()
@@ -64,7 +66,7 @@ uint8_t modbus_handle()
       if (modbus_RxBufferPointer == 0)
       {
         free(modbus_RxBuffer);
-        modbus_RxBuffer = (uint8_t*) malloc(1 * sizeof(uint8_t));
+        modbus_RxBuffer = (uint8_t*) malloc(sizeof(uint8_t));
       }
       else
       {
@@ -77,28 +79,24 @@ uint8_t modbus_handle()
       if (modbus_RxBuffer[0] != modbusDeviceAddress) {
         modbus_RxBufferPointer = 0;
         DEBUG_V ("modbus device address != received address");
-      } else {
-
       }
-
-      if (modbus_RxBufferPointer == 1)
+      else
       {
-        if (modbus_RxBuffer[1] != 0x03)  {
-          modbus_RxBufferPointer = 0;
-        }
+        modbus_RxBufferPointer++;
       }
-      modbus_RxBufferPointer++;
-
+      
     } else {
       DEBUG_E("Serial Buffer Overflow!!\n");
       DEBUG_V("Serial Buffer Overflow!!\n");
       modbus_RxBufferPointer = 0;
     }
 
-
-    if ((modbus_RxBuffer[0] == modbusDeviceAddress && modbus_RxBuffer[1] == 0x03) && (modbus_RxBufferPointer == modbus_RxBuffer[2] + 5))
+    if (modbus_RxBufferPointer > 2)
     {
-      modbux_RxReady = true;
+      if ((modbus_RxBuffer[0] == modbusDeviceAddress) && (modbus_RxBufferPointer == modbus_RxBuffer[2] + 5))
+      {
+        modbux_RxReady = true;
+      }
     }
   }
 }
@@ -124,6 +122,7 @@ uint8_t modbus_get_byte(uint8_t bytenr)
 void modbus_clear_buffer()
 {
   free (modbus_RxBuffer);
+  modbus_RxBuffer = NULL;
   modbus_RxBufferPointer = 0;
   modbux_RxReady = 0;
 }

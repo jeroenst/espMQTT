@@ -52,10 +52,8 @@ void growattModbus_request() {
   }
 }
 
-int8_t growattModbus_read() {
-
-  modbus_handle();
-
+int8_t growattModbus_read() 
+{
   // do something with data if read is successful
   if (modbus_rx_ready()) {
     growattModbus_RxReady = true;
@@ -144,5 +142,6 @@ void growattModbus_handle()
     growattModbus_request();
   }
 
+  modbus_handle();
   growattModbus_read();
 }

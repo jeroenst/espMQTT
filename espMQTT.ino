@@ -3133,7 +3133,7 @@ void eeprom_write(String value, int eepromindex)
   int n = value.length() + 1;
 
   // declaring character array
-  char *char_array;
+  static char *char_array = NULL;
   char_array = (char*) malloc(n * sizeof(char));
 
   // copying the contents of the
