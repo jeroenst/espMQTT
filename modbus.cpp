@@ -19,7 +19,7 @@ bool modbux_RxReady = false;
 
 void modbus_request_function_code(uint8_t deviceAddress, uint8_t functionCode, uint16_t startAddress, uint16_t numberOfAddresses )
 {
-  DEBUG_V("Requesting Modbus Data From %02x...\n", deviceAddress);
+  DEBUG_V("Requesting Modbus Data From %02x, FunctionCode: %d, StartAddress: %d, NumberOfAddresses: %d...\n", deviceAddress, functionCode, startAddress, numberOfAddresses);
   modbux_RxReady = false;
   uint8_t TxBuffer[10];
 
@@ -27,9 +27,9 @@ void modbus_request_function_code(uint8_t deviceAddress, uint8_t functionCode, u
   TxBuffer[0] = deviceAddress; // adres
   TxBuffer[1] = functionCode; // type
   TxBuffer[2] = startAddress >> 8; // H startaddress
-  TxBuffer[3] = startAddress && 0xFF; // L startaddress
+  TxBuffer[3] = startAddress & 0xFF; // L startaddress
   TxBuffer[4] = numberOfAddresses >> 8; // H number of addresses
-  TxBuffer[5] = numberOfAddresses && 0xFF; // L number of addresses
+  TxBuffer[5] = numberOfAddresses & 0xFF; // L number of addresses
 
   //Calc the raw_msg_data_byte CRC code
   uint16_t crc = 0xFFFF;
@@ -51,8 +51,9 @@ void modbus_request_function_code(uint8_t deviceAddress, uint8_t functionCode, u
 
   for (int i = 0; i < 8; i++)
   {
-    DEBUG_V ("Sending to modbus Device: 0x%02x\n", TxBuffer[i]);
+    DEBUG_V ("Sending to modbus Device [addr %i] (pointer : %d): %d (0x%02x)\n", TxBuffer[0], i, TxBuffer[i], TxBuffer[i]);
     Serial.write(TxBuffer[i]);
+    yield();
   }
 
   modbus_RxBufferPointer = 0;
@@ -72,22 +73,31 @@ uint8_t modbus_handle()
       {
         modbus_RxBuffer = (uint8_t *) realloc(modbus_RxBuffer, (modbus_RxBufferPointer + 1) * sizeof(uint8_t));
       }
-      modbus_RxBuffer[modbus_RxBufferPointer] = Serial.read();
 
-      DEBUG_V ("Received from modbus device [addr %i] (pointer: %i) : 0x%02x\n", modbus_RxBuffer[0], modbus_RxBufferPointer, modbus_RxBuffer[modbus_RxBufferPointer]);
-
-      if (modbus_RxBuffer[0] != modbusDeviceAddress) {
-        modbus_RxBufferPointer = 0;
-        DEBUG_V ("modbus device address != received address");
-      }
-      else
+      int serialData = Serial.read();
+      if (serialData >= 0)
       {
-        modbus_RxBufferPointer++;
+
+        modbus_RxBuffer[modbus_RxBufferPointer] = serialData;
+
+        DEBUG_V ("Received from modbus Device [addr %i] (pointer: %i) : %d (0x%02x)\n", modbus_RxBuffer[0], modbus_RxBufferPointer, modbus_RxBuffer[modbus_RxBufferPointer], modbus_RxBuffer[modbus_RxBufferPointer]);
+        yield();
+
+        if (modbus_RxBuffer[0] != modbusDeviceAddress) {
+          modbus_RxBufferPointer = 0;
+          DEBUG_V ("modbus device address != received address");
+          Serial.flush();
+        }
+        else
+        {
+          modbus_RxBufferPointer++;
+        }
       }
-      
+
     } else {
       DEBUG_E("Serial Buffer Overflow!!\n");
       DEBUG_V("Serial Buffer Overflow!!\n");
+      Serial.flush();
       modbus_RxBufferPointer = 0;
     }
 
@@ -108,10 +118,27 @@ bool modbus_rx_ready()
 
 uint8_t modbus_get_byte(uint8_t bytenr)
 {
-
   if (bytenr < modbus_RxBufferPointer)
   {
     return modbus_RxBuffer[bytenr];
+  }
+  else
+  {
+    return 0;
+  }
+}
+
+uint16_t modbus_get_register(uint8_t registerid)
+{
+
+  uint8_t bytenr = 3 + (registerid * 2);
+  if (bytenr < modbus_RxBufferPointer)
+  {
+    uint16_t value;
+    value = modbus_RxBuffer[bytenr];
+    value <<= 8;
+    value |= modbus_RxBuffer[bytenr + 1];
+    return value;
   }
   else
   {
@@ -134,11 +161,11 @@ double glue(unsigned int d1, unsigned int d0) {
   return t;
 }
 
-double modbus_get_double(uint8_t startbytenr, uint16_t devide)
+double modbus_get_two_register_double(uint8_t registerstartid, double devide)
 {
-  if (startbytenr < modbus_RxBufferPointer + 1)
+  if (registerstartid * 2 < modbus_RxBufferPointer)
   {
-    return glue(modbus_RxBuffer[startbytenr], modbus_RxBuffer[startbytenr + 1]) / devide;
+    return glue(modbus_get_register(registerstartid), modbus_get_register(registerstartid+1)) / devide;
   }
   else
   {

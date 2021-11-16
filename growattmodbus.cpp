@@ -26,8 +26,6 @@ void growattModbus_init(void(*callback)(const char *, String), int fanpin)
 uint8_t growattModbus_itteration = 0;
 
 void growattModbus_request() {
-  uint8_t result = 0;
-
   growattModbus_RxReady = false;
 
   if (growattModbus_itteration > 3) growattModbus_itteration = 0;
@@ -60,7 +58,7 @@ int8_t growattModbus_read()
     switch (growattModbus_itteration)
     {
       case 0:
-        switch (modbus_get_byte(5))
+        switch (modbus_get_register(0))
         {
           case 0: _growattModbus_callback("inverter/status", "waiting");
             break;
@@ -71,34 +69,34 @@ int8_t growattModbus_read()
         }
 
 
-        _growattModbus_callback("inverter/status/value", String((int)modbus_get_byte(5)));
+        _growattModbus_callback("inverter/status/value", String((int)modbus_get_register(0)));
 
-        _growattModbus_callback("pv/watt", String(modbus_get_double(6, 10), 1));
+        _growattModbus_callback("pv/watt", String(modbus_get_two_register_double(1, 10), 1));
 
-        _growattModbus_callback("pv/1/volt", String((float)modbus_get_byte(8) / 10, 1));
-        _growattModbus_callback("pv/1/amp",  String((float)modbus_get_byte(9) / 10, 1));
-        _growattModbus_callback("pv/1/watt", String(modbus_get_double(10, 10), 1));
+        _growattModbus_callback("pv/1/volt", String((float)modbus_get_register(3) / 10, 1));
+        _growattModbus_callback("pv/1/amp",  String((float)modbus_get_register(4) / 10, 1));
+        _growattModbus_callback("pv/1/watt", String(modbus_get_two_register_double(5, 10), 1));
 
-        _growattModbus_callback("pv/2/volt", String((float)modbus_get_byte(12) / 10, 1));
-        _growattModbus_callback("pv/2/amp",  String((float)modbus_get_byte(13) / 10, 1));
-        _growattModbus_callback("pv/2/watt", String(modbus_get_double(14, 10), 1));
+        _growattModbus_callback("pv/2/volt", String((float)modbus_get_register(7) / 10, 1));
+        _growattModbus_callback("pv/2/amp",  String((float)modbus_get_register(8) / 10, 1));
+        _growattModbus_callback("pv/2/watt", String(modbus_get_two_register_double(9, 10), 1));
         break;
 
       case 1:
-        _growattModbus_callback("grid/watt", String(modbus_get_double(5, 10), 1));
-        _growattModbus_callback("grid/frequency", String((float)modbus_get_byte(7) / 100, 1));
-        _growattModbus_callback("grid/volt", String((float)modbus_get_byte(8) / 10, 1));
-        _growattModbus_callback("grid/amp", String((float)modbus_get_byte(9) / 10, 1));
+        _growattModbus_callback("grid/watt", String(modbus_get_two_register_double(0, 10), 1));
+        _growattModbus_callback("grid/frequency", String((float)modbus_get_register(2) / 100, 1));
+        _growattModbus_callback("grid/volt", String((float)modbus_get_register(3) / 10, 1));
+        _growattModbus_callback("grid/amp", String((float)modbus_get_register(4) / 10, 1));
         break;
 
       case 2:
-        _growattModbus_callback("grid/today/kwh", String(modbus_get_double(5, 10), 1));
-        _growattModbus_callback("grid/total/kwh", String(modbus_get_double(7, 10), 1));
-        _growattModbus_callback("inverter/seconds", String(modbus_get_double(9, 10), 1));
+        _growattModbus_callback("grid/today/kwh", String(modbus_get_two_register_double(0, 10), 1));
+        _growattModbus_callback("grid/total/kwh", String(modbus_get_two_register_double(2, 10), 1));
+        _growattModbus_callback("inverter/seconds", String(modbus_get_two_register_double(4, 10), 1));
         break;
 
       case 3:
-        _growattModbus_callback("inverter/temperature", String((float)modbus_get_byte(5) / 10, 1));
+        _growattModbus_callback("inverter/temperature", String((float)modbus_get_byte(4) / 10, 1));
         _growattModbus_callback("status", "ready");
         break;
     }
@@ -106,6 +104,7 @@ int8_t growattModbus_read()
     growattModbus_itteration++;
     return growattModbus_itteration - 1;
   }
+  else return -1;
 }
 
 void growattModbus_handle()
