@@ -267,7 +267,6 @@ QsWifiSwitch qswifiswitch(QSWIFISWITCHCHANNELS);
 #define NODEMCULEDPIN D0
 #define FLASHBUTTON D3
 #define ESPLED D4
-#define FANPIN D1
 #include "growattmodbus.h"
 #undef SERIALLOG
 #endif
@@ -1266,6 +1265,7 @@ void connectToWifi()
       mainstate.defaultpassword = false;
 
       WiFi.scanNetworksAsync(wifiScanReady); // Search for strongest accesspoint and connect
+      yield();
     }
   }
   else
@@ -1818,7 +1818,7 @@ void flashbutton_handle()
 }
 #endif
 
-void loop()
+void dotasks()
 {
   ESP.wdtFeed(); // Prevent HW WD to kick in...
   yield();
@@ -1827,7 +1827,14 @@ void loop()
   MDNS.update();
   yield();
   Debug.handle();
+  yield();  
+  webserver.handleClient();
   yield();
+}
+
+void loop()
+{
+  dotasks();
 
   if (WiFi.status() == WL_CONNECTED)
   {
@@ -1841,22 +1848,22 @@ void loop()
     if (mainstate.wificonnected) triggers.wifidisconnected = true;
     mainstate.wificonnected = false;
   }
-  yield();
+  dotasks();
 
 
 #ifdef QSWIFIDIMMERCHANNELS
   qswifidimmer_handle();
-  yield();
+  dotasks();
 #endif
 
 #ifdef QSWIFISWITCHCHANNELS
   qswifiswitch.handle();
-  yield();
+  dotasks();
 #endif
 
 #ifdef  ESPMQTT_DDNS
   EasyDDNS.update(10000);
-  yield();
+  dotasks();
 #endif
 
   if ((0 != reboottimeout) && (uptime > reboottimeout))
@@ -1864,7 +1871,7 @@ void loop()
     ESP.restart();
     delay(1000);
   }
-  yield();
+  dotasks();
 
   if ((0 != wifichangesettingstimeout) && (uptime > wifichangesettingstimeout))
   {
@@ -1875,7 +1882,7 @@ void loop()
     }
     wifichangesettingstimeout = 0;
   }
-  yield();
+  dotasks();
 
 
   if (triggers.wificonnected)
@@ -1895,6 +1902,8 @@ void loop()
           yield();
         }
       #endif*/
+
+    dotasks();
 #ifdef ESPMQTT_BHT002
     bht002_connected();
 #endif
@@ -1903,7 +1912,8 @@ void loop()
     tuya_connected();
 #endif
   }
-  yield();
+  dotasks();
+
 
   if (triggers.wifidisconnected)
   {
@@ -1919,14 +1929,14 @@ void loop()
     //tuya_disconnected(); // Don't do this, the device starts beeping....
 #endif
   }
-  yield();
+  dotasks();
 
   if (triggers.mqttconnected)
   {
     triggers.mqttconnected = false;
     DEBUG_I("Connected to MQTT Server=%s\n", mqtt_server.c_str());
     //syslogN("Connected to MQTT Server=%s\n", mqtt_server.c_str());
-    yield(); // Prevent crash because of to many debug data to send
+      dotasks();  // Prevent crash because of to many debug data to send
     update_systeminfo(true);
     mqttdosubscriptions();
     updateexternalip();
@@ -1934,19 +1944,21 @@ void loop()
     tuya_connectedMQTT();
 #endif
   }
-  yield();
+    dotasks();
+
 
   if (triggers.mqttdisconnected)
   {
     triggers.mqttdisconnected = false;
     DEBUG_W("Disconnected from MQTT Server=%s\n", mqtt_server.c_str());
     //syslogN("Disconnected from MQTT Server=%s\n", mqtt_server.c_str());
-    yield(); // Prevent crash because of to many debug data to send
+      dotasks(); // Prevent crash because of to many debug data to send
     if (WiFi.isConnected()) {
       mqttReconnectTimer.once(5, connectToMqtt);
     }
   }
-  yield();
+    dotasks();
+
 
   if (triggers.mqttpublished)
   {
@@ -1955,7 +1967,7 @@ void loop()
     publishdatamap(mqttlastpublishedpacketid);
 
   }
-  yield();
+  dotasks();
 
   if (triggers.mqttpublishall)
   {
@@ -2032,7 +2044,7 @@ void loop()
       }
     }
   }
-  yield();
+  dotasks();
 
   if (triggers.wifiscanready)
   {
@@ -2079,11 +2091,11 @@ void loop()
 
 
       DEBUG_V(" %d: %s, %s, Ch:%d (%ddBm) %s\n", i, WiFi.SSID(i).c_str(), WiFi.BSSIDstr(i).c_str(), WiFi.channel(i), WiFi.RSSI(i), enctype.c_str());
-      yield(); // Prevent crash because of to many debug data to send
+      dotasks(); // Prevent crash because of to many debug data to send
     }
 
     DEBUG_D("CurrentAp ID=%d SSID=%s BSSID=%s RSSI=%d(%d), Strongest AP ID=%d SSID=%s, BSSID=%s RSSI=%d(%d)\n", currentwifiid, wifissid.c_str(), WiFi.BSSIDstr().c_str(), currentwifirssi, WiFi.RSSI(), strongestwifiid, WiFi.SSID(strongestwifiid).c_str(), WiFi.BSSIDstr(strongestwifiid).c_str(), WiFi.RSSI(strongestwifiid), strongestwifirssi);
-    yield(); // Prevent crash because of to many debug data to send
+      dotasks();  // Prevent crash because of to many debug data to send
 
     if (!mainstate.accesspoint)
     {
@@ -2091,32 +2103,28 @@ void loop()
       {
         DEBUG_I ("Switching to stronger AP %d (%s, %s, %s)\n", strongestwifiid, WiFi.SSID().c_str(), WiFi.psk().c_str(), WiFi.BSSIDstr(strongestwifiid).c_str());
         WiFi.begin(wifissid.c_str(), wifipsk.c_str(), WiFi.channel(strongestwifiid), WiFi.BSSID(strongestwifiid), 1);
+        dotasks();
       }
     }
   }
-  yield();
+  dotasks();
 
-  webserver.handleClient();
-  yield();
+
 
 #ifdef SONOFFCH
   sonoff_handle();
-  yield();
 #endif
 
 #ifdef  ESPMQTT_NOISE
   handle_noise();
-  yield();
 #endif
 
 #ifdef  ESPMQTT_DUCOBOX
   ducobox_handle();
-  yield();
 #endif
 
 #ifdef  ESPMQTT_DIMMER
   dimmer_handle();
-  yield();
 #endif
 
 #ifdef  ESPMQTT_GENERIC8266
@@ -2124,12 +2132,10 @@ void loop()
 
 #ifdef  ESPMQTT_BHT002
   bht002_handle();
-  yield();
 #endif
 
 #ifdef ESPMQTT_TUYA_2GANGDIMMERV2
   tuya_handle();
-  yield();
 #endif
 
 
@@ -2193,7 +2199,6 @@ void loop()
   else minreg = false;
 
   digitalWrite(NODEMCULEDPIN, rainpinstate);
-  yield();
 #endif
 
 
@@ -2213,12 +2218,10 @@ void loop()
       putdatamap("water/m3", String((double(watermeter_liters) / 1000), 3));
     }
   }
-  yield();
 #endif
 
 #ifdef  ESPMQTT_OPENTHERM
   opentherm_handle();
-  yield();
 #endif
 
 #ifdef ESPMQTT_ZMAI90
@@ -2330,32 +2333,26 @@ void loop()
 
 #ifdef  ESPMQTT_SMARTMETER
   smartmeter_handle();
-  yield();
 #endif
 
 #ifdef  ESPMQTT_GROWATT
   growatt_handle();
-  yield();
 #endif
 
 #ifdef  ESPMQTT_GROWATT_MODBUS
   growattModbus_handle();
-  yield();
 #endif
 
 #ifdef FLASHBUTTON
   flashbutton_handle();
-  yield();
 #endif
 
 #ifdef  ESPMQTT_AMGPELLETSTOVE
   amgpelletstove_handle();
-  yield();
 #endif
 
 #ifdef ESPMQTT_OBD2
   obd2_handle();
-  yield();
 #endif
 
 #ifdef  ESPMQTT_SONOFFPOWR2
@@ -2427,7 +2424,6 @@ void loop()
       serpointer = 0;
     }
   }
-  yield();
 #endif
 
 #ifdef MH_Z19
@@ -2446,7 +2442,6 @@ void loop()
     default:
       break;
   }
-  yield();
 #endif
 
   if (timertick == 1) // Every 0.1 second read next SDM120 register
@@ -2511,7 +2506,6 @@ void loop()
       digitalWrite(NODEMCULEDPIN, isnan(value) ? 1 : 0);
       sdmreadcounter++;
     }
-    yield();
 #endif
 #ifdef  ESPMQTT_DDM18SD
     static uint8_t sdmreadcounter = 1;
@@ -2775,6 +2769,7 @@ void loop()
     }
     previouswifistatus = WiFi.status();
   }
+  dotasks();
 }
 
 #ifdef SONOFFCH
@@ -2953,7 +2948,7 @@ void publishdatamap(int32_t packetId, bool publishall, bool init, bool publishre
 
   if ((packetId != -1) || publishall) DEBUG_V("Publishdatamap packetId=%d publishall=%d datamappointer=%d datamapsize=%d nextpacketid=%d waitingforack=%d\n", packetId, publishall, datamappointer, dataMap->size(), nextpacketId, waitingforack);
 
-  yield();
+  dotasks();
 
   if (publishall || publishregular)
   {
@@ -2968,12 +2963,12 @@ void publishdatamap(int32_t packetId, bool publishall, bool init, bool publishre
       dataMap->put(topic, data);
       publishallpointer++;
       //DEBUG("publishallpointer=%d datamapsize=%d\n",publishallpointer, dataMap->size());
-      yield();
+      dotasks();
     }
     datamappointer = 0;
   }
 
-  yield();
+  dotasks();
 
   // If connected to mqtt and waiting for ack wait for packetid which has to be acked
   if (mqttClient.connected())
@@ -3014,7 +3009,7 @@ void publishdatamap(int32_t packetId, bool publishall, bool init, bool publishre
       }
     }
 
-    yield();
+    dotasks();
 
   // If not waiting for ack search for next item in datamap which has to be send
     if (!waitingforack)
@@ -3038,7 +3033,7 @@ void publishdatamap(int32_t packetId, bool publishall, bool init, bool publishre
               dataMap->put(topic, data);
             }
             DEBUG_D ("MQTT PUBLISHING DATAMAP %s=%s (nextpacketId=%d)\n", topic, data.payload, nextpacketId);
-            yield();
+            dotasks();
           }
           else
           {
@@ -3751,8 +3746,37 @@ void processCmdRemoteDebug()
     DEBUG("  showeeprommap\n");
     DEBUG("  scanwifinetworks (scan for stronger wifi network and connect to it)\n");
     DEBUG("  showtime\n");
+    DEBUG("  getrestartreason\n");
   }
 
+
+  if (lastCmd == "getrestartreason")
+  {
+    switch(ESP.getResetInfoPtr()->reason)
+    {
+      case REASON_DEFAULT_RST:
+        DEBUG ("Normal Startup\n");
+      break;
+      case REASON_WDT_RST:
+        DEBUG ("Hardware Watchdog Reset\n");
+      break;
+      case REASON_EXCEPTION_RST:
+        DEBUG ("Exception Reset\n");
+      break;
+      case REASON_SOFT_WDT_RST:
+        DEBUG ("Software Watchdog Reset\n");
+      break;
+      case REASON_SOFT_RESTART:
+        DEBUG ("Software Restart\n");
+      break;
+      case REASON_DEEP_SLEEP_AWAKE:
+        DEBUG ("Wake up from deep sleep\n");
+      break;
+      case REASON_EXT_SYS_RST:
+        DEBUG ("External Reset\n");
+      break;
+    }
+  }
 
   if (lastCmd == "showtime")
   {
@@ -3772,6 +3796,7 @@ void processCmdRemoteDebug()
   {
     DEBUG_D("Starting Wifi Scan...\n");
     WiFi.scanNetworksAsync(wifiScanReady);
+    yield();
   }
 
   if (lastCmd == "ping")
@@ -4147,7 +4172,7 @@ void setup() {
 #endif
 
 #ifdef  ESPMQTT_GROWATT_MODBUS
-  growattModbus_init(growattModbuscallback, FANPIN);
+  growattModbus_init(growattModbuscallback);
 #endif
 
 #ifdef  ESPMQTT_AMGPELLETSTOVE
