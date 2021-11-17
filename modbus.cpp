@@ -16,11 +16,13 @@ uint8_t modbusDeviceAddress = 0;
 uint8_t *modbus_RxBuffer = NULL;
 uint8_t modbus_RxBufferPointer = 0;
 bool modbux_RxReady = false;
+bool modbux_RxError = false;
 
 void modbus_request_function_code(uint8_t deviceAddress, uint8_t functionCode, uint16_t startAddress, uint16_t numberOfAddresses )
 {
   DEBUG_V("Requesting Modbus Data From %02x, FunctionCode: %d, StartAddress: %d, NumberOfAddresses: %d...\n", deviceAddress, functionCode, startAddress, numberOfAddresses);
   modbux_RxReady = false;
+  modbux_RxError = false;
   uint8_t TxBuffer[10];
 
   modbusDeviceAddress = deviceAddress;
@@ -49,6 +51,8 @@ void modbus_request_function_code(uint8_t deviceAddress, uint8_t functionCode, u
   TxBuffer[6] = crc & 0xFF;
   TxBuffer[7] = crc >> 8;
 
+  Serial.flush();
+
   for (int i = 0; i < 8; i++)
   {
     DEBUG_V ("Sending to modbus Device [addr %i] (pointer : %d): %d (0x%02x)\n", TxBuffer[0], i, TxBuffer[i], TxBuffer[i]);
@@ -69,14 +73,21 @@ void modbus_request_input_register(uint8_t deviceAddress, uint16_t startRegister
   modbus_request_function_code(deviceAddress, 4, startRegister, numberOfRegisters);  
 }
 
-uint8_t modbus_handle()
+void modbus_handle()
 {
+  yield();
   if (Serial.available())
   {
+    if (modbux_RxError)
+    {
+      Serial.flush();
+      if (modbus_RxBuffer) free(modbus_RxBuffer);
+      return;
+    }
     if (modbus_RxBufferPointer < 250) {
       if (modbus_RxBufferPointer == 0)
       {
-        free(modbus_RxBuffer);
+        if (modbus_RxBuffer) free(modbus_RxBuffer);
         modbus_RxBuffer = (uint8_t*) malloc(sizeof(uint8_t));
       }
       else
@@ -97,6 +108,7 @@ uint8_t modbus_handle()
           modbus_RxBufferPointer = 0;
           DEBUG_V ("modbus device address != received address");
           Serial.flush();
+          modbux_RxError = true;
         }
         else
         {
@@ -106,7 +118,6 @@ uint8_t modbus_handle()
 
     } else {
       DEBUG_E("Serial Buffer Overflow!!\n");
-      DEBUG_V("Serial Buffer Overflow!!\n");
       Serial.flush();
       modbus_RxBufferPointer = 0;
     }
@@ -161,7 +172,7 @@ void modbus_clear_buffer()
   free (modbus_RxBuffer);
   modbus_RxBuffer = NULL;
   modbus_RxBufferPointer = 0;
-  modbux_RxReady = 0;
+  modbux_RxReady = false;
 }
 
 // This function creates a double from 2 16 bit values

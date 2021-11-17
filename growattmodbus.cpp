@@ -10,10 +10,11 @@
 
 bool growattModbus_RxReady = false;
 uint8_t growattModbus_itteration = 0;
+uint8_t growattModbus_errorCounter = 0;
 
 void(*_growattModbus_callback)(const char*, String);
 
-void growattModbus_init(void(*callback)(const char *, String), int fanpin)
+void growattModbus_init(void(*callback)(const char *, String))
 {
   _growattModbus_callback = callback;
   Serial.setRxBufferSize(100);
@@ -51,10 +52,10 @@ uint8_t growattModbus_request() {
   return growattModbus_itteration;
 }
 
-int8_t growattModbus_read() 
+int8_t growattModbus_read()
 {
   // do something with data if read is successful
-  if (modbus_rx_ready()) 
+  if (modbus_rx_ready())
   {
     growattModbus_RxReady = true;
     switch (growattModbus_itteration++)
@@ -111,37 +112,54 @@ int8_t growattModbus_read()
 
 void growattModbus_handle()
 {
-  static long long nextupdatetime = 0;
+  static long long timeout = GROWATTMODBUS_WAIT_AFTER_STARTUP_TIMEOUT;
 
-  if ((millis() > nextupdatetime) && (millis() > 5000))
+  // When receiving has finished request next packet if it's not the last packet of sequence
+  // and set timeout for next request round
+  if (growattModbus_RxReady)
   {
-    if (growattModbus_RxReady)
+    growattModbus_RxReady = false;
+    if (growattModbus_itteration < 3) growattModbus_request();
+    else 
     {
-      if (growattModbus_request() < 3) nextupdatetime = millis() + (GROWATTMODBUS_POLL_SHORT_TIMER * 1000);
-      else nextupdatetime = millis() + (GROWATTMODBUS_POLL_LONG_TIMER * 1000);
-    }
-    else
-    {
-      _growattModbus_callback("inverter/status", "offline");
-      _growattModbus_callback("inverter/status/value", "-");
-      _growattModbus_callback("pv/watt", "-");
-      _growattModbus_callback("pv/1/volt", "-");
-      _growattModbus_callback("pv/1/amp", "-");
-      _growattModbus_callback("pv/1/watt", "-");
-      _growattModbus_callback("pv/2/volt", "-");
-      _growattModbus_callback("pv/2/amp", "-");
-      _growattModbus_callback("pv/2/watt", "-");
-      _growattModbus_callback("grid/volt", "-");
-      _growattModbus_callback("grid/amp", "-");
-      _growattModbus_callback("grid/frequency", "-");
-      _growattModbus_callback("grid/watt", "-");
-      _growattModbus_callback("inverter/temperature", "-");
-      _growattModbus_callback("status", "commerror");
       modbus_clear_buffer();
-      growattModbus_itteration = 0;
-      nextupdatetime = millis() + (GROWATTMODBUS_POLL_LONG_TIMER * 1000);
-      growattModbus_RxReady = true;
+      _growattModbus_callback("status", "ready");
     }
+    growattModbus_errorCounter = 0;
+    timeout = millis() + (GROWATTMODBUS_TIMEOUT * 1000);
+  }
+
+  // If timeout has reached errorcounter is increased and a retry to get modbus data
+  // is performed
+  if ((millis() > timeout))
+  {
+      if (growattModbus_errorCounter > 4)
+      {
+        _growattModbus_callback("inverter/status", "offline");
+        _growattModbus_callback("inverter/status/value", "-");
+        _growattModbus_callback("pv/watt", "-");
+        _growattModbus_callback("pv/1/volt", "-");
+        _growattModbus_callback("pv/1/amp", "-");
+        _growattModbus_callback("pv/1/watt", "-");
+        _growattModbus_callback("pv/2/volt", "-");
+        _growattModbus_callback("pv/2/amp", "-");
+        _growattModbus_callback("pv/2/watt", "-");
+        _growattModbus_callback("grid/volt", "-");
+        _growattModbus_callback("grid/amp", "-");
+        _growattModbus_callback("grid/frequency", "-");
+        _growattModbus_callback("grid/watt", "-");
+        _growattModbus_callback("inverter/temperature", "-");
+        _growattModbus_callback("status", "commerror");
+      }
+      else 
+      {
+        DEBUG_E ("Modbus Receive Error!\n");
+        growattModbus_errorCounter++;
+      }
+      modbus_clear_buffer();
+      timeout = millis() + (GROWATTMODBUS_TIMEOUT * 1000);
+      growattModbus_itteration = 0;
+      growattModbus_request();
   }
 
   modbus_handle();
