@@ -2211,275 +2211,8 @@ void ddm18sd_readnextregister()
 }
 #endif
 
-void dotasks()
+void espmqtt_handle_modules()
 {
-  ESP.wdtFeed(); // Prevent HW WD to kick in...
-  yield();
-  ArduinoOTA.handle();
-  yield();
-  MDNS.update();
-  yield();
-  Debug.handle();
-  yield();
-  webserver.handleClient();
-  yield();
-}
-
-void loop()
-{
-  dotasks();
-
-  if (WiFi.status() == WL_CONNECTED)
-  {
-    wifichannel = WiFi.channel(); // We can't rely on wifi.channel because while scanning the channel is changed.
-    if (!mainstate.wificonnected) triggers.wificonnected = true;
-    mainstate.wificonnected = true;
-  }
-  else
-  {
-    wifichannel = 0;
-    if (mainstate.wificonnected) triggers.wifidisconnected = true;
-    mainstate.wificonnected = false;
-  }
-  yield();
-
-  if ((0 != reboottimeout) && (uptime > reboottimeout))
-  {
-    ESP.restart();
-    delay(1000);
-  }
-  yield();
-
-  if ((0 != wifichangesettingstimeout) && (uptime > wifichangesettingstimeout))
-  {
-    mainstate.accesspoint = false;
-    if ((wifissid != ""))
-    {
-      connectToWifi();
-    }
-    wifichangesettingstimeout = 0;
-  }
-  yield();
-
-
-  if (triggers.wificonnected)
-  {
-    triggers.wificonnected = false;
-    DEBUG_I("Connected to WiFi SSID=%s RSSI=%d\n", WiFi.SSID().c_str(), WiFi.RSSI());
-    //syslogN("Connected to WiFi SSID=%s RSSI=%d\n", WiFi.SSID().c_str(), WiFi.RSSI());
-    initMqtt();
-    mqttReconnectTimer.once(1, connectToMqtt); // Wait 1 second before connecting mqtt
-    MDNS.begin(esp_hostname);
-    MDNS.addService("http", "tcp", 80);
-#ifdef ESPMQTT_BHT002
-    bht002_connected();
-#endif
-
-#ifdef ESPMQTT_TUYA_2GANGDIMMERV2
-    tuya_connected();
-#endif
-  }
-  yield();
-
-
-  if (triggers.wifidisconnected)
-  {
-    triggers.wifidisconnected = false;
-    DEBUG_W("Disconnected from Wi-Fi.\n");
-    disconnectMqtt();
-    if (!mainstate.accesspoint) wifiReconnectTimer.once(2, connectToWifi); // trying to connect to wifi can cause AP to fail
-#ifdef ESPMQTT_BHT002
-    bht002_disconnected();
-#endif
-
-#ifdef ESPMQTT_TUYA_2GANGDIMMERV2
-    //tuya_disconnected(); // Don't do this, the device starts beeping....
-#endif
-  }
-  yield();
-
-  if (triggers.mqttconnected)
-  {
-    triggers.mqttconnected = false;
-    DEBUG_I("Connected to MQTT Server=%s\n", mqtt_server.c_str());
-    //syslogN("Connected to MQTT Server=%s\n", mqtt_server.c_str());
-    dotasks();  // Prevent crash because of to many debug data to send
-    update_systeminfo(true);
-    mqttdosubscriptions();
-    updateexternalip();
-#ifdef ESPMQTT_TUYA_2GANGDIMMERV2
-    tuya_connectedMQTT();
-#endif
-  }
-  yield();
-
-
-  if (triggers.mqttdisconnected)
-  {
-    triggers.mqttdisconnected = false;
-    DEBUG_W("Disconnected from MQTT Server=%s\n", mqtt_server.c_str());
-    dotasks(); // Prevent crash because of to many debug data to send
-    if (WiFi.isConnected()) {
-      mqttReconnectTimer.once(5, connectToMqtt);
-    }
-  }
-  yield();
-
-
-  if (triggers.mqttpublished)
-  {
-    triggers.mqttpublished = false;
-    DEBUG_V ("Publish acknowledged packetid=%d\n", mqttlastpublishedpacketid);
-    publishdatamap(mqttlastpublishedpacketid);
-
-  }
-  yield();
-
-  if (triggers.mqttpublishall)
-  {
-    triggers.mqttpublishall = false;
-    publishdatamap(-1, true, true);
-  }
-  yield();
-
-  publishdatamap();
-  yield();
-
-  if (triggers.firmwareupgrade != "")
-  {
-    // wait 5 seconds before upgrading
-    static uint64_t waitbeforeupgrade = 0;
-    if (waitbeforeupgrade == 0)
-    {
-      DEBUG_I ("Received startfirmwareupgrade, upgrade pending...\n");
-      putdatamap("status", "upgrading");
-      waitbeforeupgrade = uptime + 5;
-    }
-    else if (waitbeforeupgrade < uptime)
-    {
-      waitbeforeupgrade = 0;
-
-      StaticJsonDocument<300> JSONdoc;
-      auto error = deserializeJson(JSONdoc, triggers.firmwareupgrade.c_str());
-      triggers.firmwareupgrade = "";
-
-      if (!error)
-      {
-        // The upgradekey is mainly to prevent upgrading over and over when a retained upgrade message is retained in mqtt
-        String upgradekey = JSONdoc["key"];
-        String upgradeurl = JSONdoc["url"];
-        String upgradeversion = JSONdoc["version"];
-
-        DEBUG_I ("Starting firmware upgrade\n upgradeversion=%s\n upgradeurl=%s\n upgradekey=%s\n", upgradeversion.c_str(), upgradeurl.c_str(), upgradekey.c_str());
-
-        if (upgradeversion == ESPMQTT_VERSION)
-        {
-          DEBUG_I ("Upgrade canceled, version is the same\n");
-          putdatamap("status/upgrade", "up to date, same firmware version");
-          putdatamap("status", "upgrade_exit");
-        }
-        else if (getdatamap("firmware/upgradekey") != upgradekey)
-        {
-          DEBUG_I ("Upgrade canceled, upgradekey is incorrect\n");
-          putdatamap("status/upgrade", "error, incorrect upgradekey");
-          putdatamap("status", "upgrade_exit");
-        }
-        else
-        {
-          DEBUG_I ("Starting upgrade from:%s\n", upgradeurl.c_str());
-          putdatamap("status/upgrade", "upgrading");
-          WiFiClient upgradeclient;
-          t_httpUpdate_return ret = ESPhttpUpdate.update(upgradeclient, upgradeurl, ESPMQTT_VERSION);
-          switch (ret)
-          {
-            case HTTP_UPDATE_FAILED:
-              DEBUG_E("Firmware upgrade failed: %s.\n", ESPhttpUpdate.getLastErrorString().c_str());
-              putdatamap("status/upgrade", String("error http: " + ESPhttpUpdate.getLastErrorString()));
-              putdatamap("status", "upgrade_exit");
-              break;
-            case HTTP_UPDATE_NO_UPDATES:
-              DEBUG_E("Firmware upgrade check finished, no new version available.");
-              putdatamap("status/upgrade", "up to date, same firmware version");
-              putdatamap("status", "upgrade_exit");
-              break;
-            case HTTP_UPDATE_OK:
-              DEBUG_E("Firmware upgrade done!\n"); // may not be called since we reboot the ESP
-              putdatamap("status/upgrade", "upgrade finished");
-              putdatamap("status", "rebooting");
-              break;
-          }
-        }
-      }
-    }
-  }
-  yield();
-
-  if (triggers.wifiscanready)
-  {
-    triggers.wifiscanready = false;
-    int strongestwifiid = -1;
-    int strongestwifirssi = -1000;
-    int currentwifirssi = -1000;
-    int currentwifiid = -1;
-
-    for (int i = 0; i < wifinetworksfound; i++)
-    {
-      if (WiFi.SSID(i) == wifissid.c_str())
-      {
-        if (strongestwifirssi < WiFi.RSSI(i))
-        {
-          strongestwifiid = i;
-          strongestwifirssi = WiFi.RSSI(i);
-        }
-        if (WiFi.BSSIDstr(i) == WiFi.BSSIDstr())
-        {
-          currentwifirssi = WiFi.RSSI(i);
-          currentwifiid = i;
-        }
-      }
-
-      String enctype = "None";
-      switch (WiFi.encryptionType(i)) {
-        case ENC_TYPE_WEP:
-          enctype = "WEP";
-          break;
-        case ENC_TYPE_TKIP:
-          enctype = "WPA";
-          break;
-        case ENC_TYPE_CCMP:
-          enctype = "WPA2";
-          break;
-        case ENC_TYPE_NONE:
-          enctype = "None";
-          break;
-        case ENC_TYPE_AUTO:
-          enctype = "Auto";
-          break;
-      }
-
-
-      DEBUG_V(" %d: %s, %s, Ch:%d (%ddBm) %s\n", i, WiFi.SSID(i).c_str(), WiFi.BSSIDstr(i).c_str(), WiFi.channel(i), WiFi.RSSI(i), enctype.c_str());
-      Debug.handle();
-      yield(); // Prevent crash because of to many debug data to send
-    }
-
-    DEBUG_D("CurrentAp ID=%d SSID=%s BSSID=%s RSSI=%d(%d), Strongest AP ID=%d SSID=%s, BSSID=%s RSSI=%d(%d)\n", currentwifiid, wifissid.c_str(), WiFi.BSSIDstr().c_str(), currentwifirssi, WiFi.RSSI(), strongestwifiid, WiFi.SSID(strongestwifiid).c_str(), WiFi.BSSIDstr(strongestwifiid).c_str(), WiFi.RSSI(strongestwifiid), strongestwifirssi);
-    Debug.handle();
-    yield();  // Prevent crash because of to many debug data to send
-
-    if (!mainstate.accesspoint)
-    {
-      if ((strongestwifiid >= 0) && ((WiFi.RSSI() >= 0) || (currentwifiid == -1) || ((currentwifiid != strongestwifiid) && (currentwifirssi + 10 < strongestwifirssi))))
-      {
-        DEBUG_I ("Switching to stronger AP %d (%s, %s, %s)\n", strongestwifiid, WiFi.SSID().c_str(), WiFi.psk().c_str(), WiFi.BSSIDstr(strongestwifiid).c_str());
-        WiFi.begin(wifissid.c_str(), wifipsk.c_str(), WiFi.channel(strongestwifiid), WiFi.BSSID(strongestwifiid), 1);
-        yield();
-      }
-    }
-  }
-  yield();
-
-
 #ifdef QSWIFIDIMMERCHANNELS
   qswifidimmer_handle();
 #endif
@@ -2580,10 +2313,12 @@ void loop()
       break;
   }
 #endif
+}
 
-  if (timertick == 1) // Every 0.1 second read next SDM120 register
-  {
-    //    Serial.print(".");
+
+void espmqtt_handle_modules_100ms()
+{
+  //    Serial.print(".");
     timertick = 0;
 #ifdef  ESPMQTT_SDM120
     sdm120_readnextregister();
@@ -2592,58 +2327,10 @@ void loop()
 #ifdef  ESPMQTT_DDM18SD
     ddm18sd_readnextregister();
 #endif
-  }
-  yield();
+}
 
-  if (timersectick == 1) // Every 1 second check sensors and update display (it would be insane to do it more often right?)
-  {
-    timersectick = 0;
-    updatemqtt = 1;
-
-    // scan for stronger wifi network: every 10 minutes, directly when wifi is not connected or every 30 seconds if signal is bad
-    // try to do this as less as posisble because during scan the esp is unreachable for about a second.
-    if ((!mainstate.accesspoint))
-    {
-      if ((uptime > 0) && (((uptime % 600) == 0) || (((uptime % 30) == 0) && ((WiFi.status() != WL_CONNECTED) || (WiFi.RSSI() < -70)))))
-      {
-        DEBUG_D("Starting Wifi Scan...\n");
-        WiFi.scanNetworksAsync(wifiScanReady);
-      }
-    }
-    yield();
-
-    if ((uptime % 600) == 0)
-    {
-      updateexternalip();
-    }
-    yield();
-
-    // Every 10 minutes (+/- 60 seconds) publish all mqtt data
-    static int8_t dividefactor = random(-60, 60);
-    if ((uptime > 60) && (((uptime + dividefactor) % 600) == 0))
-    {
-      DEBUG_I ("Regular publishing datamap...\n");
-      publishdatamap(-1, false, false, true);
-    }
-    yield();
-
-    if ((uptime % 60) == 0)
-    {
-      char uptimestr[20];
-      sprintf(uptimestr, "%d:%02d:%02d:%02d", uptime / 86400, (uptime / 3600) % 24, (uptime / 60) % 60, uptime % 60);
-      time_t now;
-      time(&now);
-      String strtime = ctime(&now);
-      strtime.replace("\n", "");
-      if (mainstate.wificonnected)
-      {
-        //syslogI("Uptime=%s DateTime=%s\n", uptimestr, strtime.c_str());
-      }
-      DEBUG_I("Uptime=%s DateTime=%s\n", uptimestr, strtime.c_str());
-    }
-    yield();
-
-
+void espmqtt_handle_modules_1sec()
+{
 #ifdef  ESPMQTT_BBQTEMP
     double temp = MAX6675_readCelsius(ESPMQTT_BBQTEMP_CS0);
     putdatamap("temperature/0", temp == NAN ? "-" : String(temp, 1));
@@ -2672,21 +2359,6 @@ void loop()
       putdatamap("energy/kwh", kwh);
     }
 #endif
-
-#ifdef APONBOOT
-    if ((uptime == 60) && (WiFi.status() != WL_CONNECTED))
-    {
-      DEBUG_W("Connection to wifi failed, starting accesspoint\n");
-      startWifiAP();
-    }
-    if (uptime == 660)
-    {
-      stopWifiAP();
-    }
-#endif
-
-    // Every 10 seconds update system info
-    if ((uptime % 10) == 0) update_systeminfo();
 
 #ifdef  ESPMQTT_MAINPOWERMETER
     static uint8_t circuitnr = 0;
@@ -2799,8 +2471,369 @@ void loop()
 #endif
     }
     previouswifistatus = WiFi.status();
-  }
+}
+
+void dotasks()
+{
+  ESP.wdtFeed(); // Prevent watchdog to kick in...
+  yield();
+  ArduinoOTA.handle();
+  yield();
+  MDNS.update();
+  yield();
+  Debug.handle();
+  yield();
+  webserver.handleClient();
+  yield();
+}
+
+void loop()
+{
   dotasks();
+
+  if (WiFi.status() == WL_CONNECTED)
+  {
+    wifichannel = WiFi.channel(); // We can't rely on wifi.channel because while scanning the channel is changed.
+    if (!mainstate.wificonnected) triggers.wificonnected = true;
+    mainstate.wificonnected = true;
+  }
+  else
+  {
+    wifichannel = 0;
+    if (mainstate.wificonnected) triggers.wifidisconnected = true;
+    mainstate.wificonnected = false;
+  }
+  yield();
+  ESP.wdtFeed(); // Prevent watchdog to kick in...
+
+  if ((0 != reboottimeout) && (uptime > reboottimeout))
+  {
+    ESP.restart();
+    delay(1000);
+  }
+  yield();
+  ESP.wdtFeed(); // Prevent watchdog to kick in...
+ 
+  if ((0 != wifichangesettingstimeout) && (uptime > wifichangesettingstimeout))
+  {
+    mainstate.accesspoint = false;
+    if ((wifissid != ""))
+    {
+      connectToWifi();
+    }
+    wifichangesettingstimeout = 0;
+  }
+  yield();
+  ESP.wdtFeed(); // Prevent watchdog to kick in...
+
+  if (triggers.wificonnected)
+  {
+    triggers.wificonnected = false;
+    DEBUG_I("Connected to WiFi SSID=%s RSSI=%d\n", WiFi.SSID().c_str(), WiFi.RSSI());
+    //syslogN("Connected to WiFi SSID=%s RSSI=%d\n", WiFi.SSID().c_str(), WiFi.RSSI());
+    initMqtt();
+    mqttReconnectTimer.once(1, connectToMqtt); // Wait 1 second before connecting mqtt
+    MDNS.begin(esp_hostname);
+    MDNS.addService("http", "tcp", 80);
+#ifdef ESPMQTT_BHT002
+    bht002_connected();
+#endif
+
+#ifdef ESPMQTT_TUYA_2GANGDIMMERV2
+    tuya_connected();
+#endif
+  }
+  yield();
+  ESP.wdtFeed(); // Prevent watchdog to kick in...
+
+  if (triggers.wifidisconnected)
+  {
+    triggers.wifidisconnected = false;
+    DEBUG_W("Disconnected from Wi-Fi.\n");
+    disconnectMqtt();
+    if (!mainstate.accesspoint) wifiReconnectTimer.once(2, connectToWifi); // trying to connect to wifi can cause AP to fail
+#ifdef ESPMQTT_BHT002
+    bht002_disconnected();
+#endif
+
+#ifdef ESPMQTT_TUYA_2GANGDIMMERV2
+    //tuya_disconnected(); // Don't do this, the device starts beeping....
+#endif
+  }
+  yield();
+  ESP.wdtFeed(); // Prevent watchdog to kick in...
+
+  if (triggers.mqttconnected)
+  {
+    triggers.mqttconnected = false;
+    DEBUG_I("Connected to MQTT Server=%s\n", mqtt_server.c_str());
+    //syslogN("Connected to MQTT Server=%s\n", mqtt_server.c_str());
+    dotasks();  // Prevent crash because of to many debug data to send
+    update_systeminfo(true);
+    mqttdosubscriptions();
+    updateexternalip();
+#ifdef ESPMQTT_TUYA_2GANGDIMMERV2
+    tuya_connectedMQTT();
+#endif
+  }
+  yield();
+  ESP.wdtFeed(); // Prevent watchdog to kick in...
+
+
+  if (triggers.mqttdisconnected)
+  {
+    triggers.mqttdisconnected = false;
+    DEBUG_W("Disconnected from MQTT Server=%s\n", mqtt_server.c_str());
+    dotasks(); // Prevent crash because of to many debug data to send
+    if (WiFi.isConnected()) {
+      mqttReconnectTimer.once(5, connectToMqtt);
+    }
+  }
+  yield();
+  ESP.wdtFeed(); // Prevent watchdog to kick in...
+
+
+  if (triggers.mqttpublished)
+  {
+    triggers.mqttpublished = false;
+    DEBUG_V ("Publish acknowledged packetid=%d\n", mqttlastpublishedpacketid);
+    publishdatamap(mqttlastpublishedpacketid);
+
+  }
+  yield();
+  ESP.wdtFeed(); // Prevent watchdog to kick in...
+
+  if (triggers.mqttpublishall)
+  {
+    triggers.mqttpublishall = false;
+    publishdatamap(-1, true, true);
+  }
+  yield();
+  ESP.wdtFeed(); // Prevent watchdog to kick in...
+
+  publishdatamap();
+  yield();
+  ESP.wdtFeed(); // Prevent watchdog to kick in...
+
+  if (triggers.firmwareupgrade != "")
+  {
+    // wait 5 seconds before upgrading
+    static uint64_t waitbeforeupgrade = 0;
+    if (waitbeforeupgrade == 0)
+    {
+      DEBUG_I ("Received startfirmwareupgrade, upgrade pending...\n");
+      putdatamap("status", "upgrading");
+      waitbeforeupgrade = uptime + 5;
+    }
+    else if (waitbeforeupgrade < uptime)
+    {
+      waitbeforeupgrade = 0;
+
+      StaticJsonDocument<300> JSONdoc;
+      auto error = deserializeJson(JSONdoc, triggers.firmwareupgrade.c_str());
+      triggers.firmwareupgrade = "";
+
+      if (!error)
+      {
+        // The upgradekey is mainly to prevent upgrading over and over when a retained upgrade message is retained in mqtt
+        String upgradekey = JSONdoc["key"];
+        String upgradeurl = JSONdoc["url"];
+        String upgradeversion = JSONdoc["version"];
+
+        DEBUG_I ("Starting firmware upgrade\n upgradeversion=%s\n upgradeurl=%s\n upgradekey=%s\n", upgradeversion.c_str(), upgradeurl.c_str(), upgradekey.c_str());
+
+        if (upgradeversion == ESPMQTT_VERSION)
+        {
+          DEBUG_I ("Upgrade canceled, version is the same\n");
+          putdatamap("status/upgrade", "up to date, same firmware version");
+          putdatamap("status", "upgrade_exit");
+        }
+        else if (getdatamap("firmware/upgradekey") != upgradekey)
+        {
+          DEBUG_I ("Upgrade canceled, upgradekey is incorrect\n");
+          putdatamap("status/upgrade", "error, incorrect upgradekey");
+          putdatamap("status", "upgrade_exit");
+        }
+        else
+        {
+          DEBUG_I ("Starting upgrade from:%s\n", upgradeurl.c_str());
+          putdatamap("status/upgrade", "upgrading");
+          WiFiClient upgradeclient;
+          t_httpUpdate_return ret = ESPhttpUpdate.update(upgradeclient, upgradeurl, ESPMQTT_VERSION);
+          switch (ret)
+          {
+            case HTTP_UPDATE_FAILED:
+              DEBUG_E("Firmware upgrade failed: %s.\n", ESPhttpUpdate.getLastErrorString().c_str());
+              putdatamap("status/upgrade", String("error http: " + ESPhttpUpdate.getLastErrorString()));
+              putdatamap("status", "upgrade_exit");
+              break;
+            case HTTP_UPDATE_NO_UPDATES:
+              DEBUG_E("Firmware upgrade check finished, no new version available.");
+              putdatamap("status/upgrade", "up to date, same firmware version");
+              putdatamap("status", "upgrade_exit");
+              break;
+            case HTTP_UPDATE_OK:
+              DEBUG_E("Firmware upgrade done!\n"); // may not be called since we reboot the ESP
+              putdatamap("status/upgrade", "upgrade finished");
+              putdatamap("status", "rebooting");
+              break;
+          }
+        }
+      }
+    }
+  }
+  yield();
+  ESP.wdtFeed(); // Prevent watchdog to kick in...
+
+  if (triggers.wifiscanready)
+  {
+    triggers.wifiscanready = false;
+    int strongestwifiid = -1;
+    int strongestwifirssi = -1000;
+    int currentwifirssi = -1000;
+    int currentwifiid = -1;
+
+    for (int i = 0; i < wifinetworksfound; i++)
+    {
+      if (WiFi.SSID(i) == wifissid.c_str())
+      {
+        if (strongestwifirssi < WiFi.RSSI(i))
+        {
+          strongestwifiid = i;
+          strongestwifirssi = WiFi.RSSI(i);
+        }
+        if (WiFi.BSSIDstr(i) == WiFi.BSSIDstr())
+        {
+          currentwifirssi = WiFi.RSSI(i);
+          currentwifiid = i;
+        }
+      }
+
+      String enctype = "None";
+      switch (WiFi.encryptionType(i)) {
+        case ENC_TYPE_WEP:
+          enctype = "WEP";
+          break;
+        case ENC_TYPE_TKIP:
+          enctype = "WPA";
+          break;
+        case ENC_TYPE_CCMP:
+          enctype = "WPA2";
+          break;
+        case ENC_TYPE_NONE:
+          enctype = "None";
+          break;
+        case ENC_TYPE_AUTO:
+          enctype = "Auto";
+          break;
+      }
+
+
+      DEBUG_V(" %d: %s, %s, Ch:%d (%ddBm) %s\n", i, WiFi.SSID(i).c_str(), WiFi.BSSIDstr(i).c_str(), WiFi.channel(i), WiFi.RSSI(i), enctype.c_str());
+      Debug.handle();
+      yield(); // Prevent crash because of to many debug data to send
+      ESP.wdtFeed(); // Prevent watchdog to kick in...
+    }
+
+    DEBUG_D("CurrentAp ID=%d SSID=%s BSSID=%s RSSI=%d(%d), Strongest AP ID=%d SSID=%s, BSSID=%s RSSI=%d(%d)\n", currentwifiid, wifissid.c_str(), WiFi.BSSIDstr().c_str(), currentwifirssi, WiFi.RSSI(), strongestwifiid, WiFi.SSID(strongestwifiid).c_str(), WiFi.BSSIDstr(strongestwifiid).c_str(), WiFi.RSSI(strongestwifiid), strongestwifirssi);
+    Debug.handle();
+    yield();  // Prevent crash because of to many debug data to send
+    ESP.wdtFeed(); // Prevent watchdog to kick in...
+
+    if (!mainstate.accesspoint)
+    {
+      if ((strongestwifiid >= 0) && ((WiFi.RSSI() >= 0) || (currentwifiid == -1) || ((currentwifiid != strongestwifiid) && (currentwifirssi + 10 < strongestwifirssi))))
+      {
+        DEBUG_I ("Switching to stronger AP %d (%s, %s, %s)\n", strongestwifiid, WiFi.SSID().c_str(), WiFi.psk().c_str(), WiFi.BSSIDstr(strongestwifiid).c_str());
+        WiFi.begin(wifissid.c_str(), wifipsk.c_str(), WiFi.channel(strongestwifiid), WiFi.BSSID(strongestwifiid), 1);
+        yield();
+      }
+    }
+  }
+  yield();
+  ESP.wdtFeed(); // Prevent watchdog to kick in...
+
+  espmqtt_handle_modules();
+  yield();
+  dotasks();
+
+  if (timertick == 1) // Every 0.1 second read next SDM120 register
+  {
+    espmqtt_handle_modules_100ms();
+  }
+  yield();
+  ESP.wdtFeed(); // Prevent watchdog to kick in...
+
+  if (timersectick == 1) // Every 1 second check sensors and update display (it would be insane to do it more often right?)
+  {
+    timersectick = 0;
+    updatemqtt = 1;
+
+    // scan for stronger wifi network: every 10 minutes, directly when wifi is not connected or every 30 seconds if signal is bad
+    // try to do this as less as posisble because during scan the esp is unreachable for about a second.
+    if ((!mainstate.accesspoint))
+    {
+      if ((uptime > 0) && (((uptime % 600) == 0) || (((uptime % 30) == 0) && ((WiFi.status() != WL_CONNECTED)))))
+      {
+        DEBUG_D("Starting Wifi Scan...\n");
+        WiFi.scanNetworksAsync(wifiScanReady);
+      }
+    }
+    yield();
+    ESP.wdtFeed(); // Prevent watchdog to kick in...
+
+    if ((uptime % 600) == 0)
+    {
+      updateexternalip();
+    }
+    yield();
+    ESP.wdtFeed(); // Prevent watchdog to kick in...
+
+    // Every 10 minutes (+/- 60 seconds) publish all mqtt data
+    static int8_t dividefactor = random(-60, 60);
+    if ((uptime > 60) && (((uptime + dividefactor) % 600) == 0))
+    {
+      DEBUG_I ("Regular publishing datamap...\n");
+      publishdatamap(-1, false, false, true);
+    }
+    yield();
+    ESP.wdtFeed(); // Prevent watchdog to kick in...
+
+    if ((uptime % 60) == 0)
+    {
+      char uptimestr[20];
+      sprintf(uptimestr, "%d:%02d:%02d:%02d", uptime / 86400, (uptime / 3600) % 24, (uptime / 60) % 60, uptime % 60);
+      time_t now;
+      time(&now);
+      String strtime = ctime(&now);
+      strtime.replace("\n", "");
+      if (mainstate.wificonnected)
+      {
+        //syslogI("Uptime=%s DateTime=%s\n", uptimestr, strtime.c_str());
+      }
+      DEBUG_I("Uptime=%s DateTime=%s\n", uptimestr, strtime.c_str());
+    }
+    yield();
+    ESP.wdtFeed(); // Prevent watchdog to kick in...
+
+    espmqtt_handle_modules_1sec();
+#ifdef APONBOOT
+    if ((uptime == 60) && (WiFi.status() != WL_CONNECTED))
+    {
+      DEBUG_W("Connection to wifi failed, starting accesspoint\n");
+      startWifiAP();
+    }
+    if (uptime == 660)
+    {
+      stopWifiAP();
+    }
+#endif
+
+    // Every 10 seconds update system info
+    if ((uptime % 10) == 0) update_systeminfo();
+
+    espmqtt_handle_modules_1sec();
+  }
 }
 
 #ifdef SONOFFCH
