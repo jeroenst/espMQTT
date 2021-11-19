@@ -36,7 +36,7 @@
 // #define ESPMQTT_OPENTHERM
 // #define ESPMQTT_SMARTMETER
 // #define ESPMQTT_GROWATT
-#define ESPMQTT_GROWATT_MODBUS
+// #define ESPMQTT_GROWATT_MODBUS
 // #define ESPMQTT_SDM120
 // #define ESPMQTT_DDM18SD
 // #define ESPMQTT_WATERMETER
@@ -48,7 +48,7 @@
 // #define ESPMQTT_SOIL
 // #define ESPMQTT_DIMMER
 // #define ESPMQTT_RELAY
-// #define ESPMQTT_LIVINGROOM
+#define ESPMQTT_LIVINGROOM
 // #define ESPMQTT_BBQTEMP
 
 /* ESP8285 */
@@ -1818,413 +1818,21 @@ void flashbutton_handle()
 }
 #endif
 
-void dotasks()
-{
-  ESP.wdtFeed(); // Prevent HW WD to kick in...
-  yield();
-  ArduinoOTA.handle();
-  yield();
-  MDNS.update();
-  yield();
-  Debug.handle();
-  yield();  
-  webserver.handleClient();
-  yield();
-}
-
-void loop()
-{
-  dotasks();
-
-  if (WiFi.status() == WL_CONNECTED)
-  {
-    wifichannel = WiFi.channel(); // We can't rely on wifi.channel because while scanning the channel is changed.
-    if (!mainstate.wificonnected) triggers.wificonnected = true;
-    mainstate.wificonnected = true;
-  }
-  else
-  {
-    wifichannel = 0;
-    if (mainstate.wificonnected) triggers.wifidisconnected = true;
-    mainstate.wificonnected = false;
-  }
-  dotasks();
-
-
-#ifdef QSWIFIDIMMERCHANNELS
-  qswifidimmer_handle();
-  dotasks();
-#endif
-
-#ifdef QSWIFISWITCHCHANNELS
-  qswifiswitch.handle();
-  dotasks();
-#endif
-
-#ifdef  ESPMQTT_DDNS
-  EasyDDNS.update(10000);
-  dotasks();
-#endif
-
-  if ((0 != reboottimeout) && (uptime > reboottimeout))
-  {
-    ESP.restart();
-    delay(1000);
-  }
-  dotasks();
-
-  if ((0 != wifichangesettingstimeout) && (uptime > wifichangesettingstimeout))
-  {
-    mainstate.accesspoint = false;
-    if ((wifissid != ""))
-    {
-      connectToWifi();
-    }
-    wifichangesettingstimeout = 0;
-  }
-  dotasks();
-
-
-  if (triggers.wificonnected)
-  {
-    triggers.wificonnected = false;
-    DEBUG_I("Connected to WiFi SSID=%s RSSI=%d\n", WiFi.SSID().c_str(), WiFi.RSSI());
-    //syslogN("Connected to WiFi SSID=%s RSSI=%d\n", WiFi.SSID().c_str(), WiFi.RSSI());
-    initMqtt();
-    mqttReconnectTimer.once(1, connectToMqtt); // Wait 1 second before connecting mqtt
-    MDNS.begin(esp_hostname);
-    MDNS.addService("http", "tcp", 80);
-
-    /*#ifdef syslogDEBUG
-        for (int i = 0; i < dataMap->size(); i++)
-        {
-          //syslogD("%s=%s (%d)\n", dataMap->getKey(i).c_str(), dataMap->getData(i).payload.c_str(), dataMap->getData(i).send);
-          yield();
-        }
-      #endif*/
-
-    dotasks();
-#ifdef ESPMQTT_BHT002
-    bht002_connected();
-#endif
-
-#ifdef ESPMQTT_TUYA_2GANGDIMMERV2
-    tuya_connected();
-#endif
-  }
-  dotasks();
-
-
-  if (triggers.wifidisconnected)
-  {
-    triggers.wifidisconnected = false;
-    DEBUG_W("Disconnected from Wi-Fi.\n");
-    disconnectMqtt();
-    if (!mainstate.accesspoint) wifiReconnectTimer.once(2, connectToWifi); // trying to connect to wifi can cause AP to fail
-#ifdef ESPMQTT_BHT002
-    bht002_disconnected();
-#endif
-
-#ifdef ESPMQTT_TUYA_2GANGDIMMERV2
-    //tuya_disconnected(); // Don't do this, the device starts beeping....
-#endif
-  }
-  dotasks();
-
-  if (triggers.mqttconnected)
-  {
-    triggers.mqttconnected = false;
-    DEBUG_I("Connected to MQTT Server=%s\n", mqtt_server.c_str());
-    //syslogN("Connected to MQTT Server=%s\n", mqtt_server.c_str());
-      dotasks();  // Prevent crash because of to many debug data to send
-    update_systeminfo(true);
-    mqttdosubscriptions();
-    updateexternalip();
-#ifdef ESPMQTT_TUYA_2GANGDIMMERV2
-    tuya_connectedMQTT();
-#endif
-  }
-    dotasks();
-
-
-  if (triggers.mqttdisconnected)
-  {
-    triggers.mqttdisconnected = false;
-    DEBUG_W("Disconnected from MQTT Server=%s\n", mqtt_server.c_str());
-    //syslogN("Disconnected from MQTT Server=%s\n", mqtt_server.c_str());
-      dotasks(); // Prevent crash because of to many debug data to send
-    if (WiFi.isConnected()) {
-      mqttReconnectTimer.once(5, connectToMqtt);
-    }
-  }
-    dotasks();
-
-
-  if (triggers.mqttpublished)
-  {
-    triggers.mqttpublished = false;
-    DEBUG_V ("Publish acknowledged packetid=%d\n", mqttlastpublishedpacketid);
-    publishdatamap(mqttlastpublishedpacketid);
-
-  }
-  dotasks();
-
-  if (triggers.mqttpublishall)
-  {
-    triggers.mqttpublishall = false;
-    publishdatamap(-1, true, true);
-  }
-
-  if (mainstate.mqttready) publishdatamap();
-
-  if (triggers.firmwareupgrade != "")
-  {
-    // wait 5 seconds before upgrading
-    static uint64_t waitbeforeupgrade = 0;
-    if (waitbeforeupgrade == 0)
-    {
-      DEBUG_I ("Received startfirmwareupgrade, upgrade pending...\n");
-      putdatamap("status", "upgrading");
-      waitbeforeupgrade = uptime + 5;
-    }
-    else if (waitbeforeupgrade < uptime)
-    {
-      waitbeforeupgrade = 0;
-
-      StaticJsonDocument<300> JSONdoc;
-      auto error = deserializeJson(JSONdoc, triggers.firmwareupgrade.c_str());
-      triggers.firmwareupgrade = "";
-
-      if (!error)
-      {
-        // The upgradekey is mainly to prevent upgrading over and over when a retained upgrade message is retained in mqtt
-        String upgradekey = JSONdoc["key"];
-        String upgradeurl = JSONdoc["url"];
-        String upgradeversion = JSONdoc["version"];
-
-        DEBUG_I ("Starting firmware upgrade\n upgradeversion=%s\n upgradeurl=%s\n upgradekey=%s\n", upgradeversion.c_str(), upgradeurl.c_str(), upgradekey.c_str());
-
-        if (upgradeversion == ESPMQTT_VERSION)
-        {
-          DEBUG_I ("Upgrade canceled, version is the same\n");
-          putdatamap("status/upgrade", "up to date, same firmware version");
-          putdatamap("status", "upgrade_exit");
-        }
-        else if (getdatamap("firmware/upgradekey") != upgradekey)
-        {
-          DEBUG_I ("Upgrade canceled, upgradekey is incorrect\n");
-          putdatamap("status/upgrade", "error, incorrect upgradekey");
-          putdatamap("status", "upgrade_exit");
-        }
-        else
-        {
-          DEBUG_I ("Starting upgrade from:%s\n", upgradeurl.c_str());
-          putdatamap("status/upgrade", "upgrading");
-          WiFiClient upgradeclient;
-          t_httpUpdate_return ret = ESPhttpUpdate.update(upgradeclient, upgradeurl, ESPMQTT_VERSION);
-          switch (ret)
-          {
-            case HTTP_UPDATE_FAILED:
-              DEBUG_E("Firmware upgrade failed: %s.\n", ESPhttpUpdate.getLastErrorString().c_str());
-              putdatamap("status/upgrade", String("error http: " + ESPhttpUpdate.getLastErrorString()));
-              putdatamap("status", "upgrade_exit");
-              break;
-            case HTTP_UPDATE_NO_UPDATES:
-              DEBUG_E("Firmware upgrade check finished, no new version available.");
-              putdatamap("status/upgrade", "up to date, same firmware version");
-              putdatamap("status", "upgrade_exit");
-              break;
-            case HTTP_UPDATE_OK:
-              DEBUG_E("Firmware upgrade done!\n"); // may not be called since we reboot the ESP
-              putdatamap("status/upgrade", "upgrade finished");
-              putdatamap("status", "rebooting");
-              break;
-          }
-        }
-      }
-    }
-  }
-  dotasks();
-
-  if (triggers.wifiscanready)
-  {
-    triggers.wifiscanready = false;
-    int strongestwifiid = -1;
-    int strongestwifirssi = -1000;
-    int currentwifirssi = -1000;
-    int currentwifiid = -1;
-
-    for (int i = 0; i < wifinetworksfound; i++)
-    {
-      if (WiFi.SSID(i) == wifissid.c_str())
-      {
-        if (strongestwifirssi < WiFi.RSSI(i))
-        {
-          strongestwifiid = i;
-          strongestwifirssi = WiFi.RSSI(i);
-        }
-        if (WiFi.BSSIDstr(i) == WiFi.BSSIDstr())
-        {
-          currentwifirssi = WiFi.RSSI(i);
-          currentwifiid = i;
-        }
-      }
-
-      String enctype = "None";
-      switch (WiFi.encryptionType(i)) {
-        case ENC_TYPE_WEP:
-          enctype = "WEP";
-          break;
-        case ENC_TYPE_TKIP:
-          enctype = "WPA";
-          break;
-        case ENC_TYPE_CCMP:
-          enctype = "WPA2";
-          break;
-        case ENC_TYPE_NONE:
-          enctype = "None";
-          break;
-        case ENC_TYPE_AUTO:
-          enctype = "Auto";
-          break;
-      }
-
-
-      DEBUG_V(" %d: %s, %s, Ch:%d (%ddBm) %s\n", i, WiFi.SSID(i).c_str(), WiFi.BSSIDstr(i).c_str(), WiFi.channel(i), WiFi.RSSI(i), enctype.c_str());
-      dotasks(); // Prevent crash because of to many debug data to send
-    }
-
-    DEBUG_D("CurrentAp ID=%d SSID=%s BSSID=%s RSSI=%d(%d), Strongest AP ID=%d SSID=%s, BSSID=%s RSSI=%d(%d)\n", currentwifiid, wifissid.c_str(), WiFi.BSSIDstr().c_str(), currentwifirssi, WiFi.RSSI(), strongestwifiid, WiFi.SSID(strongestwifiid).c_str(), WiFi.BSSIDstr(strongestwifiid).c_str(), WiFi.RSSI(strongestwifiid), strongestwifirssi);
-      dotasks();  // Prevent crash because of to many debug data to send
-
-    if (!mainstate.accesspoint)
-    {
-      if ((strongestwifiid >= 0) && ((WiFi.RSSI() >= 0) || (currentwifiid == -1) || ((currentwifiid != strongestwifiid) && (currentwifirssi + 10 < strongestwifirssi))))
-      {
-        DEBUG_I ("Switching to stronger AP %d (%s, %s, %s)\n", strongestwifiid, WiFi.SSID().c_str(), WiFi.psk().c_str(), WiFi.BSSIDstr(strongestwifiid).c_str());
-        WiFi.begin(wifissid.c_str(), wifipsk.c_str(), WiFi.channel(strongestwifiid), WiFi.BSSID(strongestwifiid), 1);
-        dotasks();
-      }
-    }
-  }
-  dotasks();
-
-
-
-#ifdef SONOFFCH
-  sonoff_handle();
-#endif
-
-#ifdef  ESPMQTT_NOISE
-  handle_noise();
-#endif
-
-#ifdef  ESPMQTT_DUCOBOX
-  ducobox_handle();
-#endif
-
-#ifdef  ESPMQTT_DIMMER
-  dimmer_handle();
-#endif
-
-#ifdef  ESPMQTT_GENERIC8266
-#endif
-
-#ifdef  ESPMQTT_BHT002
-  bht002_handle();
-#endif
-
-#ifdef ESPMQTT_TUYA_2GANGDIMMERV2
-  tuya_handle();
-#endif
-
-
-#ifdef RAINMETERPIN
-  static uint32_t rainpinmillis = 0;
-  static uint32_t rainpulses = 0;
-  static uint32_t rainpulsesminute = 0;
-  static uint32_t rainpulseshour = 0;
-  bool rainpinstate = 0;
-  static bool count = 0;
-  rainpinstate = digitalRead(RAINMETERPIN);
-  if ((rainpinstate == 1) && (millis() - 50 > rainpinmillis) && count) // Pulse has to settle for 50ms before counting
-  {
-    rainpulses++;
-    rainpulseshour++;
-    rainpulsesminute++;
-    String mqtttopic = String(mqtt_topicprefix + "rain/pulse");
-    mqttClient.publish(mqtttopic.c_str(), 0, false, "1");
-    count = 0;
-  }
-  if (rainpinstate == 0)
-  {
-    rainpinmillis = millis();
-    count = 1;
-  }
-  putdatamap ("rain/pulses", String(rainpulses));
-  putdatamap ("rain/mm", String((double(rainpulses)*RAINMETERPULSEMM), 1));
-
-  static bool hourreg = false;
-  static bool firsthourreg = true;
-  if ((uptime % 3600) || (firsthourreg))
-  {
-    putdatamap ("rain/hour/pulses", String(rainpulseshour));
-    putdatamap ("rain/hour/mm", String((double(rainpulseshour)*RAINMETERPULSEMM), 1));
-    firsthourreg = false;
-    if (!hourreg)
-    {
-      putdatamap ("rain/lasthour/pulses", String(rainpulseshour));
-      putdatamap ("rain/lasthour/mm", String((double(rainpulseshour)*RAINMETERPULSEMM), 1));
-      rainpulseshour = 0;
-      hourreg = true;
-    }
-  }
-  else hourreg = false;
-
-  static bool minreg = false;
-  static bool firstminreg = true;
-  if ((uptime % 60) || (firstminreg))
-  {
-    putdatamap ("rain/minute/pulses", String(rainpulsesminute));
-    putdatamap ("rain/minute/mm", String((double(rainpulsesminute)*RAINMETERPULSEMM), 1));
-    firstminreg = false;
-    if (!minreg)
-    {
-      putdatamap ("rain/lastminute/pulses", String(rainpulsesminute));
-      putdatamap ("rain/lastminute/mm", String((double(rainpulsesminute)*RAINMETERPULSEMM), 1));
-      rainpulsesminute = 0;
-      minreg = true;
-    }
-  }
-  else minreg = false;
-
-  digitalWrite(NODEMCULEDPIN, rainpinstate);
-#endif
-
-
-#ifdef  ESPMQTT_WATERMETER
-  static uint32_t watermeter_liters = watermeter_getliters();
-  if (watermeter_handle())
-  {
-    putdatamap("water/lmin", String(watermeter_getflow(), 1));
-    putdatamap("water/m3h", String(watermeter_getflow() * 0.06, 3));
-
-    if (watermeter_liters != watermeter_getliters())
-    {
-      watermeter_liters = watermeter_getliters();
-      i2cEeprom_write(watermeter_liters);
-      //syslogN("Watermeter Liters Changed=%d\n", watermeter_liters);
-      putdatamap("water/liter", String(watermeter_liters));
-      putdatamap("water/m3", String((double(watermeter_liters) / 1000), 3));
-    }
-  }
-#endif
-
-#ifdef  ESPMQTT_OPENTHERM
-  opentherm_handle();
-#endif
-
 #ifdef ESPMQTT_ZMAI90
+void zmai90_handle()
+{
+  if (uptime % 10 == 0)
+  {
+    uint8_t cmd[9] = {0xFE, 0x01, 0x0F, 0x08, 0x00, 0x00, 0x00, 0x1C};
+    // command to ask for data
+
+    DEBUG_V("Sending ZMAI request packet...\n");
+
+    Serial.flush();
+    Serial.write(cmd, 9); //request PPM CO2
+    zmai90pointer = 0;
+  }
+
   if (Serial.available() > 0) {
     uint8_t zmai90data = Serial.read();
     DEBUG ("ZMAI90DATA=%d:%02X\n", zmai90pointer, zmai90data);
@@ -2329,33 +1937,34 @@ void loop()
     }
     zmai90pointer++;
   }
+}
 #endif
 
-#ifdef  ESPMQTT_SMARTMETER
-  smartmeter_handle();
+#ifdef  ESPMQTT_WATERMETER
+void espmqtt_watermeter_handle()
+{
+  static uint32_t watermeter_liters = watermeter_getliters();
+  if (watermeter_handle())
+  {
+    putdatamap("water/lmin", String(watermeter_getflow(), 1));
+    putdatamap("water/m3h", String(watermeter_getflow() * 0.06, 3));
+
+    if (watermeter_liters != watermeter_getliters())
+    {
+      watermeter_liters = watermeter_getliters();
+      i2cEeprom_write(watermeter_liters);
+      //syslogN("Watermeter Liters Changed=%d\n", watermeter_liters);
+      putdatamap("water/liter", String(watermeter_liters));
+      putdatamap("water/m3", String((double(watermeter_liters) / 1000), 3));
+    }
+  }
+}
 #endif
 
-#ifdef  ESPMQTT_GROWATT
-  growatt_handle();
-#endif
-
-#ifdef  ESPMQTT_GROWATT_MODBUS
-  growattModbus_handle();
-#endif
-
-#ifdef FLASHBUTTON
-  flashbutton_handle();
-#endif
-
-#ifdef  ESPMQTT_AMGPELLETSTOVE
-  amgpelletstove_handle();
-#endif
-
-#ifdef ESPMQTT_OBD2
-  obd2_handle();
-#endif
 
 #ifdef  ESPMQTT_SONOFFPOWR2
+void sonoffpow2_handle()
+{
   static uint8_t serbuffer[24];
   static uint8_t serpointer = 0;
   if (Serial.available() > 0)
@@ -2424,6 +2033,534 @@ void loop()
       serpointer = 0;
     }
   }
+}
+#endif
+
+#ifdef RAINMETERPIN
+void rainmeter_handle()
+{
+  static uint32_t rainpinmillis = 0;
+  static uint32_t rainpulses = 0;
+  static uint32_t rainpulsesminute = 0;
+  static uint32_t rainpulseshour = 0;
+  bool rainpinstate = 0;
+  static bool count = 0;
+  rainpinstate = digitalRead(RAINMETERPIN);
+  if ((rainpinstate == 1) && (millis() - 50 > rainpinmillis) && count) // Pulse has to settle for 50ms before counting
+  {
+    rainpulses++;
+    rainpulseshour++;
+    rainpulsesminute++;
+    String mqtttopic = String(mqtt_topicprefix + "rain/pulse");
+    mqttClient.publish(mqtttopic.c_str(), 0, false, "1");
+    count = 0;
+  }
+  if (rainpinstate == 0)
+  {
+    rainpinmillis = millis();
+    count = 1;
+  }
+  putdatamap ("rain/pulses", String(rainpulses));
+  putdatamap ("rain/mm", String((double(rainpulses)*RAINMETERPULSEMM), 1));
+
+  static bool hourreg = false;
+  static bool firsthourreg = true;
+  if ((uptime % 3600) || (firsthourreg))
+  {
+    putdatamap ("rain/hour/pulses", String(rainpulseshour));
+    putdatamap ("rain/hour/mm", String((double(rainpulseshour)*RAINMETERPULSEMM), 1));
+    firsthourreg = false;
+    if (!hourreg)
+    {
+      putdatamap ("rain/lasthour/pulses", String(rainpulseshour));
+      putdatamap ("rain/lasthour/mm", String((double(rainpulseshour)*RAINMETERPULSEMM), 1));
+      rainpulseshour = 0;
+      hourreg = true;
+    }
+  }
+  else hourreg = false;
+
+  static bool minreg = false;
+  static bool firstminreg = true;
+  if ((uptime % 60) || (firstminreg))
+  {
+    putdatamap ("rain/minute/pulses", String(rainpulsesminute));
+    putdatamap ("rain/minute/mm", String((double(rainpulsesminute)*RAINMETERPULSEMM), 1));
+    firstminreg = false;
+    if (!minreg)
+    {
+      putdatamap ("rain/lastminute/pulses", String(rainpulsesminute));
+      putdatamap ("rain/lastminute/mm", String((double(rainpulsesminute)*RAINMETERPULSEMM), 1));
+      rainpulsesminute = 0;
+      minreg = true;
+    }
+  }
+  else minreg = false;
+
+  digitalWrite(NODEMCULEDPIN, rainpinstate);
+}
+#endif
+
+#ifdef  ESPMQTT_SDM120
+void sdm120_readnextregister()
+{
+  static uint8_t sdmreadcounter = 1;
+  double value = NAN;
+
+  switch (sdmreadcounter)
+  {
+    case 1:
+      putdatamap("status", "querying");
+      putdatamap("voltage", doubletostring(sdm.readVal(SDM120CT_VOLTAGE), 2));
+      break;
+    case 2:
+      putdatamap("current", doubletostring(sdm.readVal(SDM120CT_CURRENT), 2));
+      break;
+    case 3:
+      putdatamap("power", doubletostring(sdm.readVal(SDM120CT_POWER), 2));
+      break;
+    case 4:
+      putdatamap("power/apparant", doubletostring(sdm.readVal(SDM120CT_APPARENT_POWER), 2));
+      break;
+    case 5:
+      putdatamap("power/reactive", doubletostring(sdm.readVal(SDM120CT_REACTIVE_POWER), 2));
+      break;
+    case 6:
+      putdatamap("frequency", doubletostring(sdm.readVal(SDM120CT_FREQUENCY), 2));
+      break;
+    case 7:
+      putdatamap("powerfactor", doubletostring(sdm.readVal(SDM120CT_POWER_FACTOR), 2));
+      break;
+    case 8:
+      putdatamap("energy/active/import", doubletostring(sdm.readVal(SDM120CT_IMPORT_ACTIVE_ENERGY), 3));
+      break;
+    case 9:
+      putdatamap("energy/active/export", doubletostring(sdm.readVal(SDM120CT_EXPORT_ACTIVE_ENERGY), 3));
+      break;
+    case 10:
+      putdatamap("energy/active", doubletostring(sdm.readVal(SDM120CT_TOTAL_ACTIVE_ENERGY), 3));
+      break;
+    case 11:
+      putdatamap("energy/reactive/import", doubletostring(sdm.readVal(SDM120CT_IMPORT_REACTIVE_ENERGY), 3));
+      break;
+    case 12:
+      putdatamap("energy/reactive/export", doubletostring(sdm.readVal(SDM120CT_EXPORT_REACTIVE_ENERGY), 3));
+      break;
+    case 13:
+      value = sdm.readVal(SDM120CT_TOTAL_REACTIVE_ENERGY);
+      putdatamap("energy/reactive", doubletostring(value, 3));
+      if (isnan(value)) putdatamap("status", "commerror");
+      else putdatamap("status", "ready");
+      break;
+    case 14:
+      if (uptime % 5 == 0) sdmreadcounter = 0;
+      break;
+  }
+  if (sdmreadcounter < 14)
+  {
+    digitalWrite(NODEMCULEDPIN, isnan(value) ? 1 : 0);
+    sdmreadcounter++;
+  }
+}
+#endif
+
+#ifdef  ESPMQTT_DDM18SD
+void ddm18sd_readnextregister()
+{
+  static uint8_t sdmreadcounter = 1;
+  double value = NAN;
+
+  switch (sdmreadcounter)
+  {
+    case 1:
+      putdatamap("status", "querying");
+      putdatamap("voltage", String(sdm.readVal(DDM18SD_VOLTAGE), 2));
+      break;
+    case 2:
+      putdatamap("current", String(sdm.readVal(DDM18SD_CURRENT), 2));
+      break;
+    case 3:
+      putdatamap("power", String(sdm.readVal(DDM18SD_POWER), 2));
+      break;
+    case 4:
+      putdatamap("power/reactive", String(sdm.readVal(DDM18SD_REACTIVE_POWER), 2));
+      break;
+    case 5:
+      putdatamap("frequency", String(sdm.readVal(DDM18SD_FREQUENCY), 2));
+      break;
+    case 6:
+      putdatamap("powerfactor", String(sdm.readVal(DDM18SD_POWER_FACTOR), 2));
+      break;
+    case 7:
+      putdatamap("energy/active", String(sdm.readVal(DDM18SD_IMPORT_ACTIVE_ENERGY), 3));
+      break;
+    case 8:
+      putdatamap("energy/reactive", String(sdm.readVal(DDM18SD_IMPORT_REACTIVE_ENERGY), 3));
+      if (isnan(value)) putdatamap("status", "commerror");
+      else putdatamap("status", "ready");
+      break;
+    case 9:
+      if (uptime % 10) sdmreadcounter = 0;
+      break;
+  }
+  if (sdmreadcounter < 9)
+  {
+    digitalWrite(NODEMCULEDPIN, isnan(value) ? 1 : 0);
+    sdmreadcounter++;
+  }
+}
+#endif
+
+void dotasks()
+{
+  ESP.wdtFeed(); // Prevent HW WD to kick in...
+  yield();
+  ArduinoOTA.handle();
+  yield();
+  MDNS.update();
+  yield();
+  Debug.handle();
+  yield();
+  webserver.handleClient();
+  yield();
+}
+
+void loop()
+{
+  dotasks();
+
+  if (WiFi.status() == WL_CONNECTED)
+  {
+    wifichannel = WiFi.channel(); // We can't rely on wifi.channel because while scanning the channel is changed.
+    if (!mainstate.wificonnected) triggers.wificonnected = true;
+    mainstate.wificonnected = true;
+  }
+  else
+  {
+    wifichannel = 0;
+    if (mainstate.wificonnected) triggers.wifidisconnected = true;
+    mainstate.wificonnected = false;
+  }
+  yield();
+
+  if ((0 != reboottimeout) && (uptime > reboottimeout))
+  {
+    ESP.restart();
+    delay(1000);
+  }
+  yield();
+
+  if ((0 != wifichangesettingstimeout) && (uptime > wifichangesettingstimeout))
+  {
+    mainstate.accesspoint = false;
+    if ((wifissid != ""))
+    {
+      connectToWifi();
+    }
+    wifichangesettingstimeout = 0;
+  }
+  yield();
+
+
+  if (triggers.wificonnected)
+  {
+    triggers.wificonnected = false;
+    DEBUG_I("Connected to WiFi SSID=%s RSSI=%d\n", WiFi.SSID().c_str(), WiFi.RSSI());
+    //syslogN("Connected to WiFi SSID=%s RSSI=%d\n", WiFi.SSID().c_str(), WiFi.RSSI());
+    initMqtt();
+    mqttReconnectTimer.once(1, connectToMqtt); // Wait 1 second before connecting mqtt
+    MDNS.begin(esp_hostname);
+    MDNS.addService("http", "tcp", 80);
+#ifdef ESPMQTT_BHT002
+    bht002_connected();
+#endif
+
+#ifdef ESPMQTT_TUYA_2GANGDIMMERV2
+    tuya_connected();
+#endif
+  }
+  yield();
+
+
+  if (triggers.wifidisconnected)
+  {
+    triggers.wifidisconnected = false;
+    DEBUG_W("Disconnected from Wi-Fi.\n");
+    disconnectMqtt();
+    if (!mainstate.accesspoint) wifiReconnectTimer.once(2, connectToWifi); // trying to connect to wifi can cause AP to fail
+#ifdef ESPMQTT_BHT002
+    bht002_disconnected();
+#endif
+
+#ifdef ESPMQTT_TUYA_2GANGDIMMERV2
+    //tuya_disconnected(); // Don't do this, the device starts beeping....
+#endif
+  }
+  yield();
+
+  if (triggers.mqttconnected)
+  {
+    triggers.mqttconnected = false;
+    DEBUG_I("Connected to MQTT Server=%s\n", mqtt_server.c_str());
+    //syslogN("Connected to MQTT Server=%s\n", mqtt_server.c_str());
+    dotasks();  // Prevent crash because of to many debug data to send
+    update_systeminfo(true);
+    mqttdosubscriptions();
+    updateexternalip();
+#ifdef ESPMQTT_TUYA_2GANGDIMMERV2
+    tuya_connectedMQTT();
+#endif
+  }
+  yield();
+
+
+  if (triggers.mqttdisconnected)
+  {
+    triggers.mqttdisconnected = false;
+    DEBUG_W("Disconnected from MQTT Server=%s\n", mqtt_server.c_str());
+    dotasks(); // Prevent crash because of to many debug data to send
+    if (WiFi.isConnected()) {
+      mqttReconnectTimer.once(5, connectToMqtt);
+    }
+  }
+  yield();
+
+
+  if (triggers.mqttpublished)
+  {
+    triggers.mqttpublished = false;
+    DEBUG_V ("Publish acknowledged packetid=%d\n", mqttlastpublishedpacketid);
+    publishdatamap(mqttlastpublishedpacketid);
+
+  }
+  yield();
+
+  if (triggers.mqttpublishall)
+  {
+    triggers.mqttpublishall = false;
+    publishdatamap(-1, true, true);
+  }
+  yield();
+
+  publishdatamap();
+  yield();
+
+  if (triggers.firmwareupgrade != "")
+  {
+    // wait 5 seconds before upgrading
+    static uint64_t waitbeforeupgrade = 0;
+    if (waitbeforeupgrade == 0)
+    {
+      DEBUG_I ("Received startfirmwareupgrade, upgrade pending...\n");
+      putdatamap("status", "upgrading");
+      waitbeforeupgrade = uptime + 5;
+    }
+    else if (waitbeforeupgrade < uptime)
+    {
+      waitbeforeupgrade = 0;
+
+      StaticJsonDocument<300> JSONdoc;
+      auto error = deserializeJson(JSONdoc, triggers.firmwareupgrade.c_str());
+      triggers.firmwareupgrade = "";
+
+      if (!error)
+      {
+        // The upgradekey is mainly to prevent upgrading over and over when a retained upgrade message is retained in mqtt
+        String upgradekey = JSONdoc["key"];
+        String upgradeurl = JSONdoc["url"];
+        String upgradeversion = JSONdoc["version"];
+
+        DEBUG_I ("Starting firmware upgrade\n upgradeversion=%s\n upgradeurl=%s\n upgradekey=%s\n", upgradeversion.c_str(), upgradeurl.c_str(), upgradekey.c_str());
+
+        if (upgradeversion == ESPMQTT_VERSION)
+        {
+          DEBUG_I ("Upgrade canceled, version is the same\n");
+          putdatamap("status/upgrade", "up to date, same firmware version");
+          putdatamap("status", "upgrade_exit");
+        }
+        else if (getdatamap("firmware/upgradekey") != upgradekey)
+        {
+          DEBUG_I ("Upgrade canceled, upgradekey is incorrect\n");
+          putdatamap("status/upgrade", "error, incorrect upgradekey");
+          putdatamap("status", "upgrade_exit");
+        }
+        else
+        {
+          DEBUG_I ("Starting upgrade from:%s\n", upgradeurl.c_str());
+          putdatamap("status/upgrade", "upgrading");
+          WiFiClient upgradeclient;
+          t_httpUpdate_return ret = ESPhttpUpdate.update(upgradeclient, upgradeurl, ESPMQTT_VERSION);
+          switch (ret)
+          {
+            case HTTP_UPDATE_FAILED:
+              DEBUG_E("Firmware upgrade failed: %s.\n", ESPhttpUpdate.getLastErrorString().c_str());
+              putdatamap("status/upgrade", String("error http: " + ESPhttpUpdate.getLastErrorString()));
+              putdatamap("status", "upgrade_exit");
+              break;
+            case HTTP_UPDATE_NO_UPDATES:
+              DEBUG_E("Firmware upgrade check finished, no new version available.");
+              putdatamap("status/upgrade", "up to date, same firmware version");
+              putdatamap("status", "upgrade_exit");
+              break;
+            case HTTP_UPDATE_OK:
+              DEBUG_E("Firmware upgrade done!\n"); // may not be called since we reboot the ESP
+              putdatamap("status/upgrade", "upgrade finished");
+              putdatamap("status", "rebooting");
+              break;
+          }
+        }
+      }
+    }
+  }
+  yield();
+
+  if (triggers.wifiscanready)
+  {
+    triggers.wifiscanready = false;
+    int strongestwifiid = -1;
+    int strongestwifirssi = -1000;
+    int currentwifirssi = -1000;
+    int currentwifiid = -1;
+
+    for (int i = 0; i < wifinetworksfound; i++)
+    {
+      if (WiFi.SSID(i) == wifissid.c_str())
+      {
+        if (strongestwifirssi < WiFi.RSSI(i))
+        {
+          strongestwifiid = i;
+          strongestwifirssi = WiFi.RSSI(i);
+        }
+        if (WiFi.BSSIDstr(i) == WiFi.BSSIDstr())
+        {
+          currentwifirssi = WiFi.RSSI(i);
+          currentwifiid = i;
+        }
+      }
+
+      String enctype = "None";
+      switch (WiFi.encryptionType(i)) {
+        case ENC_TYPE_WEP:
+          enctype = "WEP";
+          break;
+        case ENC_TYPE_TKIP:
+          enctype = "WPA";
+          break;
+        case ENC_TYPE_CCMP:
+          enctype = "WPA2";
+          break;
+        case ENC_TYPE_NONE:
+          enctype = "None";
+          break;
+        case ENC_TYPE_AUTO:
+          enctype = "Auto";
+          break;
+      }
+
+
+      DEBUG_V(" %d: %s, %s, Ch:%d (%ddBm) %s\n", i, WiFi.SSID(i).c_str(), WiFi.BSSIDstr(i).c_str(), WiFi.channel(i), WiFi.RSSI(i), enctype.c_str());
+      Debug.handle();
+      yield(); // Prevent crash because of to many debug data to send
+    }
+
+    DEBUG_D("CurrentAp ID=%d SSID=%s BSSID=%s RSSI=%d(%d), Strongest AP ID=%d SSID=%s, BSSID=%s RSSI=%d(%d)\n", currentwifiid, wifissid.c_str(), WiFi.BSSIDstr().c_str(), currentwifirssi, WiFi.RSSI(), strongestwifiid, WiFi.SSID(strongestwifiid).c_str(), WiFi.BSSIDstr(strongestwifiid).c_str(), WiFi.RSSI(strongestwifiid), strongestwifirssi);
+    Debug.handle();
+    yield();  // Prevent crash because of to many debug data to send
+
+    if (!mainstate.accesspoint)
+    {
+      if ((strongestwifiid >= 0) && ((WiFi.RSSI() >= 0) || (currentwifiid == -1) || ((currentwifiid != strongestwifiid) && (currentwifirssi + 10 < strongestwifirssi))))
+      {
+        DEBUG_I ("Switching to stronger AP %d (%s, %s, %s)\n", strongestwifiid, WiFi.SSID().c_str(), WiFi.psk().c_str(), WiFi.BSSIDstr(strongestwifiid).c_str());
+        WiFi.begin(wifissid.c_str(), wifipsk.c_str(), WiFi.channel(strongestwifiid), WiFi.BSSID(strongestwifiid), 1);
+        yield();
+      }
+    }
+  }
+  yield();
+
+
+#ifdef QSWIFIDIMMERCHANNELS
+  qswifidimmer_handle();
+#endif
+
+#ifdef QSWIFISWITCHCHANNELS
+  qswifiswitch.handle();
+#endif
+
+#ifdef  ESPMQTT_DDNS
+  EasyDDNS.update(10000);
+#endif
+
+#ifdef SONOFFCH
+  sonoff_handle();
+#endif
+
+#ifdef  ESPMQTT_NOISE
+  handle_noise();
+#endif
+
+#ifdef  ESPMQTT_DUCOBOX
+  ducobox_handle();
+#endif
+
+#ifdef  ESPMQTT_DIMMER
+  dimmer_handle();
+#endif
+
+#ifdef  ESPMQTT_GENERIC8266
+#endif
+
+#ifdef  ESPMQTT_BHT002
+  bht002_handle();
+#endif
+
+#ifdef ESPMQTT_TUYA_2GANGDIMMERV2
+  tuya_handle();
+#endif
+
+#ifdef RAINMETERPIN
+  rainmeter_handle();
+#endif
+
+#ifdef  ESPMQTT_WATERMETER
+  espmqtt_watermeter_handle();
+#endif
+
+#ifdef  ESPMQTT_OPENTHERM
+  opentherm_handle();
+#endif
+
+#ifdef ESPMQTT_ZMAI90
+  zmai90_handle();
+#endif
+
+#ifdef  ESPMQTT_SMARTMETER
+  smartmeter_handle();
+#endif
+
+#ifdef  ESPMQTT_GROWATT
+  growatt_handle();
+#endif
+
+#ifdef  ESPMQTT_GROWATT_MODBUS
+  growattModbus_handle();
+#endif
+
+#ifdef FLASHBUTTON
+  flashbutton_handle();
+#endif
+
+#ifdef  ESPMQTT_AMGPELLETSTOVE
+  amgpelletstove_handle();
+#endif
+
+#ifdef ESPMQTT_OBD2
+  obd2_handle();
+#endif
+
+#ifdef  ESPMQTT_SONOFFPOWR2
+  sonoffpow2_handle();
 #endif
 
 #ifdef MH_Z19
@@ -2449,109 +2586,14 @@ void loop()
     //    Serial.print(".");
     timertick = 0;
 #ifdef  ESPMQTT_SDM120
-    static uint8_t sdmreadcounter = 1;
-    double value = NAN;
-
-    switch (sdmreadcounter)
-    {
-      case 1:
-        putdatamap("status", "querying");
-        putdatamap("voltage", doubletostring(sdm.readVal(SDM120CT_VOLTAGE), 2));
-        break;
-      case 2:
-        putdatamap("current", doubletostring(sdm.readVal(SDM120CT_CURRENT), 2));
-        break;
-      case 3:
-        putdatamap("power", doubletostring(sdm.readVal(SDM120CT_POWER), 2));
-        break;
-      case 4:
-        putdatamap("power/apparant", doubletostring(sdm.readVal(SDM120CT_APPARENT_POWER), 2));
-        break;
-      case 5:
-        putdatamap("power/reactive", doubletostring(sdm.readVal(SDM120CT_REACTIVE_POWER), 2));
-        break;
-      case 6:
-        putdatamap("frequency", doubletostring(sdm.readVal(SDM120CT_FREQUENCY), 2));
-        break;
-      case 7:
-        putdatamap("powerfactor", doubletostring(sdm.readVal(SDM120CT_POWER_FACTOR), 2));
-        break;
-      case 8:
-        putdatamap("energy/active/import", doubletostring(sdm.readVal(SDM120CT_IMPORT_ACTIVE_ENERGY), 3));
-        break;
-      case 9:
-        putdatamap("energy/active/export", doubletostring(sdm.readVal(SDM120CT_EXPORT_ACTIVE_ENERGY), 3));
-        break;
-      case 10:
-        putdatamap("energy/active", doubletostring(sdm.readVal(SDM120CT_TOTAL_ACTIVE_ENERGY), 3));
-        break;
-      case 11:
-        putdatamap("energy/reactive/import", doubletostring(sdm.readVal(SDM120CT_IMPORT_REACTIVE_ENERGY), 3));
-        break;
-      case 12:
-        putdatamap("energy/reactive/export", doubletostring(sdm.readVal(SDM120CT_EXPORT_REACTIVE_ENERGY), 3));
-        break;
-      case 13:
-        value = sdm.readVal(SDM120CT_TOTAL_REACTIVE_ENERGY);
-        putdatamap("energy/reactive", doubletostring(value, 3));
-        if (isnan(value)) putdatamap("status", "commerror");
-        else putdatamap("status", "ready");
-        break;
-      case 14:
-        if (uptime % 5 == 0) sdmreadcounter = 0;
-        break;
-    }
-    if (sdmreadcounter < 14)
-    {
-      digitalWrite(NODEMCULEDPIN, isnan(value) ? 1 : 0);
-      sdmreadcounter++;
-    }
+    sdm120_readnextregister();
 #endif
-#ifdef  ESPMQTT_DDM18SD
-    static uint8_t sdmreadcounter = 1;
-    double value = NAN;
 
-    switch (sdmreadcounter)
-    {
-      case 1:
-        putdatamap("status", "querying");
-        putdatamap("voltage", String(sdm.readVal(DDM18SD_VOLTAGE), 2));
-        break;
-      case 2:
-        putdatamap("current", String(sdm.readVal(DDM18SD_CURRENT), 2));
-        break;
-      case 3:
-        putdatamap("power", String(sdm.readVal(DDM18SD_POWER), 2));
-        break;
-      case 4:
-        putdatamap("power/reactive", String(sdm.readVal(DDM18SD_REACTIVE_POWER), 2));
-        break;
-      case 5:
-        putdatamap("frequency", String(sdm.readVal(DDM18SD_FREQUENCY), 2));
-        break;
-      case 6:
-        putdatamap("powerfactor", String(sdm.readVal(DDM18SD_POWER_FACTOR), 2));
-        break;
-      case 7:
-        putdatamap("energy/active", String(sdm.readVal(DDM18SD_IMPORT_ACTIVE_ENERGY), 3));
-        break;
-      case 8:
-        putdatamap("energy/reactive", String(sdm.readVal(DDM18SD_IMPORT_REACTIVE_ENERGY), 3));
-        if (isnan(value)) putdatamap("status", "commerror");
-        else putdatamap("status", "ready");
-        break;
-      case 9:
-        if (uptime % 10) sdmreadcounter = 0;
-        break;
-    }
-    if (sdmreadcounter < 9)
-    {
-      digitalWrite(NODEMCULEDPIN, isnan(value) ? 1 : 0);
-      sdmreadcounter++;
-    }
-    yield();
+#ifdef  ESPMQTT_DDM18SD
+    ddm18sd_readnextregister();
 #endif
   }
+  yield();
 
   if (timersectick == 1) // Every 1 second check sensors and update display (it would be insane to do it more often right?)
   {
@@ -2568,11 +2610,13 @@ void loop()
         WiFi.scanNetworksAsync(wifiScanReady);
       }
     }
+    yield();
 
     if ((uptime % 600) == 0)
     {
       updateexternalip();
     }
+    yield();
 
     // Every 10 minutes (+/- 60 seconds) publish all mqtt data
     static int8_t dividefactor = random(-60, 60);
@@ -2581,6 +2625,7 @@ void loop()
       DEBUG_I ("Regular publishing datamap...\n");
       publishdatamap(-1, false, false, true);
     }
+    yield();
 
     if ((uptime % 60) == 0)
     {
@@ -2595,8 +2640,8 @@ void loop()
         //syslogI("Uptime=%s DateTime=%s\n", uptimestr, strtime.c_str());
       }
       DEBUG_I("Uptime=%s DateTime=%s\n", uptimestr, strtime.c_str());
-      yield();
     }
+    yield();
 
 
 #ifdef  ESPMQTT_BBQTEMP
@@ -2657,20 +2702,6 @@ void loop()
     //putdatamap("circuit/" + String((circuitnr + 1)) + "/VA", String(mVA / 1000));
     if (circuitnr < 14) circuitnr++;
     else circuitnr = 0;
-#endif
-
-#ifdef ESPMQTT_ZMAI90
-    if (uptime % 10 == 0)
-    {
-      uint8_t cmd[9] = {0xFE, 0x01, 0x0F, 0x08, 0x00, 0x00, 0x00, 0x1C};
-      // command to ask for data
-
-      DEBUG_V("Sending ZMAI request packet...\n");
-
-      Serial.flush();
-      Serial.write(cmd, 9); //request PPM CO2
-      zmai90pointer = 0;
-    }
 #endif
 
 #ifdef DHTPIN
@@ -2795,8 +2826,6 @@ void sonoff_init()
 #endif
 
 #ifdef HLW8012_CF_PIN
-
-
   // Initialize HLW8012
   // void begin(unsigned char cf_pin, unsigned char cf1_pin, unsigned char sel_pin, unsigned char currentWhen = HIGH, bool use_interrupts = false, unsigned long pulse_timeout = PULSE_TIMEOUT);
   // * cf_pin, cf1_pin and sel_pin are GPIOs to the HLW8012 IC
@@ -2948,7 +2977,7 @@ void publishdatamap(int32_t packetId, bool publishall, bool init, bool publishre
 
   if ((packetId != -1) || publishall) DEBUG_V("Publishdatamap packetId=%d publishall=%d datamappointer=%d datamapsize=%d nextpacketid=%d waitingforack=%d\n", packetId, publishall, datamappointer, dataMap->size(), nextpacketId, waitingforack);
 
-  dotasks();
+  yield();
 
   if (publishall || publishregular)
   {
@@ -2963,96 +2992,88 @@ void publishdatamap(int32_t packetId, bool publishall, bool init, bool publishre
       dataMap->put(topic, data);
       publishallpointer++;
       //DEBUG("publishallpointer=%d datamapsize=%d\n",publishallpointer, dataMap->size());
-      dotasks();
+      yield();
     }
     datamappointer = 0;
   }
 
-  dotasks();
+  yield();
 
   // If connected to mqtt and waiting for ack wait for packetid which has to be acked
-  if (mqttClient.connected())
+  if (waitingforack)
   {
-    if (waitingforack)
+    if (packetId == 0)
     {
-      if (packetId == 0)
+      // If packetId == 0 resend because packet was not acked
+      DEBUG_V("Not received mqtt ack id=%d\n", packetId);
+      const char *topic = dataMap->getKey(datamappointer);
+      dataMapStruct data = dataMap->getData(datamappointer);
+      if (data.onair)
       {
-        // If packetId == 0 resend because packet was not acked
-        DEBUG_V("Not received mqtt ack id=%d\n", packetId);
-        waitingforack = true;
-        const char *topic = dataMap->getKey(datamappointer);
-        String sendtopic = String("home/" + esp_hostname + "/" + topic);
-        dataMapStruct data = dataMap->getData(datamappointer);
-        String payload = data.payload;
-        nextpacketId = mqttClient.publish(sendtopic.c_str(), 1, true, payload.c_str());
-        if (nextpacketId == 0) waitingforack = false;
-        else
-        {
-          data.onair = true;
-          dataMap->put(topic, data);
-        }
+        data.onair = false;
+        dataMap->put(topic, data);
       }
-      if (packetId == nextpacketId)
-      {
-        // Packet succesfull delivered proceed to next item
-        DEBUG_V("Received mqtt ack id=%d\n", packetId);
-        const char *topic = dataMap->getKey(datamappointer);
-        dataMapStruct data = dataMap->getData(datamappointer);
-        if (data.onair)
-        {
-          data.send = false;
-          data.onair = false;
-          dataMap->put(topic, data);
-        }
-        datamappointer++;
-        waitingforack = false;
-      }
+      waitingforack = false;
     }
-
-    dotasks();
+    else if (packetId == nextpacketId)
+    {
+      // Packet succesfull delivered proceed to next item
+      DEBUG_V("Received mqtt ack id=%d\n", packetId);
+      const char *topic = dataMap->getKey(datamappointer);
+      dataMapStruct data = dataMap->getData(datamappointer);
+      if (data.onair)
+      {
+        data.send = false;
+        data.onair = false;
+        dataMap->put(topic, data);
+      }
+      datamappointer++;
+      waitingforack = false;
+    }
+  }
 
   // If not waiting for ack search for next item in datamap which has to be send
-    if (!waitingforack)
+  else if (mqttClient.connected() && (WiFi.status() == WL_CONNECTED))
+  {
+    if (datamappointer < dataMap->size())
     {
-      if (datamappointer < dataMap->size())
+      nextpacketId = -1;
+      while ((datamappointer < dataMap->size()) && (nextpacketId == -1))
       {
-        nextpacketId = -1;
-        while ((datamappointer < dataMap->size()) && (nextpacketId == -1))
+        const char *topic = dataMap->getKey(datamappointer);
+        dataMapStruct data = dataMap->getData(datamappointer);
+        //DEBUG ("datamappointer=%d datamapsize=%d send=%d\n", datamappointer, dataMap->size(), data.send);
+        if (data.send)
         {
-          const char *topic = dataMap->getKey(datamappointer);
-          dataMapStruct data = dataMap->getData(datamappointer);
-          //DEBUG ("datamappointer=%d datamapsize=%d send=%d\n", datamappointer, dataMap->size(), data.send);
-          if (data.send)
+          String sendtopic = String(mqtt_topicprefix + topic);
+          nextpacketId = mqttClient.publish(sendtopic.c_str(), 1, true, data.payload);
+          if (nextpacketId > 0)
           {
-            String sendtopic = String(mqtt_topicprefix + topic);
-            nextpacketId = mqttClient.publish(sendtopic.c_str(), 1, true, data.payload);
-            if (nextpacketId > 0)
-            {
-              waitingforack = true;
-              data.onair = true;
-              dataMap->put(topic, data);
-            }
-            DEBUG_D ("MQTT PUBLISHING DATAMAP %s=%s (nextpacketId=%d)\n", topic, data.payload, nextpacketId);
-            dotasks();
+            waitingforack = true;
+            data.onair = true;
+            dataMap->put(topic, data);
           }
-          else
-          {
-            datamappointer++;
-          }
+          DEBUG_D ("MQTT PUBLISHING DATAMAP %s=%s (nextpacketId=%d)\n", topic, data.payload, nextpacketId);
+          yield();
         }
-        if (nextpacketId == -1)
+        else
         {
-          datamappointer = 0;
-          mainstate.mqttready = true;
+          datamappointer++;
         }
       }
-      else
+      if (nextpacketId == -1)
       {
         datamappointer = 0;
         mainstate.mqttready = true;
       }
     }
+    else
+    {
+      datamappointer = 0;
+      mainstate.mqttready = true;
+    }
   }
+  yield();
 }
 
 
@@ -3676,7 +3697,7 @@ void openthermcallback (const char *topic, String payload)
 #ifdef  ESPMQTT_GROWATT
 void growattcallback (const char *topic, String payload)
 {
-  if (strcmp(topic,"status") == 0)
+  if (strcmp(topic, "status") == 0)
   {
     if (payload == "ready") digitalWrite(NODEMCULEDPIN, 0);
     else digitalWrite(NODEMCULEDPIN, 1);
@@ -3752,29 +3773,29 @@ void processCmdRemoteDebug()
 
   if (lastCmd == "getrestartreason")
   {
-    switch(ESP.getResetInfoPtr()->reason)
+    switch (ESP.getResetInfoPtr()->reason)
     {
       case REASON_DEFAULT_RST:
         DEBUG ("Normal Startup\n");
-      break;
+        break;
       case REASON_WDT_RST:
         DEBUG ("Hardware Watchdog Reset\n");
-      break;
+        break;
       case REASON_EXCEPTION_RST:
         DEBUG ("Exception Reset\n");
-      break;
+        break;
       case REASON_SOFT_WDT_RST:
         DEBUG ("Software Watchdog Reset\n");
-      break;
+        break;
       case REASON_SOFT_RESTART:
         DEBUG ("Software Restart\n");
-      break;
+        break;
       case REASON_DEEP_SLEEP_AWAKE:
         DEBUG ("Wake up from deep sleep\n");
-      break;
+        break;
       case REASON_EXT_SYS_RST:
         DEBUG ("External Reset\n");
-      break;
+        break;
     }
   }
 
