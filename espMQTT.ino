@@ -30,7 +30,7 @@
 
 /* ESP8266 */
 // #define ESPMQTT_WEATHER
-#define ESPMQTT_AMGPELLETSTOVE
+// #define ESPMQTT_AMGPELLETSTOVE
 // #define ESPMQTT_BATHROOM
 // #define ESPMQTT_BEDROOM2
 // #define ESPMQTT_OPENTHERM
@@ -48,7 +48,7 @@
 // #define ESPMQTT_SOIL
 // #define ESPMQTT_DIMMER
 // #define ESPMQTT_RELAY
-// #define ESPMQTT_LIVINGROOM
+#define ESPMQTT_LIVINGROOM
 // #define ESPMQTT_BBQTEMP
 
 /* ESP8285 */
@@ -665,7 +665,7 @@ struct Mainstate {
 } mainstate;
 
 struct dataMapStruct {
-  char *payload;
+  char *payload = (char *) "";;
   bool send = true;
   bool onair = false;
   bool publishregular = false;
@@ -923,7 +923,7 @@ void putdatamap(const char *topic, String value, bool sendupdate = true, bool fo
 
   if (dataMap->has(topic))
   {
-    datamapstruct= dataMap->get(topic);
+    datamapstruct = dataMap->get(topic);
     if ((strcmp (datamapstruct.payload , value.c_str()) == 0) && !forceupdate) return;
 
     if (strcmp(topic, "status") == 0)
