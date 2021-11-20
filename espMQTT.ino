@@ -4318,6 +4318,7 @@ void setup() {
   digitalWrite(ESPMQTT_BBQTEMP_CS1, HIGH);
 #endif
 
+  connectToWifi(); // After everything is set, connect to wifi.
 }
 
 
