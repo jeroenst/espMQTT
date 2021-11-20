@@ -30,7 +30,7 @@
 
 /* ESP8266 */
 // #define ESPMQTT_WEATHER
-// #define ESPMQTT_AMGPELLETSTOVE
+#define ESPMQTT_AMGPELLETSTOVE
 // #define ESPMQTT_BATHROOM
 // #define ESPMQTT_BEDROOM2
 // #define ESPMQTT_OPENTHERM
@@ -48,7 +48,7 @@
 // #define ESPMQTT_SOIL
 // #define ESPMQTT_DIMMER
 // #define ESPMQTT_RELAY
-#define ESPMQTT_LIVINGROOM
+// #define ESPMQTT_LIVINGROOM
 // #define ESPMQTT_BBQTEMP
 
 /* ESP8285 */
@@ -2816,7 +2816,7 @@ void loop()
     yield();
     ESP.wdtFeed(); // Prevent watchdog to kick in...
 
-    
+
 #ifdef APONBOOT
     if ((uptime == 60) && (WiFi.status() != WL_CONNECTED))
     {
@@ -4030,7 +4030,7 @@ void setup() {
 #ifndef SERIALLOG
   Serial.setDebugOutput(false);
 #endif
-  //ESP.wdtDisable(); // Use hardware watchdog of 6 seconds to prevent auto reboot when function takes more time..
+  ESP.wdtDisable(); // Use hardware watchdog of 6 seconds to prevent auto reboot when function takes more time..
   EEPROM.begin(512);
 
   initSerial();
