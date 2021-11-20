@@ -20,12 +20,12 @@
 
 #define DEFAULT_PASSWORD "esplogin"
 
-#define DEBUGLEVEL Debug.DEBUG
+#define DEBUGLEVEL Debug.VERBOSE
 //#define //syslogDEBUG
 
 #ifndef ESPMQTT_BUILDSCRIPT // Only use defines when when firmware is not compiled from the build script...
 /* SETTINGS */
-//#define SERIALLOG
+#define SERIALLOG
 #define MYTZ TZ_Europe_Amsterdam
 
 /* ESP8266 */
@@ -213,7 +213,6 @@ QsWifiSwitch qswifiswitch(QSWIFISWITCHCHANNELS);
 #define OLED_ADDRESS 0x3c
 #define OLEDX 32
 #define OLEDSMALL
-
 #endif
 
 
@@ -238,7 +237,7 @@ QsWifiSwitch qswifiswitch(QSWIFISWITCHCHANNELS);
 #define FLASHBUTTON D3
 #define ESPLED D4
 #include "amgpelletstove.h"
-//#undef SERIALLOG
+#undef SERIALLOG
 #endif
 
 #ifdef  ESPMQTT_WEATHER
@@ -920,10 +919,11 @@ void showdatamap()
 
 void putdatamap(const char *topic, String value, bool sendupdate = true, bool forceupdate = false, bool publishregular = true)
 {
-  dataMapStruct datamapstruct = dataMap->get(topic);
+  dataMapStruct datamapstruct;
 
   if (dataMap->has(topic))
   {
+    datamapstruct= dataMap->get(topic);
     if ((strcmp (datamapstruct.payload , value.c_str()) == 0) && !forceupdate) return;
 
     if (strcmp(topic, "status") == 0)
@@ -1610,7 +1610,7 @@ void initSerial()
   Serial.setDebugOutput(false);
   Serial.begin(4800, SERIAL_8E1);
 #elif defined ( ESPMQTT_AMGPELLETSTOVE)
-  Serial.setDebugOutput(false);
+  Serial.begin(115200); //Init serial 115200 baud
 #elif defined ( ESPMQTT_SDM120) || defined (ESPMQTT_DDM18SD)
   Serial.setDebugOutput(false);
   sdm.begin();
@@ -4030,9 +4030,8 @@ void setup() {
 #ifndef SERIALLOG
   Serial.setDebugOutput(false);
 #endif
-  ESP.wdtDisable(); // Use hardware watchdog of 6 seconds to prevent auto reboot when function takes more time..
-  EEPROM.begin(512);
 
+  ESP.wdtDisable(); // Use hardware watchdog of 6 seconds to prevent auto reboot when function takes more time..
   initSerial();
 
 #ifdef SERIALLOG
@@ -4044,6 +4043,8 @@ void setup() {
   Debug.begin("");
   DEBUG_I("\n\nInitializing ESP8266 %s %s...\n\n", FIRMWARE_TARGET, ESPMQTT_VERSION);
 
+  EEPROM.begin(512);
+
   char buffer[25];
   snprintf(buffer, 25, "%08X", ESP.getChipId());
   chipid = buffer;
@@ -4054,8 +4055,6 @@ void setup() {
   eeprom_load_variables();
 
   update_systeminfo(true);
-
-  triggers.wifidisconnected = true;
 
 #ifdef  ESPMQTT_DDNS
   EasyDDNS.service("duckdns");
