@@ -4030,7 +4030,7 @@ void setup() {
 #ifndef SERIALLOG
   Serial.setDebugOutput(false);
 #endif
-  ESP.wdtDisable(); // Use hardware watchdog of 6 seconds to prevent auto reboot when function takes more time..
+  //ESP.wdtDisable(); // Use hardware watchdog of 6 seconds to prevent auto reboot when function takes more time..
   EEPROM.begin(512);
 
   initSerial();
@@ -4055,7 +4055,7 @@ void setup() {
 
   update_systeminfo(true);
 
-  connectToWifi();
+  triggers.wifidisconnected = true;
 
 #ifdef  ESPMQTT_DDNS
   EasyDDNS.service("duckdns");
