@@ -2816,7 +2816,7 @@ void loop()
     yield();
     ESP.wdtFeed(); // Prevent watchdog to kick in...
 
-    espmqtt_handle_modules_1sec();
+    
 #ifdef APONBOOT
     if ((uptime == 60) && (WiFi.status() != WL_CONNECTED))
     {
