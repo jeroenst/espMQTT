@@ -176,50 +176,6 @@ void goodwe_handle()
         }
         
         waitForResponse = false;
-        // _goodwe_callback((String)RxBuffer[0]+"/commstatus", "ok");
-
-        /*
-                  intvalue = RxBuffer[6];
-                  _goodwe_callback("inverterstatus/value", String(intvalue));
-                  _goodwe_callback("inverterstatus", intvalue == 0 ? "waiting" : intvalue == 1 ? "ready" : intvalue == 3 ? "fault" : "unknown");
-
-                  value = double((uint16_t(RxBuffer[7]) << 8) + RxBuffer[8]) / 10;
-                  pv1volt = value;
-                  _goodwe_callback("pv/1/volt", String(value, 1));
-
-                  value = double((uint16_t(RxBuffer[9]) << 8) + RxBuffer[10]) / 10;
-                  _goodwe_callback("pv/2/volt", String(value, 1));
-                  value = double((uint16_t(RxBuffer[11]) << 8) + RxBuffer[12]) / 10;
-                  _goodwe_callback("pv/watt", String(value, 1));
-                  value = double((uint16_t(RxBuffer[13]) << 8) + RxBuffer[14]) / 10;
-                  _goodwe_callback("grid/volt", String(value, 1));
-                  value = double((uint16_t(RxBuffer[15]) << 8) + RxBuffer[16]) / 10;
-                  _goodwe_callback("grid/amp", String(value, 1));
-                  value = double((uint16_t(RxBuffer[17]) << 8) + RxBuffer[18]) / 100;
-                  _goodwe_callback("grid/frequency", String(value, 1));
-                  value = double((uint16_t(RxBuffer[19]) << 8) + RxBuffer[20]) / 10;
-                  _goodwe_callback("grid/watt", String(value, 1));
-                  value = double((uint16_t(RxBuffer[33]) << 8) + RxBuffer[34]) / 10;
-                  _goodwe_callback("fault/temperature", String(value, 1));
-                  intvalue = double((uint16_t(RxBuffer[35]) << 8) + RxBuffer[36]);
-                  _goodwe_callback("fault/type", String(intvalue));
-                  value = double((uint16_t(RxBuffer[37]) << 8) + RxBuffer[38]) / 10;
-                  _goodwe_callback("temperature", String(value, 1));
-
-                  RxPowerDataOk = 1;
-                  //goodwe_send_command(0x42);
-
-                  DEBUG_D("Received energy data from goodwe Inverter...\n");
-                  value = double((uint16_t(RxBuffer[13]) << 8) + RxBuffer[14]) / 10;
-                  if (pv1volt > 100) _goodwe_callback("grid/today/kwh", String(value, 1)); // Only reset today value when pv 1 volt is above 100 volt (steady voltage) otherwise this gets resets during shutdown
-                  value = double((uint32_t(RxBuffer[15]) << 24) + (uint32_t(RxBuffer[16]) << 16) + (uint16_t(RxBuffer[17]) << 8) + RxBuffer[18]) / 10;
-                  _goodwe_callback("grid/total/kwh", String(value, 1));
-                  intvalue = ((uint32_t(RxBuffer[19]) << 24) + (uint32_t(RxBuffer[20]) << 16) + (uint16_t(RxBuffer[21]) << 8) + RxBuffer[22]);
-                  _goodwe_callback("grid/total/hour", String(intvalue));
-                  _goodwe_callback("status", "ready");
-        */
-
-        // RxBufferPointer = 0;
       }
     }
   }
