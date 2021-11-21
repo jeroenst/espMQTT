@@ -650,13 +650,14 @@ struct Triggers {
   bool mqttdisconnected = false;
   bool wifiscanready = false;
   bool mqttpublished = false;
-  bool mqttpublishall = false;
+  bool mqttsubscribed = false;
   String firmwareupgrade = "";
 } triggers;
 
 struct Mainstate {
   bool wificonnected = false;
   bool mqttconnected = false;
+  bool mqttsubscribed = false;
   bool mqttconnectedtrigger = false;
   bool mqttready = false;
   bool mqttsenddatamap = false;
@@ -1265,7 +1266,6 @@ void connectToWifi()
       mainstate.defaultpassword = false;
 
       WiFi.scanNetworksAsync(wifiScanReady); // Search for strongest accesspoint and connect
-      yield();
     }
   }
   else
@@ -1374,7 +1374,11 @@ void mqttdosubscriptions(int32_t packetId = -1)
     if (subscribetopic == "") nextsubscribe++;
   }
 
-  if (subscribetopic == "") triggers.mqttpublishall = true; // When subscription has finished start publishing of datamap
+  if (subscribetopic == "") 
+  {
+    mainstate.mqttsubscribed = true;
+    triggers.mqttsubscribed = true; // When subscription has finished start publishing of datamap
+  }
   else
   {
     DEBUG("MQTT Subscribing to: %s\n", subscribetopic.c_str());
@@ -1594,6 +1598,7 @@ void disconnectMqtt()
   mqttReconnectTimer.detach();
   mqttClient.disconnect();
   mainstate.mqttconnected = false;
+  mainstate.mqttsubscribed = false;
   mainstate.mqttready = false;
   triggers.mqttdisconnected = true;
 }
@@ -2580,6 +2585,13 @@ void loop()
   ESP.wdtFeed(); // Prevent watchdog to kick in...
 
 
+  if (triggers.mqttsubscribed)
+  {
+    triggers.mqttsubscribed = false;
+    mainstate.mqttsubscribed = true;
+    publishdatamap(-1, true);
+  }
+
   if (triggers.mqttdisconnected)
   {
     triggers.mqttdisconnected = false;
@@ -2598,15 +2610,6 @@ void loop()
     triggers.mqttpublished = false;
     DEBUG_V ("Publish acknowledged packetid=%d\n", mqttlastpublishedpacketid);
     publishdatamap(mqttlastpublishedpacketid);
-
-  }
-  yield();
-  ESP.wdtFeed(); // Prevent watchdog to kick in...
-
-  if (triggers.mqttpublishall)
-  {
-    triggers.mqttpublishall = false;
-    publishdatamap(-1, true, true);
   }
   yield();
   ESP.wdtFeed(); // Prevent watchdog to kick in...
@@ -3066,7 +3069,7 @@ void publishdatamap(int32_t packetId, bool publishall, bool init, bool publishre
   }
 
   // If not waiting for ack search for next item in datamap which has to be send
-  else if (mqttClient.connected() && (WiFi.status() == WL_CONNECTED))
+  else if (mqttClient.connected() && (WiFi.status() == WL_CONNECTED) && mainstate.mqttsubscribed)
   {
     if (datamappointer < dataMap->size())
     {
@@ -3794,15 +3797,21 @@ void processCmdRemoteDebug()
     DEBUG("  showdatamap\n");
     DEBUG("  ping [hostname]\n");
     DEBUG("  route\n");
-    DEBUG("  mqttforceconnect\n");
+    DEBUG("  mqttconnect\n");
     DEBUG("  showmainstate\n");
     DEBUG("  factoryreset\n");
     DEBUG("  showeeprommap\n");
     DEBUG("  scanwifinetworks (scan for stronger wifi network and connect to it)\n");
     DEBUG("  showtime\n");
     DEBUG("  getrestartreason\n");
+    DEBUG("  wifidisconnect\n");
   }
 
+  if (lastCmd == "wifidisconnect")
+  {
+    WiFi.disconnect();
+    connectToWifi();
+  }
 
   if (lastCmd == "getrestartreason")
   {
@@ -3868,7 +3877,7 @@ void processCmdRemoteDebug()
     DEBUG("%s\n", gw.c_str());
   }
 
-  if (lastCmd == "mqttforceconnect")
+  if (lastCmd == "mqttconnect")
   {
     connectToMqtt();
   }
