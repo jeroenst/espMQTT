@@ -14,10 +14,6 @@ void goodwe_init(void(*callback)(const char *, String))
   Serial.setRxBufferSize(50);
   Serial.begin(9600);  //Init serial 9600 baud
   Serial.setDebugOutput(false);
-  // _goodwe_callback("grid/today/kwh", "0.0");
-  // _goodwe_callback("grid/today/kwh", "-");
-  // _goodwe_callback("grid/total/kwh", "-");
-  // _goodwe_callback("grid/total/hour", "-");
 }
 
 void goodwe_send_command(uint8_t mbAddr)
