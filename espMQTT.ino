@@ -20,7 +20,7 @@
 
 #define DEFAULT_PASSWORD "esplogin"
 
-#define DEBUGLEVEL Debug.VERBOSE
+#define DEBUGLEVEL Debug.DEBUG
 //#define //syslogDEBUG
 
 #ifndef ESPMQTT_BUILDSCRIPT // Only use defines when when firmware is not compiled from the build script...
@@ -48,8 +48,9 @@
 // #define ESPMQTT_SOIL
 // #define ESPMQTT_DIMMER
 // #define ESPMQTT_RELAY
-#define ESPMQTT_LIVINGROOM
+// #define ESPMQTT_LIVINGROOM
 // #define ESPMQTT_BBQTEMP
+#define ESPMQTT_GOODWE
 
 /* ESP8285 */
 // #define ESPMQTT_ZMAI90
@@ -258,6 +259,15 @@ QsWifiSwitch qswifiswitch(QSWIFISWITCHCHANNELS);
 #define ESPLED D4
 #define FANPIN D1
 #include "growatt.h"
+#undef SERIALLOG
+#endif
+
+#ifdef  ESPMQTT_GOODWE
+#define FIRMWARE_TARGET "GOODWE"
+#define FLASHBUTTON 0 //d3
+#define ESPLED 2 // d4
+#define NODEMCULEDPIN 16 //d0
+#include "goodwe.h"
 #undef SERIALLOG
 #endif
 
@@ -1608,7 +1618,7 @@ void disconnectMqtt()
 void initSerial()
 {
   Serial.setRxBufferSize(100);
-#if defined(MH_Z19) || defined( ESPMQTT_OPENTHERM) || defined( ESPMQTT_GROWATT)
+#if defined(MH_Z19) || defined( ESPMQTT_OPENTHERM) || defined( ESPMQTT_GROWATT) || defined( ESPMQTT_GOODWE)
   Serial.setDebugOutput(false);
   Serial.begin(9600);  //Init serial 9600 baud
 #elif defined ( ESPMQTT_SONOFFPOWR2)
@@ -2279,6 +2289,10 @@ void espmqtt_handle_modules()
 
 #ifdef  ESPMQTT_GROWATT
   growatt_handle();
+#endif
+
+#ifdef  ESPMQTT_GOODWE
+  goodwe_handle();
 #endif
 
 #ifdef  ESPMQTT_GROWATT_MODBUS
@@ -3742,6 +3756,18 @@ void growattcallback (const char *topic, String payload)
 }
 #endif
 
+#ifdef  ESPMQTT_GOODWE
+void goodwecallback (const char *topic, String payload)
+{
+  if (topic == "status")
+  {
+    if (payload == "ready") digitalWrite(NODEMCULEDPIN, 0);
+    else digitalWrite(NODEMCULEDPIN, 1);
+  }
+  putdatamap(topic, payload);
+}
+#endif
+
 #ifdef  ESPMQTT_GROWATT_MODBUS
 void growattModbuscallback (const char *topic, String payload)
 {
@@ -4231,6 +4257,10 @@ void setup() {
 
 #ifdef  ESPMQTT_GROWATT
   growatt_init(growattcallback, FANPIN);
+#endif
+
+#ifdef  ESPMQTT_GOODWE
+  goodwe_init(goodwecallback);
 #endif
 
 #ifdef  ESPMQTT_GROWATT_MODBUS
