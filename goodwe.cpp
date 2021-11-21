@@ -11,7 +11,7 @@ void(*_goodwe_callback)(const char *, String);
 void goodwe_init(void(*callback)(const char *, String))
 {
   _goodwe_callback = callback;
-  Serial.setRxBufferSize(512);
+  Serial.setRxBufferSize(50);
   Serial.begin(9600);  //Init serial 9600 baud
   Serial.setDebugOutput(false);
   // _goodwe_callback("grid/today/kwh", "0.0");
@@ -63,7 +63,7 @@ void goodwe_handle()
 {
   static long long  nextupdatetime = 0;
   static long long  querytime = 0;
-  static uint8_t    RxBuffer[250];
+  static uint8_t    RxBuffer[50];
   static uint8_t    RxBufferPointer = 0;
   static bool       waitForResponse = false;
   static bool       dataReceived = false;
@@ -116,7 +116,7 @@ void goodwe_handle()
   if (Serial.available())
   {
     dataReceived = true;
-    if (RxBufferPointer < 250) 
+    if (RxBufferPointer < 50) 
     {
       RxBuffer[RxBufferPointer] = Serial.read();
       lh = !lh;
