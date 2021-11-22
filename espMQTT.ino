@@ -3531,6 +3531,7 @@ void handleWWWSettings()
         }
       }
       if (webserver.argName(i) == "hostname") esp_hostname = webserver.arg(i);
+      esp_hostname.replace("_","-"); // RFC doesn't alllow underscores.
 #ifdef  ESPMQTT_WATERMETER
       if (webserver.argName(i) == "watermeterliter")
       {
@@ -4023,6 +4024,7 @@ void eeprom_load_variables()
     DEBUG_E("Error reading hostname from internal eeprom\n");
     esp_hostname = String(FIRMWARE_TARGET) + "-" + String(chipid);
   }
+  esp_hostname.replace("_","-"); // RFC doesn't alllow underscores.
   DEBUG_I("Hostname=%s\n", esp_hostname.c_str());
 
   String mqttportstr = "";
