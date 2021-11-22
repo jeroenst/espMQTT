@@ -4,10 +4,10 @@
 #endif
 #define NODEMCULEDPIN D0
 
-static String amgpowercmd = "";
-static String amgtempcmd = "";
-static uint8_t amgcmdnr = 0;
-static bool cooldown_phase_1 = false;
+String amgpowercmd = "";
+String amgtempcmd = "";
+uint8_t amgcmdnr = 0;
+bool cooldown_phase_1 = false;
 
 void(*_amgpelletstove_callback)(const char *, String);
 
@@ -21,7 +21,7 @@ void amgpelletstove_init(void(*callback)(const char *, String))
 
 void amgpelletstove_receivemqtt(String topicstring, String payloadstring)
 {
-  if (topicstring == String("home/" + WiFi.hostname() + "/setpower"))
+  if (topicstring.substring(topicstring.length() - 9) == "/setpower")
   {
     int powersetpoint = payloadstring.toInt();
     if ((payloadstring == "0") || ((powersetpoint > 0) && (powersetpoint <= 5)))
@@ -45,7 +45,7 @@ void amgpelletstove_receivemqtt(String topicstring, String payloadstring)
       }
     }
   }
-  if (topicstring == String("home/" + WiFi.hostname() + "/settemperature"))
+  if (topicstring.substring(topicstring.length() - 15) == "/settemperature")
   {
     if ((payloadstring.toInt() >= 16) && (payloadstring.toInt() <= 25)) // No wider range supported for now..
     {
