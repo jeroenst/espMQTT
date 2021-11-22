@@ -22,7 +22,8 @@
 
 #ifdef ESPMQTT_BUILDSCRIPT 
 #define DEBUGLEVEL Debug.DEBUG
-#elif // Only use defines when when firmware is not compiled from the build script...
+#else 
+// Only use defines when when firmware is not compiled from the build script...
 /* SETTINGS */
 #define SERIALLOG
 #define MYTZ TZ_Europe_Amsterdam
@@ -76,8 +77,6 @@
 // #define ESPMQTT_QSWIFISWITCH2C
 
 #define ESPMQTT_VERSION "TEST"
-#else
-// Using build.sh option are passed through -D flags
 #endif
 
 #define APONBOOT
