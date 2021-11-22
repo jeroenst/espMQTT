@@ -20,13 +20,13 @@
 
 #define DEFAULT_PASSWORD "esplogin"
 
+#ifdef ESPMQTT_BUILDSCRIPT 
 #define DEBUGLEVEL Debug.DEBUG
-//#define //syslogDEBUG
-
-#ifndef ESPMQTT_BUILDSCRIPT // Only use defines when when firmware is not compiled from the build script...
+#elif // Only use defines when when firmware is not compiled from the build script...
 /* SETTINGS */
 #define SERIALLOG
 #define MYTZ TZ_Europe_Amsterdam
+#define DEBUGLEVEL Debug.VERBOSE
 
 /* ESP8266 */
 // #define ESPMQTT_WEATHER
@@ -48,9 +48,9 @@
 // #define ESPMQTT_SOIL
 // #define ESPMQTT_DIMMER
 // #define ESPMQTT_RELAY
-// #define ESPMQTT_LIVINGROOM
+#define ESPMQTT_LIVINGROOM
 // #define ESPMQTT_BBQTEMP
-#define ESPMQTT_GOODWE
+// #define ESPMQTT_GOODWE
 
 /* ESP8285 */
 // #define ESPMQTT_ZMAI90
@@ -666,6 +666,7 @@ struct Triggers {
 
 struct Mainstate {
   bool wificonnected = false;
+  bool wificonnectedonce = false;
   bool mqttconnected = false;
   bool mqttsubscribed = false;
   bool mqttconnectedtrigger = false;
@@ -1313,14 +1314,24 @@ void mqttdosubscriptions(int32_t packetId = -1)
 {
   const uint8_t nr_of_subsribe_topics = 30;
 
-  DEBUG_D("mqttdosubscriptions (%d)\n", packetId);
-  static int32_t nextpacketid = -1;
+  static int32_t nextpacketid = 1;
   static uint16_t nextsubscribe = 0;
   static String subscribetopic = ""; // We need this static variable because mqttclient.subscribe uses a pointer
 
-  if (packetId == -1) nextsubscribe = 0;
-  if (packetId > 0) nextsubscribe++;
-  nextpacketid = -1;
+  DEBUG_D("mqttdosubscriptions (packetId=%d, nextpacketId=%d, nextsubscribe=%d)\n", packetId, nextpacketid, nextsubscribe);
+
+  if (packetId == -1)
+  {
+    nextpacketid = -1;
+    nextsubscribe = 0;
+  }
+  else if (packetId == nextpacketid)
+  {
+    nextsubscribe++;
+    nextpacketid = -1;
+  }
+  else return;
+  
   subscribetopic = "";
   while ((subscribetopic == "") && (nextsubscribe <= nr_of_subsribe_topics))
   {
@@ -1391,7 +1402,7 @@ void mqttdosubscriptions(int32_t packetId = -1)
   }
   else
   {
-    DEBUG("MQTT Subscribing to: %s\n", subscribetopic.c_str());
+    DEBUG_D("MQTT Subscribing to: %s\n", subscribetopic.c_str());
     nextpacketid = mqttClient.subscribe(subscribetopic.c_str() , 1);
   }
   DEBUG_V("mqttdosubscriptions end nextpacketid=%d\n", nextpacketid);
@@ -2515,6 +2526,7 @@ void loop()
     wifichannel = WiFi.channel(); // We can't rely on wifi.channel because while scanning the channel is changed.
     if (!mainstate.wificonnected) triggers.wificonnected = true;
     mainstate.wificonnected = true;
+    mainstate.wificonnectedonce = true;
   }
   else
   {
@@ -2589,7 +2601,7 @@ void loop()
     //syslogN("Connected to MQTT Server=%s\n", mqtt_server.c_str());
     dotasks();  // Prevent crash because of to many debug data to send
     update_systeminfo(true);
-    mqttdosubscriptions();
+    mqttdosubscriptions(-1);
     updateexternalip();
 #ifdef ESPMQTT_TUYA_2GANGDIMMERV2
     tuya_connectedMQTT();
@@ -2761,7 +2773,7 @@ void loop()
     {
       if ((strongestwifiid >= 0) && ((WiFi.RSSI() >= 0) || (currentwifiid == -1) || ((currentwifiid != strongestwifiid) && (currentwifirssi + 10 < strongestwifirssi))))
       {
-        DEBUG_I ("Switching to stronger AP %d (%s, %s, %s)\n", strongestwifiid, WiFi.SSID().c_str(), WiFi.psk().c_str(), WiFi.BSSIDstr(strongestwifiid).c_str());
+        DEBUG_I ("Switching to stronger AP %d (%s, %s, %s)\n", strongestwifiid, wifissid.c_str(), wifipsk.c_str(), WiFi.BSSIDstr(strongestwifiid).c_str());
         WiFi.begin(wifissid.c_str(), wifipsk.c_str(), WiFi.channel(strongestwifiid), WiFi.BSSID(strongestwifiid), 1);
         yield();
       }
@@ -2835,7 +2847,7 @@ void loop()
 
 
 #ifdef APONBOOT
-    if ((uptime == 60) && (WiFi.status() != WL_CONNECTED))
+    if ((uptime == 60) && (!mainstate.wificonnectedonce))
     {
       DEBUG_W("Connection to wifi failed, starting accesspoint\n");
       startWifiAP();
