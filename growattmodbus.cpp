@@ -113,17 +113,23 @@ int8_t growattModbus_read()
 void growattModbus_handle()
 {
   static long long timeout = GROWATTMODBUS_WAIT_AFTER_STARTUP_TIMEOUT;
+  static bool communicationFinished = false;
 
   // When receiving has finished request next packet if it's not the last packet of sequence
   // and set timeout for next request round
   if (growattModbus_RxReady)
   {
     growattModbus_RxReady = false;
-    if (growattModbus_itteration < 3) growattModbus_request();
+    if (growattModbus_itteration < 3) 
+    {
+      growattModbus_request();
+      communicatioFinished = false;
+    }
     else 
     {
       modbus_clear_buffer();
       _growattModbus_callback("status", "ready");
+      communicationFinished = true;
     }
     growattModbus_errorCounter = 0;
     timeout = millis() + (GROWATTMODBUS_TIMEOUT * 1000);
@@ -153,7 +159,7 @@ void growattModbus_handle()
       }
       else 
       {
-        DEBUG_E ("Modbus Receive Error!\n");
+        if (!communicationFinished) DEBUG_E ("Modbus Receive Error!\n");
         growattModbus_errorCounter++;
       }
       modbus_clear_buffer();
