@@ -658,7 +658,6 @@ struct Triggers {
   bool mqttconnected = false;
   bool mqttdisconnected = false;
   bool wifiscanready = false;
-  bool mqttpublished = false;
   bool mqttsubscribed = false;
   String firmwareupgrade = "";
 } triggers;
@@ -671,6 +670,8 @@ struct Mainstate {
   bool mqttconnectedtrigger = false;
   bool mqttready = false;
   bool mqttsenddatamap = false;
+  uint16_t mqttlastsubscribedpacketid = 0;
+  uint16_t mqttlastpublishedpacketid = 0;
   bool defaultpassword = true;
   bool accesspoint = false;
 } mainstate;
@@ -684,7 +685,6 @@ struct dataMapStruct {
 
 int wifichannel = 0;
 int wifinetworksfound = 0;
-uint16_t mqttlastpublishedpacketid = 0;
 
 
 
@@ -1410,14 +1410,13 @@ void mqttdosubscriptions(int32_t packetId = -1)
 void onMqttSubscribe(uint16_t packetId, uint8_t qos)
 {
   DEBUG_V ("Subscribe acknowledged packetid=%d qos=%d\n", packetId, qos);
-  mqttdosubscriptions(packetId);
+  mainstate.mqttlastsubscribedpacketid = packetId;
 }
 
 
 void onMqttPublish(uint16_t packetId)
 {
-  triggers.mqttpublished = true;
-  mqttlastpublishedpacketid = packetId;
+  mainstate.mqttlastpublishedpacketid = packetId;
 }
 
 void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties, size_t len, size_t, size_t) {
@@ -2593,6 +2592,17 @@ void loop()
   yield();
   ESP.wdtFeed(); // Prevent watchdog to kick in...
 
+  if (mainstate.mqttlastpublishedpacketid)
+  {
+    uint16_t mqttlastpublishedpacketid = mainstate.mqttlastpublishedpacketid;
+    mainstate.mqttlastpublishedpacketid = 0;
+    DEBUG_V("Acknowledged published packetid=%d\n", mqttlastpublishedpacketid);
+    publishdatamap(mqttlastpublishedpacketid);
+  }
+  else publishdatamap();
+  yield();
+  ESP.wdtFeed(); // Prevent watchdog to kick in...
+
   if (triggers.mqttconnected)
   {
     triggers.mqttconnected = false;
@@ -2610,12 +2620,26 @@ void loop()
   ESP.wdtFeed(); // Prevent watchdog to kick in...
 
 
+  if (mainstate.mqttlastsubscribedpacketid)
+  {
+    uint16_t mqttlastsubscribedpacketid = mainstate.mqttlastsubscribedpacketid;
+    mainstate.mqttlastsubscribedpacketid = 0;
+    DEBUG_V("Acknowledged subscribed packetid=%d\n", mqttlastsubscribedpacketid);
+    mqttdosubscriptions(mqttlastsubscribedpacketid);
+  }
+  yield();
+  ESP.wdtFeed(); // Prevent watchdog to kick in...
+
+
   if (triggers.mqttsubscribed)
   {
     triggers.mqttsubscribed = false;
     mainstate.mqttsubscribed = true;
     publishdatamap(-1, true);
   }
+  yield();
+  ESP.wdtFeed(); // Prevent watchdog to kick in...
+
 
   if (triggers.mqttdisconnected)
   {
@@ -2629,19 +2653,6 @@ void loop()
   yield();
   ESP.wdtFeed(); // Prevent watchdog to kick in...
 
-
-  if (triggers.mqttpublished)
-  {
-    triggers.mqttpublished = false;
-    DEBUG_V ("Publish acknowledged packetid=%d\n", mqttlastpublishedpacketid);
-    publishdatamap(mqttlastpublishedpacketid);
-  }
-  yield();
-  ESP.wdtFeed(); // Prevent watchdog to kick in...
-
-  publishdatamap();
-  yield();
-  ESP.wdtFeed(); // Prevent watchdog to kick in...
 
   if (triggers.firmwareupgrade != "")
   {
