@@ -123,7 +123,7 @@ void growattModbus_handle()
     if (growattModbus_itteration < 3) 
     {
       growattModbus_request();
-      communicatioFinished = false;
+      communicationFinished = false;
     }
     else 
     {
