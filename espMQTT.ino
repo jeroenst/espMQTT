@@ -1396,6 +1396,7 @@ void mqttdosubscriptions(int32_t packetId = -1)
 
   if (subscribetopic == "") 
   {
+    DEBUG_V("Subscribing to mqtt topics finished successfull\n");
     mainstate.mqttsubscribed = true;
     triggers.mqttsubscribed = true; // When subscription has finished start publishing of datamap
   }
@@ -2634,8 +2635,7 @@ void loop()
   if (triggers.mqttsubscribed)
   {
     triggers.mqttsubscribed = false;
-    mainstate.mqttsubscribed = true;
-    publishdatamap(-1, true);
+    publishdatamap(-1, true, true);
   }
   yield();
   ESP.wdtFeed(); // Prevent watchdog to kick in...
