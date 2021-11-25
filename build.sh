@@ -103,7 +103,7 @@ rm -rf ./builds/cache
 mkdir ./builds/cache
 
 echo $VERSION > version
-FQBN=esp8266com:esp8266:nodemcuv2:xtal=80,vt=flash,exception=disabled,ssl=all,eesz=4M,led=2,ip=lm2f,dbg=Disabled,lvl=None____,wipe=none
+FQBN=esp8266com:esp8266:nodemcuv2:xtal=80,vt=flash,exception=disabled,ssl=basic,eesz=4M,led=2,ip=lm2n,dbg=Disabled,lvl=None____,wipe=none
 declare -a TARGETS=("ESPMQTT_GROWATT_MODBUS" "ESPMQTT_DDM18SD" "ESPMQTT_WEATHER" "ESPMQTT_AMGPELLETSTOVE" "ESPMQTT_BATHROOM" "ESPMQTT_BEDROOM2" "ESPMQTT_OPENTHERM" "ESPMQTT_SMARTMETER" "ESPMQTT_GROWATT" "ESPMQTT_SDM120" "ESPMQTT_WATERMETER" "ESPMQTT_DDNS" "ESPMQTT_GENERIC8266" "ESPMQTT_MAINPOWERMETER" "ESPMQTT_NOISE" "ESPMQTT_SOIL" "ESPMQTT_DIMMER" "ESPMQTT_OBD2" "ESPMQTT_LIVINGROOM" "ESPMQTT_LIVINGROOM" "ESPMQTT_BBQTEMP")
 for targetname in "${TARGETS[@]}"
 do
@@ -120,7 +120,7 @@ done
 
 declare -a TARGETS=("ESPMQTT_BHT002" "ESPMQTT_DUCOBOX" "ESPMQTT_SONOFFS20" "ESPMQTT_SONOFFBULB" "ESPMQTT_SONOFFPOWR2" "ESPMQTT_GARDEN" "ESPMQTT_SONOFF_FLOORHEATING" "ESPMQTT_IRRIGATION" "ESPMQTT_BLITZWOLF" "ESPMQTT_SONOFF4CH" "ESPMQTT_SONOFFDUAL" "ESPMQTT_SONOFFS20_PRINTER" "ESPMQTT_SONOFFPOW" "ESPMQTT_QSWIFIDIMMERD01" "ESPMQTT_QSWIFIDIMMERD02" "ESPMQTT_ZMAI90" "ESPMQTT_SONOFFTH" "ESPMQTT_RELAY" "ESPMQTT_TUYA_2GANGDIMMERV2" "ESPMQTT_QSWIFISWITCH1C" "ESPMQTT_QSWIFISWITCH2C")
 #FQBN=esp8266com:esp8266:esp8285:xtal=80,exception=legacy,ssl=all,CrystalFreq=26,eesz=1M,led=2,ip=lm2f,dbg=Disabled,lvl=None____,wipe=none
-FQBN=esp8266com:esp8266:esp8285:xtal=80,vt=flash,exception=disabled,ssl=all,ResetMethod=nodemcu,CrystalFreq=26,eesz=1M,led=2,ip=lm2f,dbg=Disabled,lvl=None____,wipe=none,baud=115200
+FQBN=esp8266com:esp8266:esp8285:xtal=80,vt=flash,exception=disabled,ssl=basic,ResetMethod=nodemcu,CrystalFreq=26,eesz=1M,led=2,ip=lm2n,dbg=Disabled,lvl=None____,wipe=none,baud=115200
 for targetname in "${TARGETS[@]}"
 do
 	if [ "$TARGET" == "" ]
