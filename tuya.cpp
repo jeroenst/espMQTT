@@ -20,9 +20,9 @@
  * 0x0e Test the Wi-Fi function (product testing command).
  */
 
-static uint8_t tuya_dimvalue0 = 0;
+static uint8_t tuya_dimvalue0 = 100;
 static uint8_t tuya_dimvalue1 = 0;
-static uint8_t tuya_dimstate0 = 0;
+static uint8_t tuya_dimstate0 = 100;
 static uint8_t tuya_dimstate1 = 0;
 
 
