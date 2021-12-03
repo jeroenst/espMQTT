@@ -9,7 +9,8 @@ dist: xenial
 #    - ~/arduino_ide
 #    - ~/.arduino15/packages/
 branches:
-  only: /^v\d+(\.\d+)+(\.\d+)?(-\S*)?$/
+  only: 
+  - /^v\d+(\.\d+)+(\.\d+)?(-\S*)?$/
 
 git:
   depth: false
@@ -52,7 +53,7 @@ script:
   - ./build.sh
 
 deploy:
-  skip_cleanup: true
+  cleanup: false
   provider: releases
   token: $GITHUBAPIKEY
   file_glob: true
