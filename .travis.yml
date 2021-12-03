@@ -9,7 +9,7 @@ dist: xenial
 #    - ~/arduino_ide
 #    - ~/.arduino15/packages/
 branches:
-  only: /^v\d+\.\d+(\.\d+)?(-\S*)?$/
+  only: /^v\d+(\.\d+)+(\.\d+)?(-\S*)?$/
 
 git:
   depth: false
