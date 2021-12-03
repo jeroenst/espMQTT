@@ -540,8 +540,8 @@ static bool sonoff_oldbuttons[1] = {1};
 #define I2C_SCL D1
 #define OLED_ADDRESS 0x3c
 #define FLASHBUTTON D3
-#define ESPLED D4
-#define ESPLED_TIMEOUT_OFF 60 // In bedroom we want the led to go off after some time
+//#define ESPLED D4 // Disable led
+//#define ESPLED_TIMEOUT_OFF 60 // In bedroom we want the led to go off after some time
 #define DHTPIN D5
 #define DHTTYPE DHT22   // there are multiple kinds of DHT sensors
 #define OLEDX 32
