@@ -49,12 +49,12 @@
 // #define ESPMQTT_SOIL
 // #define ESPMQTT_DIMMER
 // #define ESPMQTT_RELAY
-#define ESPMQTT_LIVINGROOM
+// #define ESPMQTT_LIVINGROOM
 // #define ESPMQTT_BBQTEMP
 // #define ESPMQTT_GOODWE
 
 /* ESP8285 */
-// #define ESPMQTT_ZMAI90
+#define ESPMQTT_ZMAI90
 // #define ESPMQTT_DUCOBOX
 // #define ESPMQTT_SONOFFS20 // coffeelamp & sonoffs20_00X
 // #define ESPMQTT_SONOFFBULB
@@ -1846,16 +1846,25 @@ void flashbutton_handle()
 #ifdef ESPMQTT_ZMAI90
 void zmai90_handle()
 {
+  static bool requestsend = 0;
   if (uptime % 10 == 0)
   {
-    uint8_t cmd[9] = {0xFE, 0x01, 0x0F, 0x08, 0x00, 0x00, 0x00, 0x1C};
-    // command to ask for data
+    if (!requestsend)
+    {
+      requestsend = 1;
+      uint8_t cmd[9] = {0xFE, 0x01, 0x0F, 0x08, 0x00, 0x00, 0x00, 0x1C};
+      // command to ask for data
 
-    DEBUG_V("Sending ZMAI request packet...\n");
+      DEBUG_V("Sending ZMAI request packet...\n");
 
-    Serial.flush();
-    Serial.write(cmd, 9); //request PPM CO2
-    zmai90pointer = 0;
+      Serial.flush();
+      Serial.write(cmd, 9); //request data
+      zmai90pointer = 0;
+    }
+  }
+  else 
+  {
+    requestsend = 0;
   }
 
   if (Serial.available() > 0) {
