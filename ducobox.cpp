@@ -6,7 +6,8 @@ WiFiServer ducoserver(2233);
 static uint8_t _ducobox_fanspeedoverride = 255;
 static uint8_t _ducobox_relay0 = 0;
 static uint8_t _ducobox_relay1 = 0;
-static uint8_t _ducobox_refreshtime = 30;
+static uint8_t _ducobox_refreshdelay = 5;
+static uint8_t _ducobox_refreshtimeout = 30;
 static uint16_t _ducobox_co2 = 0;
 static uint8_t _ducobox_rh = 0;
 static float _ducobox_temp = 0;
@@ -161,21 +162,20 @@ void _ducobox_handleserial(String ducomessage)
     int stringpos = ducomessage.indexOf("RH : ");
     if (stringpos > 0)
     {
-      _ducobox_rh = ducomessage.substring(stringpos + 5, stringpos+5+4).toInt() / 100;
+      _ducobox_rh = ducomessage.substring(stringpos + 5, stringpos + 5 + 4).toInt() / 100;
       _ducobox_callback ("26/humidity", String(_ducobox_rh));
     }
-    
+
     stringpos = ducomessage.indexOf("TEMP : ");
     if (stringpos > 0)
     {
-      _ducobox_temp = float(ducomessage.substring(stringpos + 8, stringpos+8+3).toInt()) / 10;
+      _ducobox_temp = float(ducomessage.substring(stringpos + 8, stringpos + 8 + 3).toInt()) / 10;
       _ducobox_callback ("26/temperature", String(_ducobox_temp, 1));
     }
   }
 
   if (ducomessage == "> ")
   {
-    _nextupdatetime = millis() + (_ducobox_refreshtime * 1000); // Next update over _duco_refreshtime seconds
     ducocmd++;
     switch (ducocmd)
     {
@@ -195,8 +195,8 @@ void _ducobox_handleserial(String ducomessage)
         static uint8_t fanspeed = 0;
         if (_ducobox_co2 < 800) fanspeed = 255; // 255 = auto
         else if (_ducobox_co2 > 1200) fanspeed = 100;
-        else fanspeed = ((_ducobox_co2 - 800) / 40)*10;
-        if (fanspeed > 100) fanspeed = 100; 
+        else fanspeed = ((_ducobox_co2 - 800) / 40) * 10;
+        if (fanspeed > 100) fanspeed = 100;
         ducobox_setfan_internal(0, fanspeed);
 
         static uint8 _ducobox_fanspeedoverride_old = 255;
@@ -210,12 +210,13 @@ void _ducobox_handleserial(String ducomessage)
         {
           _ducobox_callback("status", "ready");
           ducocmd = 0;
+          _nextupdatetime = millis() + (_ducobox_refreshdelay * 1000); // Next update over _duco_refreshtime seconds
         }
         break;
       case 6:
         _ducobox_callback("status", "ready");
         ducocmd = 0;
-      break;
+        break;
     }
   }
 }
@@ -267,7 +268,7 @@ void ducobox_handle()
     if (millis() > _nextupdatetime)
     {
       if (recvok == 0)   _ducobox_callback("status", "commerror");
-      _nextupdatetime = millis() + (_ducobox_refreshtime * 1000); // Next update over _duco_refreshtime seconds
+      _nextupdatetime = millis() + (_ducobox_refreshtimeout * 1000); // Next update over _duco_refreshtime seconds
       ducobox_writeserial("fanspeed");                // Request fanspeed
       recvok = 0;
     }
@@ -275,12 +276,12 @@ void ducobox_handle()
   }
 }
 
-void ducobox_init(uint8_t ducobox_relay0, uint8_t ducobox_relay1, uint8_t ducobox_refreshtime, void(*callback)(const char *, String))
+void ducobox_init(uint8_t ducobox_relay0, uint8_t ducobox_relay1, uint8_t ducobox_refreshtimeout, void(*callback)(const char *, String))
 {
   _ducobox_callback = callback;
   _ducobox_relay0 = ducobox_relay0;
   _ducobox_relay1 = ducobox_relay1;
-  _ducobox_refreshtime = ducobox_refreshtime;
+  _ducobox_refreshtimeout = ducobox_refreshtimeout;
   Serial.setRxBufferSize(100);
   Serial.setDebugOutput(false);
   Serial.begin(115200); //Init serial 115200 baud
