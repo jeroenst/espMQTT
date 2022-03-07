@@ -183,10 +183,10 @@ void _ducobox_handleserial(String ducomessage)
         ducobox_writeserial("fanparaget");             // Get fan parameters
         break;
       case 2:
-        ducobox_writeserial("nodeparaget 3 73");       // Request TEMPERATURE of node 3
+        ducobox_writeserial("nodeparaget 4 73");       // Request TEMPERATURE of node 3
         break;
       case 3:
-        ducobox_writeserial("nodeparaget 3 74");       // Request CO2 of sensor 3
+        ducobox_writeserial("nodeparaget 4 74");       // Request CO2 of sensor 3
         break;
       case 4:
         ducobox_writeserial("sensorinfo");       // Request internal sensors
@@ -282,7 +282,7 @@ void ducobox_init(uint8_t ducobox_relay0, uint8_t ducobox_relay1, uint8_t ducobo
   _ducobox_relay0 = ducobox_relay0;
   _ducobox_relay1 = ducobox_relay1;
   _ducobox_refreshtimeout = ducobox_refreshtimeout;
-  Serial.setRxBufferSize(100);
+  Serial.setRxBufferSize(1000);
   Serial.setDebugOutput(false);
   Serial.begin(115200); //Init serial 115200 baud
   ducoserver.begin();
