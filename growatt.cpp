@@ -107,7 +107,7 @@ void growatt_handle()
     growatt_send_command(0x41);
   }
 
-  if (Serial.available())
+  while (Serial.available())
   {
     if (RxBufferPointer < 50)
     {

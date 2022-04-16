@@ -76,7 +76,7 @@ void modbus_request_input_register(uint8_t deviceAddress, uint16_t startRegister
 void modbus_handle()
 {
   yield();
-  if (Serial.available())
+  while (Serial.available())
   {
     if (modbux_RxError)
     {

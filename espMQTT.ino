@@ -54,7 +54,7 @@
 // #define ESPMQTT_GOODWE
 
 /* ESP8285 */
-#define ESPMQTT_ZMAI90
+// #define ESPMQTT_ZMAI90
 // #define ESPMQTT_DUCOBOX
 // #define ESPMQTT_SONOFFS20 // coffeelamp & sonoffs20_00X
 // #define ESPMQTT_SONOFFBULB
@@ -63,7 +63,7 @@
 // #define ESPMQTT_IRRIGATION
 // #define ESPMQTT_BLITZWOLF
 // #define ESPMQTT_QSWIFIDIMMERD01
-// #define ESPMQTT_QSWIFIDIMMERD02
+#define ESPMQTT_QSWIFIDIMMERD02
 // #define ESPMQTT_SONOFF4CH //ESP8285
 // #define ESPMQTT_SONOFFDUAL
 // #define ESPMQTT_SONOFFS20_PRINTER
@@ -1031,7 +1031,7 @@ void obd2_handle()
   }
 
   byte serdata = 0;
-  if (Serial.available() > 0)
+  while (Serial.available() > 0)
   {
     static String serialstring = "";
     serdata = Serial.read();
@@ -1261,9 +1261,10 @@ void connectToWifi()
     {
       DEBUG_I("Connecting to Wi-Fi: SSID='%s' HOSTNAME='%s'...\n", wifissid.c_str(), esp_hostname.c_str());
 
-      WiFi.persistent(false); // Don't save wifi credentials, we save this our self because of switching to stronger accesspoints
+      WiFi.persistent(true); // Save wifi credentials for other firmware
       WiFi.setAutoReconnect(false); // We handle reconnect our self
-      WiFi.setSleepMode(WIFI_NONE_SLEEP); // When sleep is on regular disconnects occur https://github.com/esp8266/Arduino/issues/5083
+      WiFi.setSleepMode(WIFI_LIGHT_SLEEP);
+      //WiFi.setSleepMode(WIFI_NONE_SLEEP); // When sleep is on regular disconnects occur https://github.com/esp8266/Arduino/issues/5083
       WiFi.setOutputPower(20);        // 10dBm == 10mW, 14dBm = 25mW, 17dBm = 50mW, 20dBm = 100mW
       WiFi.hostname(esp_hostname);
       WiFi.mode(WIFI_STA);
@@ -1867,7 +1868,7 @@ void zmai90_handle()
     requestsend = 0;
   }
 
-  if (Serial.available() > 0) {
+  while (Serial.available() > 0) {
     uint8_t zmai90data = Serial.read();
     DEBUG ("ZMAI90DATA=%d:%02X\n", zmai90pointer, zmai90data);
     char str[3];
@@ -2001,7 +2002,7 @@ void sonoffpow2_handle()
 {
   static uint8_t serbuffer[24];
   static uint8_t serpointer = 0;
-  if (Serial.available() > 0)
+  while (Serial.available() > 0)
   {
     uint8_t serval = Serial.read();
     if ((serpointer >= 0) && (serpointer < 24))
@@ -2528,6 +2529,10 @@ void dotasks()
 void loop()
 {
   dotasks();
+  #ifndef RAINMETERPIN
+  delay(50); // Reduce power consumption https://tasmota.github.io/docs/Energy-Saving/
+  dotasks();
+  #endif
 
   if (WiFi.status() == WL_CONNECTED)
   {
@@ -3320,8 +3325,8 @@ void systemTimerCallback()
     ledofftime = 4;
   }
   else if (mainstate.mqttconnected) {
-    ledontime = 10;
-    ledofftime = 10;
+    ledontime = 1;
+    ledofftime = 50;
   }
   else if (mainstate.wificonnected) {
     ledontime = 19;
@@ -4010,7 +4015,7 @@ void eeprom_load_variables()
   // Read settings from EEPROM
   DEBUG_D("Reading internal EEPROM...\n");
   eeprom_init();
-  if (!eeprom_read(&mqtt_server, 0))
+    if (!eeprom_read(&mqtt_server, 0))
   {
     DEBUG_E("Error reading mqtt server from internal eeprom\n");
   }

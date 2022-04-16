@@ -109,7 +109,7 @@ void goodwe_handle()
     }
   }
 
-  if (Serial.available())
+  while (Serial.available())
   {
     dataReceived = true;
     if (RxBufferPointer < 50) 

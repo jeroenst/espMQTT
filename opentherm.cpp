@@ -89,7 +89,7 @@ int opentherm_handle()
 
   yield();
 
-  if (Serial.available() > 0) {
+  while (Serial.available() > 0) {
     yield();
     char otchar = char(Serial.read());
     serialbuffer += otchar;

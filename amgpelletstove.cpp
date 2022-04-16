@@ -155,7 +155,7 @@ void amgpelletstove_handle()
   static String serstr = "";
   static int8_t currentpower = -1;
   static bool commok = 1;
-  if (Serial.available() > 0)
+  while (Serial.available() > 0)
   {
     int serval = Serial.read();
     if (serval != 27) serstr += String(char(serval));

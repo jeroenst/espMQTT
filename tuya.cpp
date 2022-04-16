@@ -135,7 +135,7 @@ void tuya_handle()
   static uint8_t receivedCommand[receivedCommandLength];
   static uint8_t commandLength = 0;
 
-  if (Serial.available() > 0)
+  while (Serial.available() > 0)
   {
     receiveIndex++;
     unsigned char inChar = Serial.read();
