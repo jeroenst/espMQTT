@@ -137,13 +137,19 @@ void _ducobox_handleserial(String ducomessage)
         {
           ducovalue = ducomessage.substring(6);
           _ducobox_co2 = ducovalue.toInt();
-          _ducobox_callback("2/co2", ducovalue);
-          co2retry = 0;
+          if (_ducobox_co2 > 400)
+          {
+            _ducobox_callback("2/co2", ducovalue);
+            co2retry = 0;
+          }
+          else
+          {
+            if (co2retry < 255) co2retry++;
+          }
         }
         else
         {
-          co2retry++;
-          if (co2retry == 0) co2retry--;
+            if (co2retry < 255) co2retry++;
         }
         if (co2retry == 30)
         {
@@ -183,10 +189,10 @@ void _ducobox_handleserial(String ducomessage)
         ducobox_writeserial("fanparaget");             // Get fan parameters
         break;
       case 2:
-        ducobox_writeserial("nodeparaget 4 73");       // Request TEMPERATURE of node 3
+        ducobox_writeserial("nodeparaget 3 73");       // Request TEMPERATURE of node 3
         break;
       case 3:
-        ducobox_writeserial("nodeparaget 4 74");       // Request CO2 of sensor 3
+        ducobox_writeserial("nodeparaget 3 74");       // Request CO2 of sensor 3
         break;
       case 4:
         ducobox_writeserial("sensorinfo");       // Request internal sensors
@@ -244,7 +250,7 @@ void ducobox_handle()
 
   if (ducoclient && ducoclient.connected())
   {
-    if (Serial.available() > 0)
+    while (Serial.available() > 0)
     {
       char ducochar = char(Serial.read());
       ducoclient.print(ducochar);
@@ -253,7 +259,7 @@ void ducobox_handle()
   }
   else
   {
-    if (Serial.available() > 0)
+    while (Serial.available() > 0)
     {
       char ducochar = char(Serial.read());
       if (ducochar != '\r') serialmessage += ducochar;
