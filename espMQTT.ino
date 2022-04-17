@@ -33,7 +33,7 @@
 // #define ESPMQTT_WEATHER
 // #define ESPMQTT_AMGPELLETSTOVE
 // #define ESPMQTT_BATHROOM
-// #define ESPMQTT_BEDROOM2
+#define ESPMQTT_BEDROOM2
 // #define ESPMQTT_OPENTHERM
 // #define ESPMQTT_SMARTMETER
 // #define ESPMQTT_GROWATT
@@ -63,7 +63,7 @@
 // #define ESPMQTT_IRRIGATION
 // #define ESPMQTT_BLITZWOLF
 // #define ESPMQTT_QSWIFIDIMMERD01
-#define ESPMQTT_QSWIFIDIMMERD02
+// #define ESPMQTT_QSWIFIDIMMERD02
 // #define ESPMQTT_SONOFF4CH //ESP8285
 // #define ESPMQTT_SONOFFDUAL
 // #define ESPMQTT_SONOFFS20_PRINTER
@@ -1317,7 +1317,6 @@ void mqttdosubscriptions(int32_t packetId = -1)
   static int32_t nextpacketid = 1;
   static uint16_t nextsubscribe = 0;
   static String subscribetopic = ""; // We need this static variable because mqttclient.subscribe uses a pointer
-
   DEBUG_D("mqttdosubscriptions (packetId=%d, nextpacketId=%d, nextsubscribe=%d)\n", packetId, nextpacketid, nextsubscribe);
 
   if (packetId == -1)
@@ -3552,6 +3551,7 @@ void handleWWWSettings()
         {
           esp_password = webserver.arg(i);
           ArduinoOTA.setPassword(esp_password.c_str());
+          ArduinoOTA.begin();
           Debug.setPassword(esp_password);
         }
       }
@@ -4164,13 +4164,15 @@ void setup() {
   DEBUG_I("Hostname=%s\n", WiFi.hostname().c_str());
 
   ArduinoOTA.onStart([]() {
-    Serial.end();
 #ifdef  ESPMQTT_DIMMER
     dimmer_stop();
 #endif
+    Serial.end();
+    WiFi.setSleepMode(WIFI_NONE_SLEEP); // When sleep is on regular disconnects occur https://github.com/esp8266/Arduino/issues/5083
   });
 
   ArduinoOTA.onEnd([]() {
+    WiFi.setSleepMode(WIFI_LIGHT_SLEEP);
     initSerial();
 #ifdef  ESPMQTT_DIMMER
     dimmer_init(ZEROCROSS_PIN, TRIAC_PIN);
