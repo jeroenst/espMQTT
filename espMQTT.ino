@@ -19,6 +19,7 @@
 */
 
 #define DEFAULT_PASSWORD "esplogin"
+#define CPUSLEEP 50
 
 #ifdef ESPMQTT_BUILDSCRIPT 
 #define DEBUGLEVEL Debug.DEBUG
@@ -28,7 +29,6 @@
 #define SERIALLOG
 #define MYTZ TZ_Europe_Amsterdam
 #define DEBUGLEVEL Debug.VERBOSE
-#define CPUSLEEP 50
 
 /* ESP8266 */
 // #define ESPMQTT_WEATHER
