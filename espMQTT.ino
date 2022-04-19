@@ -28,12 +28,13 @@
 #define SERIALLOG
 #define MYTZ TZ_Europe_Amsterdam
 #define DEBUGLEVEL Debug.VERBOSE
+#define CPUSLEEP 50
 
 /* ESP8266 */
 // #define ESPMQTT_WEATHER
 // #define ESPMQTT_AMGPELLETSTOVE
 // #define ESPMQTT_BATHROOM
-#define ESPMQTT_BEDROOM2
+// #define ESPMQTT_BEDROOM2
 // #define ESPMQTT_OPENTHERM
 // #define ESPMQTT_SMARTMETER
 // #define ESPMQTT_GROWATT
@@ -63,7 +64,7 @@
 // #define ESPMQTT_IRRIGATION
 // #define ESPMQTT_BLITZWOLF
 // #define ESPMQTT_QSWIFIDIMMERD01
-// #define ESPMQTT_QSWIFIDIMMERD02
+#define ESPMQTT_QSWIFIDIMMERD02
 // #define ESPMQTT_SONOFF4CH //ESP8285
 // #define ESPMQTT_SONOFFDUAL
 // #define ESPMQTT_SONOFFS20_PRINTER
@@ -151,6 +152,7 @@ SDM sdm(serSDM, 2400);
 #define APONBOOT
 #define QSWIFIDIMMERCHANNELS 1
 #include "qswifidimmer.h"
+#define CPUSLEEP 5
 #endif
 
 #ifdef  ESPMQTT_QSWIFIDIMMERD02
@@ -158,6 +160,7 @@ SDM sdm(serSDM, 2400);
 #define APONBOOT
 #define QSWIFIDIMMERCHANNELS 2
 #include "qswifidimmer.h"
+#define CPUSLEEP 5
 #endif
 
 #ifdef  ESPMQTT_QSWIFISWITCH1C
@@ -249,6 +252,7 @@ QsWifiSwitch qswifiswitch(QSWIFISWITCHCHANNELS);
 #define RAINMETERPIN D1
 #define RAINMETERPULSEMM 0.3636
 #undef SERIALLOG
+#define CPUSLEEP 5
 #endif
 
 #ifdef  ESPMQTT_GROWATT
@@ -2528,8 +2532,14 @@ void dotasks()
 void loop()
 {
   dotasks();
-  #ifndef RAINMETERPIN
-  delay(50); // Reduce power consumption https://tasmota.github.io/docs/Energy-Saving/
+  delay(0);
+  for (uint16_t i = 0; i < CPUSLEEP; i++)
+  {
+    delay(1); // Reduce power consumption https://tasmota.github.io/docs/Energy-Saving/
+    yield();
+    if (Serial.available()) break;
+  }
+  #ifdef CPUSLEEP
   dotasks();
   #endif
 
