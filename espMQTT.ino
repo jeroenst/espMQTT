@@ -38,7 +38,7 @@
 // #define ESPMQTT_OPENTHERM
 // #define ESPMQTT_SMARTMETER
 // #define ESPMQTT_GROWATT
-// #define ESPMQTT_GROWATT_MODBUS
+#define ESPMQTT_GROWATT_MODBUS
 // #define ESPMQTT_SDM120
 // #define ESPMQTT_DDM18SD
 // #define ESPMQTT_WATERMETER
@@ -64,7 +64,7 @@
 // #define ESPMQTT_IRRIGATION
 // #define ESPMQTT_BLITZWOLF
 // #define ESPMQTT_QSWIFIDIMMERD01
-#define ESPMQTT_QSWIFIDIMMERD02
+// #define ESPMQTT_QSWIFIDIMMERD02
 // #define ESPMQTT_SONOFF4CH //ESP8285
 // #define ESPMQTT_SONOFFDUAL
 // #define ESPMQTT_SONOFFS20_PRINTER
@@ -2529,19 +2529,32 @@ void dotasks()
   yield();
 }
 
+void SleepDelay(uint32_t mseconds) {
+  if (mseconds) {
+    uint32_t wait = millis() + mseconds;
+    while (wait > millis() && !Serial.available()) {  // We need to service serial buffer ASAP as otherwise we get uart buffer overrun
+      delay(1);
+    }
+  } else {
+    delay(0);
+  }
+}
+
 void loop()
 {
   dotasks();
-  delay(0);
-  for (uint16_t i = 0; i < CPUSLEEP; i++)
-  {
-    delay(1); // Reduce power consumption https://tasmota.github.io/docs/Energy-Saving/
-    yield();
-    if (Serial.available()) break;
-  }
+
   #ifdef CPUSLEEP
-  dotasks();
+  static uint32_t my_sleep = 0;
+  if (my_sleep > 0)
+  {
+    uint32_t my_activity = millis() - my_sleep; 
+    SleepDelay(CPUSLEEP - my_activity);
+    dotasks();
+  }
+  my_sleep = millis();
   #endif
+
 
   if (WiFi.status() == WL_CONNECTED)
   {
