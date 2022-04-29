@@ -38,7 +38,7 @@
 // #define ESPMQTT_OPENTHERM
 // #define ESPMQTT_SMARTMETER
 // #define ESPMQTT_GROWATT
-#define ESPMQTT_GROWATT_MODBUS
+// #define ESPMQTT_GROWATT_MODBUS
 // #define ESPMQTT_SDM120
 // #define ESPMQTT_DDM18SD
 // #define ESPMQTT_WATERMETER
@@ -50,7 +50,7 @@
 // #define ESPMQTT_SOIL
 // #define ESPMQTT_DIMMER
 // #define ESPMQTT_RELAY
-// #define ESPMQTT_LIVINGROOM
+#define ESPMQTT_LIVINGROOM
 // #define ESPMQTT_BBQTEMP
 // #define ESPMQTT_GOODWE
 
@@ -2533,7 +2533,7 @@ void SleepDelay(uint32_t mseconds) {
   if (mseconds) {
     uint32_t wait = millis() + mseconds;
     while (wait > millis() && !Serial.available()) {  // We need to service serial buffer ASAP as otherwise we get uart buffer overrun
-      delay(1);
+      delay(1);//delayMicroseconds(50);
     }
   } else {
     delay(0);
