@@ -2533,7 +2533,7 @@ void SleepDelay(uint32_t mseconds) {
   if (mseconds) {
     uint32_t wait = millis() + mseconds;
     while (wait > millis() && !Serial.available()) {  // We need to service serial buffer ASAP as otherwise we get uart buffer overrun
-      delay(1);//delayMicroseconds(50);
+      delay(1);
     }
   } else {
     delay(0);
