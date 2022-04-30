@@ -1267,7 +1267,7 @@ void connectToWifi()
 
       WiFi.persistent(true); // Save wifi credentials for other firmware
       WiFi.setAutoReconnect(false); // We handle reconnect our self
-      WiFi.setSleepMode(WIFI_LIGHT_SLEEP);
+      WiFi.setSleepMode(WIFI_MODEM_SLEEP);
       //WiFi.setSleepMode(WIFI_NONE_SLEEP); // When sleep is on regular disconnects occur https://github.com/esp8266/Arduino/issues/5083
       WiFi.setOutputPower(20);        // 10dBm == 10mW, 14dBm = 25mW, 17dBm = 50mW, 20dBm = 100mW
       WiFi.hostname(esp_hostname);
@@ -4195,7 +4195,7 @@ void setup() {
   });
 
   ArduinoOTA.onEnd([]() {
-    WiFi.setSleepMode(WIFI_LIGHT_SLEEP);
+    WiFi.setSleepMode(WIFI_MODEM_SLEEP);
     initSerial();
 #ifdef  ESPMQTT_DIMMER
     dimmer_init(ZEROCROSS_PIN, TRIAC_PIN);
