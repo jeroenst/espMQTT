@@ -50,7 +50,7 @@
 // #define ESPMQTT_SOIL
 // #define ESPMQTT_DIMMER
 // #define ESPMQTT_RELAY
-#define ESPMQTT_LIVINGROOM
+// #define ESPMQTT_LIVINGROOM
 // #define ESPMQTT_BBQTEMP
 // #define ESPMQTT_GOODWE
 
@@ -64,7 +64,7 @@
 // #define ESPMQTT_IRRIGATION
 // #define ESPMQTT_BLITZWOLF
 // #define ESPMQTT_QSWIFIDIMMERD01
-// #define ESPMQTT_QSWIFIDIMMERD02
+#define ESPMQTT_QSWIFIDIMMERD02
 // #define ESPMQTT_SONOFF4CH //ESP8285
 // #define ESPMQTT_SONOFFDUAL
 // #define ESPMQTT_SONOFFS20_PRINTER
@@ -152,6 +152,7 @@ SDM sdm(serSDM, 2400);
 #define APONBOOT
 #define QSWIFIDIMMERCHANNELS 1
 #include "qswifidimmer.h"
+#undef CPUSLEEP
 #define CPUSLEEP 5
 #endif
 
@@ -160,6 +161,7 @@ SDM sdm(serSDM, 2400);
 #define APONBOOT
 #define QSWIFIDIMMERCHANNELS 2
 #include "qswifidimmer.h"
+#undef CPUSLEEP
 #define CPUSLEEP 5
 #endif
 

@@ -136,6 +136,9 @@ void qswifidimmer_handle()
   }
   yield();
 
+  // Filter ghost pulses
+  if (Stime[dimchannel] + 150 < msec) Scounter[dimchannel] = 0;
+
   // When switch was pressed for more then 5 pulses and released for about 100ms switch from on to off or from off to on and also reset counters etc.
   if ((Scounter[dimchannel] > 5) && (Stime[dimchannel] + 100 < msec))
   {
