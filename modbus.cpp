@@ -56,8 +56,12 @@ void modbus_request_function_code(uint8_t deviceAddress, uint8_t functionCode, u
   for (int i = 0; i < 8; i++)
   {
     DEBUG_V ("Sending to modbus Device [addr %i] (pointer : %d): %d (0x%02x)\n", TxBuffer[0], i, TxBuffer[i], TxBuffer[i]);
-    Serial.write(TxBuffer[i]);
     yield();
+  }
+
+  for (int i = 0; i < 8; i++)
+  {
+    Serial.write(TxBuffer[i]);
   }
 
   modbus_RxBufferPointer = 0;
