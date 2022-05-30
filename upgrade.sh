@@ -45,7 +45,7 @@ then
 		echo "Please give firmwarename as second argument..."
 		exit 1
 	fi
-	python3 ~/Arduino/hardware/esp8266com/esp8266/tools/upload.py write_flash 0 $2
+	python3 ~/Arduino/hardware/esp8266com/esp8266/tools/upload.py write_flash 0 ./builds/v$VERSION/$2_$VERSION.bin
 fi
 
 if [ "$2" == "" ] 
