@@ -99,7 +99,7 @@ int8_t growattModbus_read()
         break;
 
       case 3:
-        _growattModbus_callback("inverter/temperature", String((float)modbus_get_byte(4) / 10, 1));
+        _growattModbus_callback("inverter/temperature", String((float)modbus_get_register(0) / 10, 1));
         _growattModbus_callback("status", "ready");
         growattModbus_itteration = 0;
         break;
@@ -120,7 +120,7 @@ void growattModbus_handle()
   if (growattModbus_RxReady)
   {
     growattModbus_RxReady = false;
-    if (growattModbus_itteration < 3) 
+    if (growattModbus_itteration < 4) 
     {
       growattModbus_request();
       communicationFinished = false;
@@ -128,7 +128,6 @@ void growattModbus_handle()
     else 
     {
       modbus_clear_buffer();
-      _growattModbus_callback("status", "ready");
       communicationFinished = true;
     }
     growattModbus_errorCounter = 0;
