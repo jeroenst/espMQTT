@@ -101,7 +101,6 @@ int8_t growattModbus_read()
       case 3:
         _growattModbus_callback("inverter/temperature", String((float)modbus_get_register(0) / 10, 1));
         _growattModbus_callback("status", "ready");
-        growattModbus_itteration = 0;
         break;
     }
     modbus_clear_buffer();
