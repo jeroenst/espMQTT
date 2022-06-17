@@ -36,7 +36,7 @@
 // #define ESPMQTT_BATHROOM
 // #define ESPMQTT_BEDROOM2
 // #define ESPMQTT_OPENTHERM
-// #define ESPMQTT_SMARTMETER
+#define ESPMQTT_SMARTMETER
 // #define ESPMQTT_GROWATT
 // #define ESPMQTT_GROWATT_MODBUS
 // #define ESPMQTT_SDM120
@@ -44,6 +44,7 @@
 // #define ESPMQTT_WATERMETER
 // #define ESPMQTT_DDNS
 // #define ESPMQTT_GENERIC8266
+// #define ESPMQTT_GENERIC8266_NEO
 // #define ESPMQTT_MAINPOWERMETER
 // #define ESPMQTT_OBD2
 // #define ESPMQTT_NOISE
@@ -64,7 +65,7 @@
 // #define ESPMQTT_IRRIGATION
 // #define ESPMQTT_BLITZWOLF
 // #define ESPMQTT_QSWIFIDIMMERD01
-#define ESPMQTT_QSWIFIDIMMERD02
+// #define ESPMQTT_QSWIFIDIMMERD02
 // #define ESPMQTT_SONOFF4CH //ESP8285
 // #define ESPMQTT_SONOFFDUAL
 // #define ESPMQTT_SONOFFS20_PRINTER
@@ -220,10 +221,18 @@ QsWifiSwitch qswifiswitch(QSWIFISWITCHCHANNELS);
 #define OLEDSMALL
 #endif
 
-
 #ifdef  ESPMQTT_GENERIC8266
 #define FIRMWARE_TARGET "GENERIC8266"
 #define FLASHBUTTON D3
+#define ESPLED D4
+#define SERIALLOG
+#define APONBOOT
+#endif
+
+#ifdef  ESPMQTT_GENERIC8266_NEO
+#define FIRMWARE_TARGET "GENERIC8266"
+#define FLASHBUTTON D3
+#define NEOPIXELPIN D2
 #define ESPLED D4
 #define SERIALLOG
 #define APONBOOT
@@ -319,6 +328,11 @@ static bool sonoffch_timeout_enabled[4] = {1, 1, 1, 0};
 #error "Wrong board selected! Select Generic ESP8285 module"
 #endif
 #define  ESPMQTT_SONOFF4CH
+#endif
+
+#ifdef NEOPIXELPIN
+#include <Adafruit_NeoPixel.h>
+Adafruit_NeoPixel neopixelleds = Adafruit_NeoPixel(2, NEOPIXELPIN, NEO_RGB + NEO_KHZ400);
 #endif
 
 #ifdef  ESPMQTT_SONOFF4CH
@@ -563,8 +577,6 @@ static bool sonoff_oldbuttons[1] = {1};
 #define DHTTYPE DHT22   // there are multiple kinds of DHT sensors
 #define DHTTEMPOFFSET -2
 #define NEOPIXELPIN D6
-#include <Adafruit_NeoPixel.h>
-Adafruit_NeoPixel neopixelleds = Adafruit_NeoPixel(2, NEOPIXELPIN, NEO_RGB + NEO_KHZ400);
 #endif
 
 #ifdef  ESPMQTT_BEDROOM2
@@ -680,10 +692,11 @@ struct Mainstate {
   uint16_t mqttlastpublishedpacketid = 0;
   bool defaultpassword = true;
   bool accesspoint = false;
+  bool statusok = false;
 } mainstate;
 
 struct dataMapStruct {
-  char *payload = (char *) "";;
+  char *payload = (char *) "";
   bool send = true;
   bool onair = false;
   bool publishregular = false;
@@ -691,10 +704,6 @@ struct dataMapStruct {
 
 int wifichannel = 0;
 int wifinetworksfound = 0;
-
-
-
-
 
 SimpleMap<const char*, dataMapStruct> *dataMap = new SimpleMap<const char*, dataMapStruct>([](const char* &a, const char* &b) -> int {
   if (a == b) return 0;      // a and b are equal
@@ -708,101 +717,11 @@ SimpleMap<int, char *> *eepromMap = new SimpleMap<int, char *>([](int &a, int &b
   else return -1;            // a is smaller than b
 });
 
-
-static const char *dataNames[] PROGMEM =
-{ "hostname",
-  "firmware/name",
-  "firmware/target",
-  "firmware/sourcefile",
-  "firmware/version",
-  "firmware/compiletime",
-  "status",
-  "status/upgrade",
-  "flash/id",
-  "flash/size/real",
-  "flash/size/ide",
-  "flash/mode",
-  "flash/speed",
-  "system/chipid",
-  "system/uptime",
-  "system/freeram",
-  "wifi/mac",
-  "wifi/state",
-  "wifi/localip",
-  "wifi/ssid",
-  "wifi/bssid",
-  "wifi/rssi",
-  "wifi/externalip",
-  "mqtt/server",
-  "mqtt/port",
-  "mqtt/sll",
-  "mqtt/state",
-  "mqtt/user",
-  "mqtt/clientid",
-  "mqtt/user"
-};
-
-
 struct {
   char status[10] = "online";
   char status_upgrade[10] = "online";
 } dataValues;
 
-const char* getDataValue(const char *dataName)
-{
-  static bool initialized = false;
-  static char compiletime[20] = "";
-  static char flash_id[10] = "";
-  static char flash_size_real[10] = "";
-  static char flash_size_ide[10] = "";
-  static char flash_speed[10] = "";
-  static char flash_mode[10] = "";
-
-  static struct {
-    const char *value = "";
-    bool sendupdate = false;
-    bool forceupdate = false;
-    bool publishregular = false;
-
-  } status[20];
-
-  if (!initialized)
-  {
-    initialized = true;
-
-    status[0].value = WiFi.hostname().c_str();
-    status[1].value = "espMQTT";
-    status[2].value = FIRMWARE_TARGET;
-    status[3].value = __FILE__;
-    status[4].value = compiletime;
-    status[5].value = ESPMQTT_VERSION;
-    status[6].value = dataValues.status;
-    status[7].value = dataValues.status_upgrade;
-    status[8].value = flash_id;
-    status[9].value = flash_size_real;
-    status[10].value = flash_size_ide;
-    status[11].value = flash_mode;
-
-
-    strcat(compiletime, __DATE__);
-    strcat(compiletime, " ");
-    strcat(compiletime, __TIME__);
-
-    itoa(ESP.getFlashChipId(), flash_id, 10);
-    itoa(ESP.getFlashChipRealSize(), flash_size_real, 10);
-    itoa(ESP.getFlashChipSize(), flash_size_ide, 10);
-    itoa(ESP.getFlashChipSpeed(), flash_speed, 10);
-    FlashMode_t ideMode = ESP.getFlashChipMode();
-    strcpy (flash_mode, (ideMode == FM_QIO ? "QIO" : ideMode == FM_QOUT ? "QOUT" : ideMode == FM_DIO ? "DIO" : ideMode == FM_DOUT ? "DOUT" : "UNKNOWN"));
-
-  }
-
-  for (int i = 0; i < 20; i++)
-  {
-    if (strcmp(dataName, dataNames[i])) return status[i].value;
-  }
-  return "";
-}
 
 bool updatemqtt = 0;
 
@@ -900,6 +819,52 @@ void ICACHE_RAM_ATTR hlw8012_cf_interrupt() {
 #endif
 
 
+size_t strlcpy(char* dst, const char* src, size_t bufsize)
+{
+  size_t srclen =strlen(src);
+  size_t result =srclen; /* Result is always the length of the src string */
+  if(bufsize>0)
+  {
+    if(srclen>=bufsize)
+       srclen=bufsize-1;
+    if(srclen>0)
+       memcpy(dst,src,srclen);
+    dst[srclen]='\0';
+  }
+  return result;
+}
+
+void update_neoled_status()
+{
+#ifdef NEOPIXELPIN
+  if (mainstate.accesspoint) {
+        neopixelleds.setPixelColor(0, neopixelleds.Color(50, 0, 15));
+        neopixelleds.show();
+  }
+  else if (mainstate.defaultpassword) {
+        neopixelleds.setPixelColor(0, neopixelleds.Color(50, 40, 20));
+        neopixelleds.show();
+  }
+  else if (mainstate.statusok) {
+        neopixelleds.setPixelColor(0, neopixelleds.Color(0, 50, 0));
+        neopixelleds.show();
+  }
+  else if (mainstate.mqttconnected) {
+        neopixelleds.setPixelColor(0, neopixelleds.Color(0, 0, 50));
+        neopixelleds.show();
+  }
+  else if (mainstate.wificonnected) {
+        neopixelleds.setPixelColor(0, neopixelleds.Color(50, 20, 0));
+        neopixelleds.show();
+  }
+  else
+  {
+        neopixelleds.setPixelColor(0, neopixelleds.Color(50, 0, 0));
+        neopixelleds.show();    
+  }
+#endif
+}
+
 void publishdatamap(int32_t packetId = -1, bool publishall = false, bool init = false, bool publishregular = false);
 
 String getRandomString(int len) {
@@ -919,19 +884,205 @@ String getRandomString(int len) {
 
 void updateexternalip();
 
-String getdatamap(const char *topic)
+#define DATAMAP_BASELENGTH 26
+
+enum DataMapStatus {initializing, wifierror, mqtterror, commerror, online};
+enum DataMapStatusUpgrade {notchecked, uptodate, fail};
+
+struct
 {
-  return dataMap->get(topic).payload;
+  uint64_t sendIds[2] = {0,0};
+  uint64_t publishRegularIds[2] = {0,0};
+  int8_t length = DATAMAP_BASELENGTH;
+  char firmware_upgradekey[11] = "";
+  DataMapStatus status = initializing;
+  DataMapStatusUpgrade status_upgrade = notchecked;
+  char externalip[17] = "";
+} DataMap;
+
+
+bool getdatamap_checkandfill(char *key, char *outputvalue, uint8_t id, uint8_t idCounter, const char *searchkey, const char *inputvalue)
+{
+  if (((strcmp (key, searchkey) == 0) || (id == idCounter)) && (id < DataMap.length))
+  {
+    strcpy (outputvalue, inputvalue);
+    strcpy (key, searchkey);
+    return true;
+  }
+  return false;
+}
+
+uint8_t getDataMapLength()
+{
+  return DataMap.length;
+}
+
+bool getDataMapPublishRegular(uint8_t id)
+{
+  if (id < 64) return (DataMap.publishRegularIds[0] && (2^id));
+  else return (DataMap.publishRegularIds[1] && (2^(id-64)));
+}
+
+void PublishRegular(uint8_t id, bool value)
+{
+  if (id < 64)
+  {
+    if (value) DataMap.publishRegularIds[0] |= 1<<id;  
+    else DataMap.publishRegularIds[0] &= DataMap.publishRegularIds[0] - (1<<id);
+  }
+  else
+  {
+    if (value) DataMap.publishRegularIds[1] |= 1<<(id-64);  
+    else DataMap.publishRegularIds[1] &= DataMap.publishRegularIds[1] - (1<<(id-64));
+  }
+}
+
+bool getDataMapSendStatus(uint8_t id)
+{
+  if (id < 64) return (DataMap.sendIds[0] && (2^id));
+  else return (DataMap.sendIds[1] && (2^(id-64)));
+}
+
+void setDataMapSendStatus(uint8_t id, bool sendstatus = true)
+{
+  if (id < 64)
+  {
+    if (sendstatus) DataMap.sendIds[0] |= 1<<id;
+    else DataMap.sendIds[0] &= DataMap.sendIds[0] - (1<<id);
+  }
+  else
+  {
+    if (sendstatus) DataMap.sendIds[1] |= 1<<(id-64);  
+    else DataMap.sendIds[1] &= DataMap.sendIds[1] - (1<<(id-64));    
+  }
+}
+
+int16_t getDataMap(char *key, char *value, uint8_t id = -1)
+{
+  uint8_t idCounter = 0;
+  char valuestring[20] = "";
+
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "hostname", WiFi.hostname().c_str())) return --idCounter;
+    
+  // Return Status Items  
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "status", (DataMap.status == initializing) ? "initializing" : (DataMap.status == online) ? "online" : (DataMap.status == commerror) ? "commerror" : "")) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "status/upgrade", (DataMap.status_upgrade == notchecked) ? "not checked" : (DataMap.status_upgrade == uptodate) ? "up to date" : (DataMap.status_upgrade == fail) ? "check failed" : "")) return --idCounter;
+  
+
+  // Return Firmware Items
+  String firmwarename = __FILE__;
+  firmwarename = firmwarename.substring(firmwarename.lastIndexOf("/") + 1);
+  firmwarename = firmwarename.substring(firmwarename.lastIndexOf("\\") + 1);
+  firmwarename = firmwarename.substring(0, firmwarename.lastIndexOf("."));
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "firmware/name", firmwarename.c_str())) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "firmware/target", FIRMWARE_TARGET)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "firmware/sourcefile", String(__FILE__).substring(String(__FILE__).lastIndexOf('/') + 1).c_str())) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "firmware/version", ESPMQTT_VERSION)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "firmware/compiletime", String(String(__DATE__) + " " + __TIME__).c_str())) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "firmware/upgradekey", DataMap.firmware_upgradekey)) return --idCounter;
+  
+  // Return System Items
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "system/chipid", chipid.c_str())) return --idCounter;
+  sprintf(valuestring, "%d:%02d:%02d:%02d", uptime / 86400, (uptime / 3600) % 24, (uptime / 60) % 60, uptime % 60);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "system/uptime", valuestring)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "system/freeram", String(system_get_free_heap_size()).c_str())) return --idCounter;
+  
+  
+  // Return Wifi items
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "wifi/state", WiFi.status() == WL_CONNECTED ? "connected" : "disconnected")) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "wifi/localip", WiFi.localIP().toString().c_str())) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "wifi/ssid", WiFi.SSID().c_str())) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "wifi/bssid", WiFi.BSSIDstr().c_str())) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "wifi/rssi", String(WiFi.RSSI()).c_str())) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "wifi/channel", String(WiFi.channel()).c_str())) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "wifi/externalip",  DataMap.externalip)) return --idCounter;
+
+  // Return MQTT items
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "mqtt/server", mqtt_server.c_str())) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "mqtt/port", String(mqtt_port).c_str())) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "mqtt/ssl", String(mqtt_ssl).c_str())) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "mqtt/state", mqttClient.connected() ? "connected" : "disconnected")) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "mqtt/clientid", mqttClient.getClientId())) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "mqtt/user",  mqtt_username.c_str())) return --idCounter;
+  
+#ifdef ESPMQTT_SMARTMETER
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/watt", String(smartmeter_DataMap.electricity.watt).c_str())) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/watt_using", String(smartmeter_DataMap.electricity.watt_using).c_str())) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/watt_providing", String(smartmeter_DataMap.electricity.watt_providing).c_str())) return --idCounter;
+  
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/kwh", String((float)smartmeter_DataMap.electricity.wh/1000,3).c_str()))return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/kwh_used1", String((float)smartmeter_DataMap.electricity.wh_used1/1000,3).c_str()))
+  {
+    DEBUG ("whused1=%d\n", smartmeter_DataMap.electricity.wh_used1);
+    return --idCounter;
+  }
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/kwh_used2", String((float)smartmeter_DataMap.electricity.wh_used2/1000,3).c_str())) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/kwh_provided1", String((float)smartmeter_DataMap.electricity.wh_provided1/1000,3).c_str())) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/kwh_provided2", String((float)smartmeter_DataMap.electricity.wh_provided2/1000,3).c_str())) return --idCounter;
+#endif  
+  return -1;
   yield();
+}
+
+int16_t getDatamapId(String key)
+{
+  char value[30] = "";
+  char keyarray[30] = "";
+  for (uint8_t id = 0; id < getDataMapLength(); id++)
+  {
+    strcpy (keyarray, "");
+    getDataMap(keyarray, value, id);
+    if (strcmp(keyarray, key.c_str()) == 0) return id;
+  }
+  return -1;
+}
+
+String getDataMapKey(uint8_t id)
+{
+  char value[30] = "";
+  char keyarray[30] = "";
+  getDataMap(keyarray, value, id);
+  return String(keyarray);
+}
+
+String getDataMapValue(uint8_t id)
+{
+  char value[30] = "";
+  char keyarray[30] = "";
+  getDataMap(keyarray, value, id);
+  return String(value);
+}
+
+
+String getDataMapValue(String key)
+{
+  char value[30] = "";
+  char keyarray[30] = "";
+  strcpy(keyarray, key.c_str());
+  getDataMap(keyarray, value);
+  return String(value);
+}
+
+String getdatamap(String key)
+{
+  return getDataMapValue(key);
 }
 
 void showdatamap()
 {
-  for (int i = 0; i < dataMap->size(); i++)
+  char key[30];
+  char value[30];
+  uint8_t id = 0;
+  while (getDataMap(key, value, id++) >= 0)
   {
-    DEBUG("%s=%s (send=%d, onair=%d)\n", dataMap->getKey(i), dataMap->getData(i).payload, dataMap->getData(i).send, dataMap->getData(i).onair);
+    DEBUG("%d %s=%s\n", id, key, value);
+    strcpy (key, "");
     yield();
   }
+
+  char buf[256];
+  snprintf(buf,255,"snprintf-s: %s",(char *)F("PROGMEM-STRING"));
+  DEBUG("%s\n", buf);
 }
 
 void putdatamap(const char *topic, String value, bool sendupdate = true, bool forceupdate = false, bool publishregular = true)
@@ -1186,50 +1337,6 @@ void obd2_handle()
 }
 #endif
 
-void update_systeminfo(bool writestaticvalues = false)
-{
-  char uptimestr[20];
-  const bool sendupdate = true;
-  sprintf(uptimestr, "%d:%02d:%02d:%02d", uptime / 86400, (uptime / 3600) % 24, (uptime / 60) % 60, uptime % 60);
-  if (writestaticvalues)
-  {
-    putdatamap("hostname", WiFi.hostname(), sendupdate, false, false);
-    String firmwarename = __FILE__;
-    firmwarename = firmwarename.substring(firmwarename.lastIndexOf("/") + 1);
-    firmwarename = firmwarename.substring(firmwarename.lastIndexOf("\\") + 1);
-    firmwarename = firmwarename.substring(0, firmwarename.lastIndexOf("."));
-    //putdatamap("firmware/name", firmwarename, sendupdate, false, false);
-    putdatamap("firmware/target", FIRMWARE_TARGET, sendupdate, false, false);
-    //putdatamap("firmware/sourcefile", String(__FILE__).substring(String(__FILE__).lastIndexOf('/') + 1), sendupdate, false, false);
-    putdatamap("firmware/version", ESPMQTT_VERSION, sendupdate, false, false);
-    //putdatamap("firmware/compiletime", String(__DATE__) + " " + __TIME__, sendupdate, false, false);
-    putdatamap("firmware/upgradekey", getRandomString(10), sendupdate, false, false);
-    putdatamap("status", "online", sendupdate, false, false);
-    putdatamap("status/upgrade", "not checked", sendupdate, false, false);
-    //putdatamap("flash/id", String(ESP.getFlashChipId()), sendupdate, false, false);
-    //putdatamap("flash/size/real", String(ESP.getFlashChipRealSize()), sendupdate, false, false);
-    //putdatamap("flash/size/ide", String(ESP.getFlashChipSize()), sendupdate, false, false);
-    //FlashMode_t ideMode = ESP.getFlashChipMode();
-    //putdatamap("flash/mode", (ideMode == FM_QIO ? "QIO" : ideMode == FM_QOUT ? "QOUT" : ideMode == FM_DIO ? "DIO" : ideMode == FM_DOUT ? "DOUT" : "UNKNOWN"), sendupdate, false, false);
-    //putdatamap("flash/speed", String(ESP.getFlashChipSpeed()), sendupdate, false, false);
-    putdatamap("system/chipid", String(chipid), sendupdate, false, false);
-    putdatamap("wifi/mac", String(WiFi.macAddress()), sendupdate, false, false);
-  }
-  putdatamap("system/uptime", String(uptimestr), uptime % 60 == 0, true, false);
-  putdatamap("system/freeram", String(system_get_free_heap_size()), (uptime % 60 == 0), false, false);
-  putdatamap("wifi/state", WiFi.status() == WL_CONNECTED ? "connected" : "disconnected", sendupdate, false, false);
-  putdatamap("wifi/localip", WiFi.localIP().toString(), sendupdate, false, false);
-  putdatamap("wifi/ssid", String(WiFi.SSID()), sendupdate, false, false);
-  putdatamap("wifi/bssid", String(WiFi.BSSIDstr()), sendupdate, false, false);
-  if ((abs(getdatamap("wifi/rssi").toInt() - WiFi.RSSI()) > 5) || (uptime % 60 == 0)) putdatamap("wifi/rssi", String(WiFi.RSSI()), sendupdate, false, false);
-  putdatamap("wifi/channel", String(wifichannel), sendupdate, false, false);
-  putdatamap("mqtt/server", String(mqtt_server), sendupdate, false, false);
-  putdatamap("mqtt/port", String(mqtt_port), sendupdate, false, false);
-  putdatamap("mqtt/ssl", String(mqtt_ssl), sendupdate, false, false);
-  putdatamap("mqtt/state", mqttClient.connected() ? "connected" : "disconnected", sendupdate, false, false);
-  putdatamap("mqtt/clientid", String(mqttClient.getClientId()), sendupdate, false, false);
-  putdatamap("mqtt/user", mqtt_username, sendupdate, false, false);
-}
 
 void startWifiAP()
 {
@@ -2492,28 +2599,6 @@ void espmqtt_handle_modules_1sec()
 
     write_oled_display();
 
-    if (WiFi.status() == WL_CONNECTED)
-    {
-      if (WiFi.status() != previouswifistatus)
-      {
-#ifdef NEOPIXELPIN
-        neopixelleds.setPixelColor(0, neopixelleds.Color(30, 15, 0));
-        neopixelleds.show();
-#endif
-      }
-
-#ifdef NEOPIXELPIN
-      neopixelleds.setPixelColor(0, neopixelleds.Color(0, 20, 0));
-      neopixelleds.show();
-#endif
-    }
-    else
-    {
-#ifdef NEOPIXELPIN
-      neopixelleds.setPixelColor(0, neopixelleds.Color(30, 0, 0));
-      neopixelleds.show();
-#endif
-    }
     previouswifistatus = WiFi.status();
 }
 
@@ -2597,7 +2682,7 @@ void loop()
   if (triggers.wificonnected)
   {
     triggers.wificonnected = false;
-    DEBUG_I("Connected to WiFi SSID=%s RSSI=%d\n", WiFi.SSID().c_str(), WiFi.RSSI());
+    DEBUG_I("Connected to WiFi SSID=%s RSSI=%d LOCALIP=%s\n", WiFi.SSID().c_str(), WiFi.RSSI(), WiFi.localIP().toString().c_str());
     //syslogN("Connected to WiFi SSID=%s RSSI=%d\n", WiFi.SSID().c_str(), WiFi.RSSI());
     initMqtt();
     mqttReconnectTimer.once(1, connectToMqtt); // Wait 1 second before connecting mqtt
@@ -2648,7 +2733,7 @@ void loop()
     DEBUG_I("Connected to MQTT Server=%s\n", mqtt_server.c_str());
     //syslogN("Connected to MQTT Server=%s\n", mqtt_server.c_str());
     dotasks();  // Prevent crash because of to many debug data to send
-    update_systeminfo(true);
+//    update_systeminfo(true);
     mqttdosubscriptions(-1);
     updateexternalip();
 #ifdef ESPMQTT_TUYA_2GANGDIMMERV2
@@ -2837,6 +2922,7 @@ void loop()
   if (timertick == 1) // Every 0.1 second read next SDM120 register
   {
     espmqtt_handle_modules_100ms();
+    update_neoled_status();
   }
   yield();
   ESP.wdtFeed(); // Prevent watchdog to kick in...
@@ -2907,7 +2993,7 @@ void loop()
 #endif
 
     // Every 10 seconds update system info
-    if ((uptime % 10) == 0) update_systeminfo();
+//    if ((uptime % 10) == 0) update_systeminfo();
 
     espmqtt_handle_modules_1sec();
   }
@@ -3077,6 +3163,7 @@ void publishdatamap(int32_t packetId, bool publishall, bool init, bool publishre
   static uint16_t datamappointer = 0;
   static int32_t nextpacketId = -1;
   static bool waitingforack = false;
+  static int16_t onAirId = -1;
 
   if (init)
   {
@@ -3091,17 +3178,13 @@ void publishdatamap(int32_t packetId, bool publishall, bool init, bool publishre
 
   if (publishall || publishregular)
   {
-    int32_t publishallpointer = 0;
-    while (publishallpointer < dataMap->size())
+    uint8_t id = 0;
+    while (id < getDataMapLength())
     {
-      const char *topic = dataMap->getKey(publishallpointer);
-      dataMapStruct data = dataMap->getData(publishallpointer);
-      data.onair = false;
-      if (publishall) data.send = true;
-      if (publishregular) data.send = data.publishregular;
-      dataMap->put(topic, data);
-      publishallpointer++;
-      //DEBUG("publishallpointer=%d datamapsize=%d\n",publishallpointer, dataMap->size());
+      if (publishall) setDataMapSendStatus(id, true);
+      if ((publishregular) && (getDataMapPublishRegular(id))) setDataMapSendStatus(id, true);
+      DEBUG("id=%d datamaplength=%d publishall=%d publishregular=%d\n",id, getDataMapLength(), publishall, publishregular);
+      id++;
       yield();
     }
     datamappointer = 0;
@@ -3116,27 +3199,15 @@ void publishdatamap(int32_t packetId, bool publishall, bool init, bool publishre
     {
       // If packetId == 0 resend because packet was not acked
       DEBUG_V("Not received mqtt ack id=%d\n", packetId);
-      const char *topic = dataMap->getKey(datamappointer);
-      dataMapStruct data = dataMap->getData(datamappointer);
-      if (data.onair)
-      {
-        data.onair = false;
-        dataMap->put(topic, data);
-      }
+      onAirId = -1;
       waitingforack = false;
     }
     else if (packetId == nextpacketId)
     {
       // Packet succesfull delivered proceed to next item
       DEBUG_V("Received mqtt ack id=%d\n", packetId);
-      const char *topic = dataMap->getKey(datamappointer);
-      dataMapStruct data = dataMap->getData(datamappointer);
-      if (data.onair)
-      {
-        data.send = false;
-        data.onair = false;
-        dataMap->put(topic, data);
-      }
+      setDataMapSendStatus(onAirId, false);
+      onAirId = -1;
       datamappointer++;
       waitingforack = false;
     }
@@ -3145,25 +3216,22 @@ void publishdatamap(int32_t packetId, bool publishall, bool init, bool publishre
   // If not waiting for ack search for next item in datamap which has to be send
   else if (mqttClient.connected() && (WiFi.status() == WL_CONNECTED) && mainstate.mqttsubscribed)
   {
-    if (datamappointer < dataMap->size())
+    if (datamappointer < getDataMapLength())
     {
       nextpacketId = -1;
-      while ((datamappointer < dataMap->size()) && (nextpacketId == -1))
+      while ((datamappointer < getDataMapLength()) && (nextpacketId == -1))
       {
-        const char *topic = dataMap->getKey(datamappointer);
-        dataMapStruct data = dataMap->getData(datamappointer);
-        //DEBUG ("datamappointer=%d datamapsize=%d send=%d\n", datamappointer, dataMap->size(), data.send);
-        if (data.send)
+//        DEBUG ("datamappointer=%d datamaplength=%d send=%d\n", datamappointer, getDataMapLength(), getDataMapSendStatus(datamappointer));
+        if (getDataMapSendStatus(datamappointer))
         {
-          String sendtopic = String(mqtt_topicprefix + topic);
-          nextpacketId = mqttClient.publish(sendtopic.c_str(), 1, true, data.payload);
+          String sendtopic = String(mqtt_topicprefix + getDataMapKey(datamappointer));
+          nextpacketId = mqttClient.publish(sendtopic.c_str(), 1, true, getDataMapValue(datamappointer).c_str());
           if (nextpacketId > 0)
           {
             waitingforack = true;
-            data.onair = true;
-            dataMap->put(topic, data);
+            onAirId = datamappointer;
           }
-          DEBUG_D ("MQTT PUBLISHING DATAMAP %s=%s (nextpacketId=%d)\n", topic, data.payload, nextpacketId);
+          DEBUG_D ("MQTT PUBLISHING DATAMAP %s=%s (nextpacketId=%d)\n", sendtopic.c_str(), getDataMapValue(datamappointer).c_str(), nextpacketId);
           yield();
         }
         else
@@ -3375,6 +3443,8 @@ void systemTimerCallback()
   ledtimer++;
   if (ledtimer >= ledontime + ledofftime) ledtimer = 0;
 #endif
+
+
 }
 
 #ifdef MH_Z19
@@ -3554,7 +3624,7 @@ void handleWWWSettings()
     {
       if (webserver.argName(i) == "rebootdevice")
       {
-        webserver.send(200, "text/html", "<HTML><HEAD><meta http-equiv=\"refresh\" content=\"5;url=\\\" /></HEAD><BODY>Device Rebooting, Please Wait...</BODY></HTML>");
+        webserver.send(200, "text/html", F("<HTML><HEAD><meta http-equiv=\"refresh\" content=\"5;url=\\\" /></HEAD><BODY>Device Rebooting, Please Wait...</BODY></HTML>"));
         reboottimeout = uptime + 4;
         return;
       }
@@ -3616,7 +3686,7 @@ void handleWWWSettings()
 
     if ((wifissid != "") && (wifipsk != "") && (esp_hostname != "") && ((wifissid != WiFi.SSID()) || (wifipsk != WiFi.psk())))
     {
-      webserver.send(200, "text/html", "<HTML><BODY>Settings Saved.<BR>Please wait a moment and connect to proper wifi network and open the page of the saved hostname.</BODY></HTML>");
+      webserver.send(200, "text/html", F("<HTML><BODY>Settings Saved.<BR>Please wait a moment and connect to proper wifi network and open the page of the saved hostname.</BODY></HTML>"));
       flashbuttonstatus = 0;
       previouswifistatus = -1;
       wifichangesettingstimeout = uptime + 4;
@@ -3625,12 +3695,12 @@ void handleWWWSettings()
     else
     {
       wifichangesettingstimeout = uptime + 4;
-      webserver.send(200, "text/html", "<HTML><HEAD><meta http-equiv=\"refresh\" content=\"5;url=\\\" /></HEAD><BODY>Settings Saved, Please Wait...</BODY></HTML>");
+      webserver.send(200, "text/html", F("<HTML><HEAD><meta http-equiv=\"refresh\" content=\"5;url=\\\" /></HEAD><BODY>Settings Saved, Please Wait...</BODY></HTML>"));
     }
 
     initMqtt();
     connectToMqtt();
-    update_systeminfo(true);
+//    update_systeminfo(true);
   }
   else
   {
@@ -3642,59 +3712,59 @@ void handleWWWSettings()
 
 
     webserver.setContentLength(CONTENT_LENGTH_UNKNOWN);
-    webserver.send (200, "text/html", "<HTML><HEAD><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"></HEAD><BODY><CENTER><div align=\"left\" style=\"width:400px; margin:auto\">");
-    webserver.sendContent ("<CENTER><H1>");
+    webserver.send (200, "text/html", F("<HTML><HEAD><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"></HEAD><BODY><CENTER><div align=\"left\" style=\"width:400px; margin:auto\">"));
+    webserver.sendContent (F("<CENTER><H1>"));
     webserver.sendContent (WiFi.hostname() + "</H1>");
-    webserver.sendContent ("</CENTER><form action=\"/settings\" method=\"post\" autocomplete=\"off\"><TABLE style=\"width:400px; margin:auto\">");
-    webserver.sendContent ("<TR><TD>Hostname</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"");
+    webserver.sendContent (F("</CENTER><form action=\"/settings\" method=\"post\" autocomplete=\"off\"><TABLE style=\"width:400px; margin:auto\">"));
+    webserver.sendContent (F("<TR><TD>Hostname</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\""));
     webserver.sendContent (String(EEPROMSTRINGSIZE - 2));
     webserver.sendContent ("\" name=\"hostname\" value=\"");
     webserver.sendContent (WiFi.hostname() + "\">");
-    webserver.sendContent ("</TD></TR>");
-    webserver.sendContent ("<TR><TD>Wifi SSID</TD><TD><select style=\"width:200\" name=\"wifissid\">");
+    webserver.sendContent (F("</TD></TR>"));
+    webserver.sendContent (F("<TR><TD>Wifi SSID</TD><TD><select style=\"width:200\" name=\"wifissid\">"));
     webserver.sendContent (wifiselectoptions + "</select>");
-    webserver.sendContent ("</TD></TR>");
-    webserver.sendContent ("<TR><TD>wifi Key</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"64\" name=\"wifipsk\" value=\"");
+    webserver.sendContent (F("</TD></TR>"));
+    webserver.sendContent (F("<TR><TD>wifi Key</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"64\" name=\"wifipsk\" value=\""));
     webserver.sendContent (String(WiFi.psk()) + "\">");
-    webserver.sendContent ("</TD></TR>");
-    webserver.sendContent ("<TR><TD>MQTT Server</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttserver\" value=\"");
+    webserver.sendContent (F("</TD></TR>"));
+    webserver.sendContent (F("<TR><TD>MQTT Server</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttserver\" value=\""));
     webserver.sendContent (mqtt_server + "\">");
-    webserver.sendContent ("</TD></TR>");
-    webserver.sendContent ("<TR><TD>MQTT Port</TD><TD><input style=\"width:200\" type=\"number\" maxlength=\"5\" name=\"mqttport\" value=\"");
+    webserver.sendContent (F("</TD></TR>"));
+    webserver.sendContent (F("<TR><TD>MQTT Port</TD><TD><input style=\"width:200\" type=\"number\" maxlength=\"5\" name=\"mqttport\" value=\""));
     webserver.sendContent (String(mqtt_port) + "\"></TD></TR>");
-    webserver.sendContent ("<TR><TD>MQTT Ssl</TD><TD ALIGN=\"left\"><input type=\"checkbox\" name=\"mqttssl\" ");
+    webserver.sendContent (F("<TR><TD>MQTT Ssl</TD><TD ALIGN=\"left\"><input type=\"checkbox\" name=\"mqttssl\" "));
     webserver.sendContent (String(mqtt_ssl ? "checked" : "") + ("></TD></TR>"));
-    webserver.sendContent ("<TR><TD>MQTT Username</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttusername\" value=\"");
+    webserver.sendContent (F("<TR><TD>MQTT Username</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttusername\" value=\""));
     webserver.sendContent (mqtt_username + "\">");
-    webserver.sendContent ("</TD></TR>");
-    webserver.sendContent ("<TR><TD>MQTT Password</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttpassword\" value=\"");
+    webserver.sendContent (F("</TD></TR>"));
+    webserver.sendContent (F("<TR><TD>MQTT Password</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttpassword\" value=\""));
     webserver.sendContent (mqtt_password + "\">");
-    webserver.sendContent ("</TD></TR>");
-    webserver.sendContent ("<TR><TD>MQTT Topic Prefix</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"50\" name=\"mqtttopicprefix\" value=\"");
+    webserver.sendContent (F("</TD></TR>"));
+    webserver.sendContent (F("<TR><TD>MQTT Topic Prefix</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"50\" name=\"mqtttopicprefix\" value=\""));
     webserver.sendContent (mqtt_topicprefix + "\">");
-    webserver.sendContent ("</TD></TR>");
-    webserver.sendContent ("<TR><TD>ESP Password</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"webpassword\" value=\"");
+    webserver.sendContent (F("</TD></TR>"));
+    webserver.sendContent (F("<TR><TD>ESP Password</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"webpassword\" value=\""));
     webserver.sendContent (esp_password + "\">");
-    webserver.sendContent ("</TD></TR>");
+    webserver.sendContent (F("</TD></TR>"));
 #ifdef  ESPMQTT_WATERMETER
-    webserver.sendContent ("<TR><TD>Watermeter Liter</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"64\" name=\"watermeterliter\" value=\"");
+    webserver.sendContent (F("<TR><TD>Watermeter Liter</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"64\" name=\"watermeterliter\" value=\""));
     webserver.sendContent (getdatamap("water/liter"));
-    webserver.sendContent (+ "\"></TD></TR>");
+    webserver.sendContent (F("\"></TD></TR>"));
 #endif
 #ifdef  ESPMQTT_QSWIFIDIMMERD01
-    webserver.sendContent ("<TR><TD>Dimmer Offset</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"3\" name=\"qswifidimoffset\" value=\"");
+    webserver.sendContent (F("<TR><TD>Dimmer Offset</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"3\" name=\"qswifidimoffset\" value=\""));
     webserver.sendContent (getdatamap("dimoffset"));
-    webserver.sendContent ("\"></TD></TR>");
+    webserver.sendContent (F("\"></TD></TR>"));
 #endif
 #ifdef  ESPMQTT_QSWIFIDIMMERD02
-    webserver.sendContent ("<TR><TD>Dimmer Offset 0</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"3\" name=\"qswifidimoffset0\" value=\"");
+    webserver.sendContent (F("<TR><TD>Dimmer Offset 0</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"3\" name=\"qswifidimoffset0\" value=\""));
     webserver.sendContent (getdatamap("dimoffset/0"));
-    webserver.sendContent ("\"></TD></TR>");
-    webserver.sendContent ("<TR><TD>Dimmer Offset 1</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"3\" name=\"qswifidimoffset1\" value=\"");
+    webserver.sendContent (F("\"></TD></TR>"));
+    webserver.sendContent (F("<TR><TD>Dimmer Offset 1</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"3\" name=\"qswifidimoffset1\" value=\""));
     webserver.sendContent (getdatamap("dimoffset/1"));
-    webserver.sendContent ("\"></TD></TR>");
+    webserver.sendContent (F("\"></TD></TR>"));
 #endif
-    webserver.sendContent ("</TABLE><BR><CENTER><input type=\"submit\" value=\"Save Settings\"></form><BR><BR><form action=\"/settings\" method=\"post\" autocomplete=\"off\"><input type=\"hidden\" name=\"rebootdevice\" value=\"1\"><input type=\"submit\" value=\"Reboot Device\"></form><BR><BR><A HREF=\"/\">Return to main page</A></CENTER></div></BODY></HTML>");
+    webserver.sendContent (F("</TABLE><BR><CENTER><input type=\"submit\" value=\"Save Settings\"></form><BR><BR><form action=\"/settings\" method=\"post\" autocomplete=\"off\"><input type=\"hidden\" name=\"rebootdevice\" value=\"1\"><input type=\"submit\" value=\"Reboot Device\"></form><BR><BR><A HREF=\"/\">Return to main page</A></CENTER></div></BODY></HTML>"));
     webserver.sendContent (""); // end chunked data
   }
 }
@@ -3703,10 +3773,10 @@ void handleJsonData() {
   String json = "{";
   webserver.setContentLength(CONTENT_LENGTH_UNKNOWN);
   webserver.send(200, "text/html", "{");
-  for (int i = 0; i < dataMap->size(); i++)
+  for (int i = 0; i < getDataMapLength(); i++)
   {
-    webserver.sendContent ("\"" + String(dataMap->getKey(i)) + "\":\"" + dataMap->getData(i).payload);
-    if (i < dataMap->size() - 1) webserver.sendContent("\",");
+    webserver.sendContent ("\"" + String(getDataMapKey(i)) + "\":\"" + getDataMapValue(i));
+    if (i < getDataMapLength() - 1) webserver.sendContent("\",");
   }
   webserver.sendContent("\"}");
   webserver.sendContent("");
@@ -3843,29 +3913,16 @@ void growattModbuscallback (const char *topic, String payload)
 #endif
 
 #ifdef  ESPMQTT_SMARTMETER
-void smartmetercallback (const char *topic, String payload)
+void smartmetercallback ()
 {
-  static uint32 nextupdatetime = 0;
-  static bool sendupdate = 0;
-
-  if (strcmp(topic, "status") == 0)
+  if (smartmeter_DataMap.status == ready) DataMap.status = online; else DataMap.status = commerror;
+  for (uint8_t bitpointer = 0;  bitpointer < 8; bitpointer++)
   {
-    if (payload == "receiving") digitalWrite(NODEMCULEDPIN, 1);
-    else digitalWrite(NODEMCULEDPIN, 0);
-  }
-
-  if ((nextupdatetime < uptime) && (strcmp(topic, "status") == 0) && (payload == "receiving")) // wait for start of new packet from smartmeter
-  {
-    sendupdate = 1;
-    nextupdatetime = uptime + 8; // wait 8 seconds before accepting new values from smartmeter (some smartmeters keep sending out data)
-  }
-
-  if (sendupdate) putdatamap(topic, payload);
-
-  if ((strcmp(topic, "status") == 0) && (payload == "ready") && sendupdate) // stop processing when a complete packet was pushed to datamap
-  {
-    sendupdate = 0;
-  }
+     if (*(uint8_t*)&smartmeter_DataMap.electricity.changed | 1 << bitpointer)
+     {
+       setDataMapSendStatus(DATAMAP_BASELENGTH + bitpointer, true);
+     }
+   }
 }
 #endif
 
@@ -4152,7 +4209,7 @@ void setup() {
 
   eeprom_load_variables();
 
-  update_systeminfo(true);
+//  update_systeminfo(true);
 
 #ifdef  ESPMQTT_DDNS
   EasyDDNS.service("duckdns");
@@ -4212,7 +4269,7 @@ void setup() {
   ArduinoOTA.setPassword(esp_password.c_str());
   ArduinoOTA.begin();
 
-  update_systeminfo(true);
+//  update_systeminfo(true);
 
   // Initialize display
 
@@ -4314,6 +4371,7 @@ void setup() {
 
 #ifdef  ESPMQTT_SMARTMETER
   smartmeter_init(smartmetercallback);
+  DataMap.length += 8;
 #endif
 
 #ifdef  ESPMQTT_OPENTHERM
@@ -4422,6 +4480,8 @@ void setup() {
   digitalWrite(ESPMQTT_BBQTEMP_CS1, HIGH);
 #endif
 
+  strcpy(DataMap.firmware_upgradekey, getRandomString(10).c_str()); // Set firmware_upgradekey to a random string
+
   connectToWifi(); // After everything is set, connect to wifi.
 }
 
@@ -4440,7 +4500,7 @@ static void handleDataExternalIpServer(void*, AsyncClient * client, void *data, 
     }
 
   }
-  putdatamap("wifi/externalip", datastring, true, true, false);
+  strcpy (DataMap.externalip, datastring.c_str());
   client->close();
 }
 
