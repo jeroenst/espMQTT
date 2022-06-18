@@ -702,11 +702,6 @@ SimpleMap<const char*, dataMapStruct> *dataMap = new SimpleMap<const char*, data
   return strcmp(a,b);      // a and b are equal
 });
 
-SimpleMap<int, char *> *eepromMap = new SimpleMap<int, char *>([](int &a, int &b) -> int {
-  if (a == b) return 0;      // a and b are equal
-  else if (a > b) return 1;  // a is bigger than b
-  else return -1;            // a is smaller than b
-});
 
 bool updatemqtt = 0;
 
@@ -3104,145 +3099,6 @@ void publishdatamap(int32_t packetId, bool publishall, bool init, bool publishre
   yield();
 }
 
-
-uint8_t oldeeprom_read(String * data, byte eepromindex)
-{
-  if (Debug.isActive(Debug.DEBUG)) Debug.printf(cF("%s"), String("read_oldeeprom(" + String(eepromindex) + ");\n").c_str());
-  String eepromstring = "";
-  char calcchecksum = 20;
-  char readchecksum = 0;
-  for (int i = 0; i < EEPROMSTRINGSIZE - 1; i++)
-  {
-    char eepromval = EEPROM.read(i + (EEPROMSTRINGSIZE * eepromindex));
-    calcchecksum += eepromval;
-    readchecksum = EEPROM.read(i + (EEPROMSTRINGSIZE * eepromindex) + 1);
-    if (eepromval == 0) break;
-    eepromstring += char(eepromval);
-  }
-  if (calcchecksum == readchecksum)
-  {
-    *data = eepromstring;
-    return 1;
-  }
-  else return 0;
-}
-
-byte oldeeprom_read()
-{
-  byte eepromindex = 0;
-  String data = "";
-  while (oldeeprom_read(&data, eepromindex))
-  {
-    eeprom_write(data, eepromindex);
-  }
-  return eepromindex;
-}
-
-void eeprom_commit()
-{
-  if (Debug.isActive(Debug.DEBUG)) Debug.printf(cF("commit_eeprom();\n"));
-  int eeprompointer = 0;
-  for (int i = 0; i < eepromMap->size(); i++)
-  {
-    uint8_t checksum = 20;
-    String eepromdata = eepromMap->get(i);
-    if (Debug.isActive(Debug.DEBUG)) Debug.printf(cF("EEPROM.write(%d,%d) (length)\n"), eeprompointer, eepromdata.length() + 1);
-    EEPROM.write(eeprompointer++, eepromdata.length() + 1);
-    for (unsigned int pos = 0; pos < eepromdata.length(); pos++)
-    {
-      char chr = eepromdata.c_str()[pos];
-      if (Debug.isActive(Debug.DEBUG)) Debug.printf(cF("EEPROM.write(%d,%c) (data)\n"), eeprompointer, chr);
-      EEPROM.write(eeprompointer++, chr);
-      checksum += chr;
-    }
-    if (Debug.isActive(Debug.DEBUG)) Debug.printf(cF("EEPROM.write(%d,%d) (checksum)\n"), eeprompointer, checksum);
-    EEPROM.write(eeprompointer++, checksum);
-  }
-  EEPROM.write(eeprompointer++, 0);
-  EEPROM.commit();
-}
-
-void eeprom_write(String value, int eepromindex)
-{
-  if (Debug.isActive(Debug.DEBUG)) Debug.printf(cF("eeprom_write %d,%s\n"), eepromindex, value.c_str());
-  for (int i = 0; i < eepromindex; i++)
-  {
-    char *eepromchararray;
-    if (!eepromMap->has(i))
-    {
-      eepromchararray = eepromMap->get(i);
-      free (eepromchararray);
-    }
-  }
-  int n = value.length() + 1;
-
-  // declaring character array
-  static char *char_array = NULL;
-  char_array = (char*) malloc(n * sizeof(char));
-
-  // copying the contents of the
-  // string to char array
-  strcpy(char_array, value.c_str());
-
-
-  eepromMap->put(eepromindex, char_array);
-}
-
-uint8_t eeprom_read()
-{
-  if (Debug.isActive(Debug.DEBUG)) Debug.printf(cF("eeprom_read();\n"));
-  int eeprompointer = 0;
-  int index = 0;
-  while (eeprompointer < 512)
-  {
-    int datasize = EEPROM.read(eeprompointer++);
-    if (Debug.isActive(Debug.INFO)) Debug.printf(cF("datasize=%d\n"), datasize);
-    if (datasize == 0) return (0);
-    byte checksum = 20;
-    String data = "";
-    for (int pos = 0; pos < datasize - 1; pos++)
-    {
-      data += String(char(EEPROM.read(eeprompointer)));
-      checksum += char(EEPROM.read(eeprompointer++));
-    }
-    byte eepromchecksum = EEPROM.read(eeprompointer++);
-    if (Debug.isActive(Debug.DEBUG)) Debug.printf(cF("Read from eeprom %d=%s (%d=%d)\n"), eeprompointer, data.c_str(), checksum, eepromchecksum);
-    if (eepromchecksum != checksum)
-    {
-      return 0;
-      if(Debug.isActive(Debug.ERROR)) Debug.printf(cF("Error reading eeprom index %d (wrong checksum)!"), index);
-    }
-    eeprom_write(data, index++);
-  }
-  return 1;
-}
-
-void eeprom_init ()
-{
-  if (oldeeprom_read())
-  {
-    eeprom_commit();
-  }
-  eeprom_read();
-}
-
-void eeprom_erase()
-{
-  if(Debug.isActive(Debug.WARNING)) Debug.printf(cF("eeprom_erase();\n"));
-  EEPROM.write(512, 0);
-  EEPROM.commit();
-  EEPROM.end();
-}
-
-uint8_t eeprom_read(String * data, byte eepromindex)
-{
-  if(Debug.isActive(Debug.VERBOSE)) Debug.printf(cF("eeprom_read(%d)\n"), eepromindex);
-  if (eepromindex >= eepromMap->size()) return 0;
-  *data = eepromMap->getData(eepromindex);
-  if (Debug.isActive(Debug.DEBUG)) Debug.printf(cF("eeprom_read(%d)=%s\n"), eepromindex, data->c_str());
-  return 1;
-}
-
 void systemTimerCallback()
 {
   static uint8_t ms = 0;
@@ -3430,33 +3286,6 @@ bool MHZ19_read(int *ppm, int *temp)
 
 #endif
 
-void eeprom_save_variables()
-{
-  eeprom_write(mqtt_server, 0);
-  eeprom_write(mqtt_username, 1);
-  eeprom_write(mqtt_password, 2);
-  eeprom_write(esp_password, 3);
-  eeprom_write(esp_hostname, 4);
-  eeprom_write(String(mqtt_port), 5);
-  eeprom_write(String(mqtt_ssl), 6);
-  eeprom_write(mqtt_topicprefix, 7);
-#ifdef  ESPMQTT_QSWIFIDIMMERD01
-  eeprom_write(String(qswifidimmer_getdimoffset()), 8);
-  putdatamap(cF("dimoffset"), String(qswifidimmer_getdimoffset()));
-  eeprom_write("", 9);
-#elif defined ESPMQTT_QSWIFIDIMMERD02
-  eeprom_write(String(qswifidimmer_getdimoffset(0)), 8);
-  putdatamap(cF("dimoffset/0"), String(qswifidimmer_getdimoffset(0)));
-  eeprom_write(String(qswifidimmer_getdimoffset(1)), 9);
-  putdatamap(cF("dimoffset/1"), String(qswifidimmer_getdimoffset(1)));
-#else
-  eeprom_write("", 8);
-  eeprom_write("", 9);
-#endif
-  eeprom_write(wifissid, 10);
-  eeprom_write(wifipsk, 11);
-  eeprom_commit();
-}
 
 
 void handleWWWSettings()
@@ -3927,11 +3756,6 @@ void processCmdRemoteDebug()
 
   if (lastCmd == sF("showeeprommap"))
   {
-    for (int i = 0; i < eepromMap->size(); i++)
-    {
-      String eepromdata = eepromMap->get(i);
-      if (Debug.isActive(Debug.DEBUG)) Debug.printf(cF("EEPROM %d=%s\n"), i, eepromdata.c_str());
-    }
   }
 
 #ifdef ESPMQTT_OPENTHERM
@@ -3941,6 +3765,98 @@ void processCmdRemoteDebug()
     opentherm_reset();
   }
 #endif
+}
+
+
+
+int16_t eeprom_read(String * data, uint8_t eepromindex)
+{
+  DEBUG_D("eeprom_read index=%d;\n", eepromindex);
+  uint16_t eeprompointer = 0;
+  uint16_t eepromdatastartpointer = 0;
+  uint8_t index = 0;
+  *data = "";
+  while (eeprompointer < 512)
+  {
+    eepromdatastartpointer = eeprompointer;
+    uint8_t datasize = EEPROM.read(eeprompointer++);
+    DEBUG("datasize=%d\n", datasize);
+    if (datasize == 0) return (-1);
+    byte checksum = 20;
+    for (int pos = 0; pos < datasize - 1; pos++)
+    {
+      *data += String(char(EEPROM.read(eeprompointer)));
+      checksum += char(EEPROM.read(eeprompointer++));
+    }
+    byte eepromchecksum = EEPROM.read(eeprompointer++);
+    if (index == eepromindex)
+    {
+      if (eepromchecksum != checksum)
+      {
+        DEBUG_E("Error reading eeprom index %d (wrong checksum)!", index);
+        return -1;
+      }
+      DEBUG_D("Read from eeprom %d=%s (checksum %d=%d)\n", eeprompointer, data->c_str(), checksum, eepromchecksum);
+      return eepromdatastartpointer;
+    }
+    *data = "";
+    index++;
+  }
+  return -1;
+}
+
+void eeprom_erase()
+{
+  for (int16_t eeprompointer = 0; eeprompointer < 512; eeprompointer++)
+  {
+    EEPROM.write (eeprompointer, 0);
+  }
+}
+
+uint16_t eeprom_write(String value, uint16_t eeprompos)
+{
+  DEBUG_D("eeprom_write %d,%s\n", eeprompos, value.c_str());
+  uint16_t eeprompointer = eeprompos;
+  uint8_t checksum = 20;
+  EEPROM.write(eeprompointer++, value.length() + 1);
+  for (uint16_t valueindex = 0; valueindex < value.length(); valueindex++)
+  {
+    char valuechar = value[valueindex];
+    EEPROM.write(eeprompointer++, valuechar);
+    checksum += valuechar;
+  }
+  EEPROM.write(eeprompointer++, checksum);
+  EEPROM.write(eeprompointer + 1, 0);
+  return eeprompointer;
+}
+
+void eeprom_save_variables()
+{
+  uint16_t pos = 0;
+  pos = eeprom_write(mqtt_server, pos);
+  pos = eeprom_write(mqtt_username, pos);
+  pos = eeprom_write(mqtt_password, pos);
+  pos = eeprom_write(esp_password, pos);
+  pos = eeprom_write(esp_hostname, pos);
+  pos = eeprom_write(String(mqtt_port), pos);
+  pos = eeprom_write(String(mqtt_ssl), pos);
+  pos = eeprom_write(mqtt_topicprefix, pos);
+#ifdef  ESPMQTT_QSWIFIDIMMERD01
+  pos = eeprom_write(String(qswifidimmer_getdimoffset()), pos);
+  putdatamap("dimoffset", String(qswifidimmer_getdimoffset()));
+  pos = eeprom_write("", pos);
+#elif defined ESPMQTT_QSWIFIDIMMERD02
+  pos = eeprom_write(String(qswifidimmer_getdimoffset(0)), pos);
+  putdatamap("dimoffset/0", String(qswifidimmer_getdimoffset(0)));
+  pos = eeprom_write(String(qswifidimmer_getdimoffset(1)), pos);
+  putdatamap("dimoffset/1", String(qswifidimmer_getdimoffset(1)));
+#else
+  pos = eeprom_write("", pos);
+  pos = eeprom_write("", pos);
+#endif
+  pos = eeprom_write(wifissid, pos);
+  pos = eeprom_write(wifipsk, pos);
+  EEPROM.commit();
 }
 
 void eeprom_load_variables()
@@ -4013,6 +3929,36 @@ void eeprom_load_variables()
     mqtt_topicprefix = "home/" + esp_hostname + "/";
   }
   if (Debug.isActive(Debug.DEBUG)) Debug.printf(cF("mqtt topicprefix=%s\n"), mqtt_topicprefix.c_str());
+
+#ifdef ESPMQTT_QSWIFIDIMMERD01
+  String dimoffset = "0";
+  if (!eeprom_read(&dimoffset, 8))
+  {
+    DEBUG_E("Error reading dimmer offset from internal eeprom\n");
+    dimoffset = "20";
+  }
+  qswifidimmer_setdimoffset(dimoffset.toInt());
+  putdatamap("dimoffset", String(qswifidimmer_getdimoffset()));
+#endif
+
+#ifdef ESPMQTT_QSWIFIDIMMERD02
+  String dimoffset = "0";
+  if (!eeprom_read(&dimoffset, 8))
+  {
+    DEBUG_E("Error reading dimmer offset 0 from internal eeprom\n");
+    dimoffset = "20";
+  }
+  qswifidimmer_setdimoffset(dimoffset.toInt(), 0);
+  dimoffset = "0";
+  if (!eeprom_read(&dimoffset, 9))
+  {
+    DEBUG_E("Error reading dimmer offset 1 from internal eeprom\n");
+    dimoffset = "20";
+  }
+  qswifidimmer_setdimoffset(dimoffset.toInt(), 1);
+  putdatamap("dimoffset/0", String(qswifidimmer_getdimoffset(0)));
+  putdatamap("dimoffset/1", String(qswifidimmer_getdimoffset(1)));
+#endif
 
   if (!eeprom_read(&wifissid, 10))
   {
@@ -4275,34 +4221,6 @@ void setup() {
 #ifdef QSWIFIDIMMERCHANNELS
   qswifidimmer_init(QSWIFIDIMMERCHANNELS, qswifidimmer_callback);
   qswifidimmer_setswitchcallback(qswifidimmer_switchcallback);
-#ifdef ESPMQTT_QSWIFIDIMMERD01
-  String dimoffset = "0";
-  if (!eeprom_read(&dimoffset, 8))
-  {
-    if(Debug.isActive(Debug.ERROR)) Debug.printf(cF("Error reading dimmer offset from internal eeprom\n"));
-    dimoffset = "20";
-  }
-  qswifidimmer_setdimoffset(dimoffset.toInt());
-  putdatamap(cF("dimoffset"), String(qswifidimmer_getdimoffset()));
-#endif
-#ifdef ESPMQTT_QSWIFIDIMMERD02
-  String dimoffset = "0";
-  if (!eeprom_read(&dimoffset, 8))
-  {
-    if(Debug.isActive(Debug.ERROR)) Debug.printf(cF("Error reading dimmer offset 0 from internal eeprom\n"));
-    dimoffset = "20";
-  }
-  qswifidimmer_setdimoffset(dimoffset.toInt(), 0);
-  dimoffset = "0";
-  if (!eeprom_read(&dimoffset, 9))
-  {
-    if(Debug.isActive(Debug.ERROR)) Debug.printf(cF("Error reading dimmer offset 1 from internal eeprom\n"));
-    dimoffset = "20";
-  }
-  qswifidimmer_setdimoffset(dimoffset.toInt(), 1);
-  putdatamap(cF("dimoffset/0"), String(qswifidimmer_getdimoffset(0)));
-  putdatamap(cF("dimoffset/1"), String(qswifidimmer_getdimoffset(1)));
-#endif
 #endif
 
 #ifdef QSWIFISWITCHCHANNELS
