@@ -36,7 +36,7 @@
 // #define ESPMQTT_BATHROOM
 // #define ESPMQTT_BEDROOM2
 // #define ESPMQTT_OPENTHERM
-// #define ESPMQTT_SMARTMETER
+#define ESPMQTT_SMARTMETER
 // #define ESPMQTT_GROWATT
 // #define ESPMQTT_GROWATT_MODBUS
 // #define ESPMQTT_SDM120
@@ -44,7 +44,7 @@
 // #define ESPMQTT_WATERMETER
 // #define ESPMQTT_DDNS
 // #define ESPMQTT_GENERIC8266
-#define ESPMQTT_GENERIC8266_NEO
+// #define ESPMQTT_GENERIC8266_NEO
 // #define ESPMQTT_MAINPOWERMETER
 // #define ESPMQTT_OBD2
 // #define ESPMQTT_NOISE
@@ -610,6 +610,7 @@ static bool sonoff_oldbuttons[1] = {1};
 #define ESPLED D4
 #define NODEMCULEDPIN D0
 #include "smartmeter.h"
+#undef SERIALLOG
 #endif
 
 #ifdef  ESPMQTT_DDNS
@@ -621,7 +622,6 @@ static bool sonoff_oldbuttons[1] = {1};
 #endif
 
 
-#define EEPROMSTRINGSIZE 40 // 2 positions are used, one for 0 character and one for checksum
 
 // ################################################################################################################# END OF DEFINES ####################################################################################################################
 
@@ -3539,9 +3539,7 @@ void handleWWWSettings()
     webserver.sendContent (F("<CENTER><H1>"));
     webserver.sendContent (WiFi.hostname() + "</H1>");
     webserver.sendContent (F("</CENTER><form action=\"/settings\" method=\"post\" autocomplete=\"off\"><TABLE style=\"width:400px; margin:auto\">"));
-    webserver.sendContent (F("<TR><TD>Hostname</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\""));
-    webserver.sendContent (String(EEPROMSTRINGSIZE - 2));
-    webserver.sendContent ("\" name=\"hostname\" value=\"");
+    webserver.sendContent (F("<TR><TD>Hostname</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"40\" name=\"hostname\" value=\""));
     webserver.sendContent (WiFi.hostname() + "\">");
     webserver.sendContent (F("</TD></TR>"));
     webserver.sendContent (F("<TR><TD>Wifi SSID</TD><TD><select style=\"width:200\" name=\"wifissid\">"));
@@ -3912,13 +3910,13 @@ void processCmdRemoteDebug()
 
 
 
-int16_t eeprom_read(String * data, uint8_t eepromindex)
+int16_t eeprom_read(String * datastring, uint8_t eepromindex)
 {
+  char data[100] = "";
   DEBUG_D("eeprom_read index=%d;\n", eepromindex);
   uint16_t eeprompointer = 0;
   uint16_t eepromdatastartpointer = 0;
   uint8_t index = 0;
-  *data = "";
   while (eeprompointer < 512)
   {
     eepromdatastartpointer = eeprompointer;
@@ -3928,7 +3926,11 @@ int16_t eeprom_read(String * data, uint8_t eepromindex)
     byte checksum = 20;
     for (int pos = 0; pos < datasize - 1; pos++)
     {
-      *data += String(char(EEPROM.read(eeprompointer)));
+      if (pos < 100)
+      {
+        data[pos] = char(EEPROM.read(eeprompointer));
+        data[pos+1] = 0;
+      }
       checksum += char(EEPROM.read(eeprompointer++));
     }
     byte eepromchecksum = EEPROM.read(eeprompointer++);
@@ -3939,10 +3941,10 @@ int16_t eeprom_read(String * data, uint8_t eepromindex)
         DEBUG_E("Error reading eeprom index %d (wrong checksum)!", index);
         return -1;
       }
-      DEBUG_D("Read from eeprom %d=%s (checksum %d=%d)\n", eeprompointer, data->c_str(), checksum, eepromchecksum);
+      DEBUG_D("Read from eeprom %d=%s (checksum %d=%d)\n", eeprompointer, data, checksum, eepromchecksum);
+      *datastring = String(data);
       return eepromdatastartpointer;
     }
-    *data = "";
     index++;
   }
   return -1;
