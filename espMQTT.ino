@@ -928,22 +928,36 @@ void PublishRegular(uint8_t id, bool value)
 
 bool getDataMapSendStatus(uint8_t id)
 {
-  if (id < 64) return (DataMap.sendIds[0] && (2^id));
-  else return (DataMap.sendIds[1] && (2^(id-64)));
+  if (id < 64) return (DataMap.sendIds[0] & (1<<id));
+  else return(DataMap.sendIds[1] & (1<<(id-64)));
+}
+
+
+
+String uint64_to_binstr (uint64_t n)
+{
+  String output = ""; 
+  for(size_t i=0; i<64; i++)
+  {
+    bool one = n & (1u << i);
+    output += (one ? "1" : "0");
+  }
+  return output;
 }
 
 void setDataMapSendStatus(uint8_t id, bool sendstatus = true)
-{
+{  
   if (id < 64)
   {
-    if (sendstatus) DataMap.sendIds[0] |= 1<<id;
+    if (sendstatus) DataMap.sendIds[0] |= (1<<id);
     else DataMap.sendIds[0] &= DataMap.sendIds[0] - (1<<id);
   }
   else
   {
-    if (sendstatus) DataMap.sendIds[1] |= 1<<(id-64);  
+    if (sendstatus) DataMap.sendIds[1] |= (1<<(id-64));  
     else DataMap.sendIds[1] &= DataMap.sendIds[1] - (1<<(id-64));    
   }
+  //DEBUG("id=%d, sendstatus=%d sendids[0]=%s sendids[1]=%s\n", id, sendstatus, uint64_to_binstr(DataMap.sendIds[0]).c_str(), uint64_to_binstr(DataMap.sendIds[1]).c_str());
 }
 
 int16_t getDataMap(char *key, char *value, uint8_t id = -1)
@@ -1000,14 +1014,13 @@ int16_t getDataMap(char *key, char *value, uint8_t id = -1)
   if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/watt_providing", String(smartmeter_DataMap.electricity.watt_providing).c_str())) return --idCounter;
   
   if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/kwh", String((float)smartmeter_DataMap.electricity.wh/1000,3).c_str()))return --idCounter;
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/kwh_used1", String((float)smartmeter_DataMap.electricity.wh_used1/1000,3).c_str()))
-  {
-    DEBUG ("whused1=%d\n", smartmeter_DataMap.electricity.wh_used1);
-    return --idCounter;
-  }
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/kwh_used1", String((float)smartmeter_DataMap.electricity.wh_used1/1000,3).c_str())) return --idCounter;
   if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/kwh_used2", String((float)smartmeter_DataMap.electricity.wh_used2/1000,3).c_str())) return --idCounter;
   if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/kwh_provided1", String((float)smartmeter_DataMap.electricity.wh_provided1/1000,3).c_str())) return --idCounter;
   if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/kwh_provided2", String((float)smartmeter_DataMap.electricity.wh_provided2/1000,3).c_str())) return --idCounter;
+
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "gas/m3", String((float)smartmeter_DataMap.gas.liter/1000,3).c_str())) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "gas/m3h", String((float)smartmeter_DataMap.gas.lh/1000,3).c_str())) return --idCounter;
 #endif  
   return -1;
   yield();
@@ -1748,6 +1761,7 @@ void initSerial()
   Serial.setDebugOutput(false);
   Serial.begin(9600, SERIAL_8E1);
 #elif defined (ESPMQTT_SMARTMETER) || defined (QSWIFIDIMMERCHANNELS) || defined (ESPMQTT_BHT002)
+  Serial.setDebugOutput(false);
   // do nothing, smartmeter initializes serial in init function.
 #elif defined (ESPMQTT_NOSERIAL_DEBUG)
   // do not initialize serial
