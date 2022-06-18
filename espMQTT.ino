@@ -610,9 +610,18 @@ Adafruit_NeoPixel neopixelleds = Adafruit_NeoPixel(2, NEOPIXELPIN, NEO_RGB + NEO
 #define ESPLED D4
 #define NODEMCULEDPIN D0
 #include "smartmeter.h"
+#undef SERIALLOG
 #endif
 
-#define EEPROMSTRINGSIZE 40 // 2 positions are used, one for 0 character and one for checksum
+#ifdef  ESPMQTT_DDNS
+#include<EasyDDNS.h>
+#define FIRMWARE_TARGET "DDNS"
+#define NODEMCULEDPIN D0
+#define FLASHBUTTON D3
+#define ESPLED D4
+#endif
+
+
 
 // ################################################################################################################# END OF DEFINES ####################################################################################################################
 
@@ -3389,25 +3398,30 @@ void handleWWWSettings()
 
 
     webserver.setContentLength(CONTENT_LENGTH_UNKNOWN);
-    webserver.send (200, "text/html", sF("<HTML><HEAD><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"></HEAD><BODY><CENTER><div align=\"left\" style=\"width:400px; margin:auto\"><CENTER><H1>"));
-    webserver.sendContent (WiFi.hostname() + sF("</H1>"));
-    webserver.sendContent (sF("</CENTER><form action=\"/settings\" method=\"post\" autocomplete=\"off\"><TABLE style=\"width:400px; margin:auto\"><TR><TD>Hostname</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\""));
-    webserver.sendContent (String(EEPROMSTRINGSIZE - 2));
-    webserver.sendContent (sF("\" name=\"hostname\" value=\""));
-    webserver.sendContent (WiFi.hostname());
-    webserver.sendContent (sF("\"></TD></TR><TR><TD>Wifi SSID</TD><TD><select style=\"width:200\" name=\"wifissid\">"));
-    webserver.sendContent (wifiselectoptions);
-    webserver.sendContent (sF("</select></TD></TR><TR><TD>wifi Key</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"64\" name=\"wifipsk\" value=\""));
-    webserver.sendContent (String(WiFi.psk()));
-    webserver.sendContent (sF("\"></TD></TR><TR><TD>MQTT Server</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttserver\" value=\""));
-    webserver.sendContent (mqtt_server);
-    webserver.sendContent (sF("\"></TD></TR><TR><TD>MQTT Port</TD><TD><input style=\"width:200\" type=\"number\" maxlength=\"5\" name=\"mqttport\" value=\""));
-    webserver.sendContent (String(mqtt_port));
-    webserver.sendContent (sF("\"></TD></TR><TR><TD>MQTT Ssl</TD><TD ALIGN=\"left\"><input type=\"checkbox\" name=\"mqttssl\" "));
-    webserver.sendContent (String(mqtt_ssl ? "checked" : "") + sF("></TD></TR>"));
-    webserver.sendContent (sF("<TR><TD>MQTT Username</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttusername\" value=\""));
-    webserver.sendContent (mqtt_username);
-    webserver.sendContent (sF("\"></TD></TR><TR><TD>MQTT Password</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttpassword\" value=\""));
+    webserver.send (200, "text/html", F("<HTML><HEAD><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"></HEAD><BODY><CENTER><div align=\"left\" style=\"width:400px; margin:auto\">"));
+    webserver.sendContent (F("<CENTER><H1>"));
+    webserver.sendContent (WiFi.hostname() + "</H1>");
+    webserver.sendContent (F("</CENTER><form action=\"/settings\" method=\"post\" autocomplete=\"off\"><TABLE style=\"width:400px; margin:auto\">"));
+    webserver.sendContent (F("<TR><TD>Hostname</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"40\" name=\"hostname\" value=\""));
+    webserver.sendContent (WiFi.hostname() + "\">");
+    webserver.sendContent (F("</TD></TR>"));
+    webserver.sendContent (F("<TR><TD>Wifi SSID</TD><TD><select style=\"width:200\" name=\"wifissid\">"));
+    webserver.sendContent (wifiselectoptions + "</select>");
+    webserver.sendContent (F("</TD></TR>"));
+    webserver.sendContent (F("<TR><TD>wifi Key</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"64\" name=\"wifipsk\" value=\""));
+    webserver.sendContent (String(WiFi.psk()) + "\">");
+    webserver.sendContent (F("</TD></TR>"));
+    webserver.sendContent (F("<TR><TD>MQTT Server</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttserver\" value=\""));
+    webserver.sendContent (mqtt_server + "\">");
+    webserver.sendContent (F("</TD></TR>"));
+    webserver.sendContent (F("<TR><TD>MQTT Port</TD><TD><input style=\"width:200\" type=\"number\" maxlength=\"5\" name=\"mqttport\" value=\""));
+    webserver.sendContent (String(mqtt_port) + "\"></TD></TR>");
+    webserver.sendContent (F("<TR><TD>MQTT Ssl</TD><TD ALIGN=\"left\"><input type=\"checkbox\" name=\"mqttssl\" "));
+    webserver.sendContent (String(mqtt_ssl ? "checked" : "") + ("></TD></TR>"));
+    webserver.sendContent (F("<TR><TD>MQTT Username</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttusername\" value=\""));
+    webserver.sendContent (mqtt_username + "\">");
+    webserver.sendContent (F("</TD></TR>"));
+    webserver.sendContent (F("<TR><TD>MQTT Password</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttpassword\" value=\""));
     webserver.sendContent (mqtt_password + "\">");
     webserver.sendContent (sF("</TD></TR><TR><TD>MQTT Topic Prefix</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"50\" name=\"mqtttopicprefix\" value=\""));
     webserver.sendContent (mqtt_topicprefix);
@@ -3769,13 +3783,13 @@ void processCmdRemoteDebug()
 
 
 
-int16_t eeprom_read(String * data, uint8_t eepromindex)
+int16_t eeprom_read(String * datastring, uint8_t eepromindex)
 {
+  char data[100] = "";
   DEBUG_D("eeprom_read index=%d;\n", eepromindex);
   uint16_t eeprompointer = 0;
   uint16_t eepromdatastartpointer = 0;
   uint8_t index = 0;
-  *data = "";
   while (eeprompointer < 512)
   {
     eepromdatastartpointer = eeprompointer;
@@ -3785,7 +3799,11 @@ int16_t eeprom_read(String * data, uint8_t eepromindex)
     byte checksum = 20;
     for (int pos = 0; pos < datasize - 1; pos++)
     {
-      *data += String(char(EEPROM.read(eeprompointer)));
+      if (pos < 100)
+      {
+        data[pos] = char(EEPROM.read(eeprompointer));
+        data[pos+1] = 0;
+      }
       checksum += char(EEPROM.read(eeprompointer++));
     }
     byte eepromchecksum = EEPROM.read(eeprompointer++);
@@ -3796,10 +3814,10 @@ int16_t eeprom_read(String * data, uint8_t eepromindex)
         DEBUG_E("Error reading eeprom index %d (wrong checksum)!", index);
         return -1;
       }
-      DEBUG_D("Read from eeprom %d=%s (checksum %d=%d)\n", eeprompointer, data->c_str(), checksum, eepromchecksum);
+      DEBUG_D("Read from eeprom %d=%s (checksum %d=%d)\n", eeprompointer, data, checksum, eepromchecksum);
+      *datastring = String(data);
       return eepromdatastartpointer;
     }
-    *data = "";
     index++;
   }
   return -1;
