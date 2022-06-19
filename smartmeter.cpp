@@ -17,15 +17,16 @@ void smartmeter_init(void(*callback)(void))
 
 int8_t smartmeter_handle()
 {
-  float value = 0;
   static int32_t wh = 0;
   int8_t returnvalue = 0;
   int day, month, year, hour, minute, second;
   char summerwinter;
-  uint32_t intvalue = 0;
+  uint32_t uintvalue = 0; 
+  uint32_t uintdecimals = 0;
   static char buffer[100];
   static uint8_t bufpos = 0;
   static int16_t watt = 0;
+
 
   while (Serial.available()) {
     char input = Serial.read() & 127;
@@ -68,102 +69,103 @@ int8_t smartmeter_handle()
 
 
       // 1-0:1.8.1 = Electricity low tarif used
-      if (sscanf(buffer, "1-0:1.8.1(%f" , &value) == 1)
+      if (sscanf(buffer, "1-0:1.8.1(%u.%u" , &uintvalue, &uintdecimals) == 2)
       {
-        wh += value*1000;
-        if (smartmeter_DataMap.electricity.wh_used1 != value * 1000)
+        uintvalue = (uintvalue * 1000) + uintdecimals;
+        wh += uintvalue;
+        if (smartmeter_DataMap.electricity.wh_used1 != uintvalue)
         {
-          smartmeter_DataMap.electricity.wh_used1 = value * 1000;
+          smartmeter_DataMap.electricity.wh_used1 = uintvalue;
           smartmeter_DataMap.electricity.changed.wh_used1 = 1;
         }
         returnvalue++;
       }
 
       // 1-0:1.8.2 = Electricity high tarif used (DSMR v4.0)
-      if (sscanf(buffer, "1-0:1.8.2(%f" , &value) == 1)
+      if (sscanf(buffer, "1-0:1.8.2(%u.%u" , &uintvalue, &uintdecimals) == 2)
       {
-        intvalue = (uint32_t)((float)value * 1000);
-        DEBUG ("Received wh_used2=%d\n", intvalue);
-        wh += value*1000;
-        if (smartmeter_DataMap.electricity.wh_used2 != intvalue)
+        uintvalue = (uintvalue * 1000) + uintdecimals;
+        DEBUG ("Received wh_used2=%d\n", uintvalue);
+        wh += uintvalue;
+        if (smartmeter_DataMap.electricity.wh_used2 != uintvalue)
         {
-          smartmeter_DataMap.electricity.wh_used2 = intvalue;
+          smartmeter_DataMap.electricity.wh_used2 = uintvalue;
           smartmeter_DataMap.electricity.changed.wh_used2 = 1;
         }
-        DEBUG ("Saved wh_used2=%d\n", smartmeter_DataMap.electricity.wh_used2);
         returnvalue++;
       }
 
       // 1-0:2.8.1 = Electricity low tarif provided
-      if (sscanf(buffer, "1-0:2.8.1(%f" , &value) == 1)
+      if (sscanf(buffer, "1-0:2.8.1(%u.%u" , &uintvalue, &uintdecimals) == 2)
       {
-        intvalue = (uint32_t)((float)value * 1000);
-        wh -= intvalue;
-        if (smartmeter_DataMap.electricity.wh_provided1 != intvalue)
+        uintvalue = (uintvalue * 1000) + uintdecimals;
+        wh -= uintvalue;
+        if (smartmeter_DataMap.electricity.wh_provided1 != uintvalue)
         {
-          smartmeter_DataMap.electricity.wh_provided1 = intvalue;
+          smartmeter_DataMap.electricity.wh_provided1 = uintvalue;
           smartmeter_DataMap.electricity.changed.wh_provided1 = 1;
         }
         returnvalue++;
       }
 
       // 1-0:2.8.2 = Electricity high tarif provided (DSMR v4.0)
-      if (sscanf(buffer, "1-0:2.8.2(%f" , &value) == 1)
+      if (sscanf(buffer, "1-0:2.8.2(%u.%u" , &uintvalue, &uintdecimals) == 2)
       {
-        intvalue = (uint32_t)((float)value * 1000);
-        wh -= intvalue;
-        if (smartmeter_DataMap.electricity.wh_provided2 != intvalue)
+        uintvalue = uintvalue * 1000 + uintdecimals;
+        wh -= uintvalue;
+        if (smartmeter_DataMap.electricity.wh_provided2 != uintvalue)
         {
-          smartmeter_DataMap.electricity.wh_provided2 = intvalue;
+          smartmeter_DataMap.electricity.wh_provided2 = uintvalue;
           smartmeter_DataMap.electricity.changed.wh_provided2 = 1;
         }
         returnvalue++;
       }
 
       // 1-0:1.7.0 = Electricity actual usage (DSMR v4.0)
-      if (sscanf(buffer, "1-0:1.7.0(%f" , &value) == 1)
+      if (sscanf(buffer, "1-0:1.7.0(%u.%u" , &uintvalue, &uintdecimals) == 2)
       {
-        intvalue = (float)value * 1000;
-        watt = intvalue;
-        if (smartmeter_DataMap.electricity.watt_using != intvalue)
+        uintvalue = uintvalue * 1000 + uintdecimals;
+        watt = uintvalue;
+        if (smartmeter_DataMap.electricity.watt_using != uintvalue)
         {
-          smartmeter_DataMap.electricity.watt_using = intvalue;
+          smartmeter_DataMap.electricity.watt_using = uintvalue;
           smartmeter_DataMap.electricity.changed.watt_using = 1;
         }
         returnvalue++;
       }
 
       // 1-0:2.7.0 = Electricity actual providing (DSMR v4.0)
-      if (sscanf(buffer, "1-0:2.7.0(%f" , &value) == 1)
+      if (sscanf(buffer, "1-0:2.7.0(%u.%u" , &uintvalue, &uintdecimals) == 2)
       {
-        intvalue = (float)value * 1000;
-        watt -= intvalue;
-        if ((smartmeter_DataMap.electricity.watt != watt) && (intvalue > 0))
+        DEBUG("Providing: %u.%u\n", uintvalue, uintdecimals);
+        uintvalue = uintvalue * 1000 + uintdecimals;
+        watt -= uintvalue;
+        if ((smartmeter_DataMap.electricity.watt != watt))
         {
           smartmeter_DataMap.electricity.watt = watt;
           smartmeter_DataMap.electricity.changed.watt = 1;
         }
-        if (smartmeter_DataMap.electricity.watt_providing != intvalue)
+        if (smartmeter_DataMap.electricity.watt_providing != uintvalue)
         {
-          smartmeter_DataMap.electricity.watt_providing = intvalue;
+          smartmeter_DataMap.electricity.watt_providing = uintvalue;
           smartmeter_DataMap.electricity.changed.watt_using = 1;
         }
         returnvalue++;
       }
 
       // 0-1:24.2.1 = Gas (DSMR v4.0)
-      if (sscanf(buffer, "0-1:24.2.1(%2d%2d%2d%2d%2d%2d%c)(%f", &day, &month, &year, &hour, &minute, &second, &summerwinter, &value) == 8)
+      if (sscanf(buffer, "0-1:24.2.1(%2d%2d%2d%2d%2d%2d%c)(%d.%d", &day, &month, &year, &hour, &minute, &second, &summerwinter, &uintvalue, &uintdecimals) == 9)
       {
-        intvalue = (uint16_t)value * 1000;
-        if (smartmeter_DataMap.gas.liter != intvalue)
+        uintvalue = uintvalue * 1000 + uintdecimals;
+        if (smartmeter_DataMap.gas.liter != uintvalue)
         {
-          smartmeter_DataMap.gas.liter = intvalue;
+          smartmeter_DataMap.gas.liter = uintvalue;
           smartmeter_DataMap.gas.changed.liter = 1;
         }
 
         char datetime[20];
         sprintf(datetime, "%02d-%02d-%02d %d:%02d:%02d", day, month, year, hour, minute, second);
-        if (strcmp (datetime, smartmeter_DataMap.gas.datetime) == 0)
+        if (strcmp (datetime, smartmeter_DataMap.gas.datetime) != 0)
         {
           strcpy (smartmeter_DataMap.gas.datetime, datetime);
           smartmeter_DataMap.gas.changed.datetime = 1;
@@ -171,17 +173,17 @@ int8_t smartmeter_handle()
         returnvalue += 2;
 
         static uint8_t oldhour = 255;
-        static float oldgas = 0;
+        static uint32_t oldgas = 0;
         if (oldhour != hour)
         {
-            intvalue = (value - oldgas) * 1000;
-            if (intvalue != smartmeter_DataMap.gas.lh)
+            uintvalue = (uintvalue - oldgas);
+            if (uintvalue != smartmeter_DataMap.gas.lh)
             {
-              smartmeter_DataMap.gas.lh = intvalue;
+              smartmeter_DataMap.gas.lh = uintvalue;
               smartmeter_DataMap.gas.changed.lh = 1;
             }
             oldhour = hour;
-            oldgas = value;
+            oldgas = uintvalue;
         }
       }
 

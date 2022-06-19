@@ -873,7 +873,7 @@ String getRandomString(int len) {
 
 void updateexternalip();
 
-#define DATAMAP_BASELENGTH 26
+#define DATAMAP_BASELENGTH 25
 
 enum DataMapStatus {initializing, wifierror, mqtterror, commerror, online};
 enum DataMapStatusUpgrade {notchecked, uptodate, fail};
@@ -892,7 +892,7 @@ struct
 
 bool getdatamap_checkandfill(char *key, char *outputvalue, uint8_t id, uint8_t idCounter, const char *searchkey, const char *inputvalue)
 {
-  if (((strcmp (key, searchkey) == 0) || (id == idCounter)) && (id < DataMap.length))
+  if (((strcmp (key, searchkey) == 0) || (id == idCounter)) && (id < DataMap.length)) 
   {
     strcpy (outputvalue, inputvalue);
     strcpy (key, searchkey);
@@ -928,8 +928,8 @@ void PublishRegular(uint8_t id, bool value)
 
 bool getDataMapSendStatus(uint8_t id)
 {
-  if (id < 64) return (DataMap.sendIds[0] & (1<<id));
-  else return(DataMap.sendIds[1] & (1<<(id-64)));
+  if (id < 64) return ((DataMap.sendIds[0] & (uint64_t(1)<<id)) > 0);
+  else return((DataMap.sendIds[1] & (uint64_t(1)<<(id-64))) > 0);
 }
 
 
@@ -939,7 +939,7 @@ String uint64_to_binstr (uint64_t n)
   String output = ""; 
   for(size_t i=0; i<64; i++)
   {
-    bool one = n & (1u << i);
+    bool one = n & (uint64_t(1) << i);
     output += (one ? "1" : "0");
   }
   return output;
@@ -949,21 +949,21 @@ void setDataMapSendStatus(uint8_t id, bool sendstatus = true)
 {  
   if (id < 64)
   {
-    if (sendstatus) DataMap.sendIds[0] |= (1<<id);
-    else DataMap.sendIds[0] &= DataMap.sendIds[0] - (1<<id);
+    if (sendstatus) DataMap.sendIds[0] |= (uint64_t(1)<<id);
+    else DataMap.sendIds[0] &= ~(uint64_t(1)<<id);
   }
   else
   {
-    if (sendstatus) DataMap.sendIds[1] |= (1<<(id-64));  
-    else DataMap.sendIds[1] &= DataMap.sendIds[1] - (1<<(id-64));    
+    if (sendstatus) DataMap.sendIds[1] |= (uint64_t(1)<<(id-64));  
+    else DataMap.sendIds[1] &= ~(uint64_t(1)<<(id-64));    
   }
-  //DEBUG("id=%d, sendstatus=%d sendids[0]=%s sendids[1]=%s\n", id, sendstatus, uint64_to_binstr(DataMap.sendIds[0]).c_str(), uint64_to_binstr(DataMap.sendIds[1]).c_str());
+  DEBUG("id=%d, sendstatus=%d sendids[0]=%s sendids[1]=%s\n", id, sendstatus, uint64_to_binstr(DataMap.sendIds[0]).c_str(), uint64_to_binstr(DataMap.sendIds[1]).c_str());
 }
 
 int16_t getDataMap(char *key, char *value, uint8_t id = -1)
 {
   uint8_t idCounter = 0;
-  char valuestring[20] = "";
+  char valuestring[30] = "";
 
   if (getdatamap_checkandfill(key, value, id, idCounter++, "hostname", WiFi.hostname().c_str())) return --idCounter;
     
@@ -1013,15 +1013,26 @@ int16_t getDataMap(char *key, char *value, uint8_t id = -1)
   if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/watt_using", String(smartmeter_DataMap.electricity.watt_using).c_str())) return --idCounter;
   if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/watt_providing", String(smartmeter_DataMap.electricity.watt_providing).c_str())) return --idCounter;
   
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/kwh", String((float)smartmeter_DataMap.electricity.wh/1000,3).c_str()))return --idCounter;
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/kwh_used1", String((float)smartmeter_DataMap.electricity.wh_used1/1000,3).c_str())) return --idCounter;
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/kwh_used2", String((float)smartmeter_DataMap.electricity.wh_used2/1000,3).c_str())) return --idCounter;
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/kwh_provided1", String((float)smartmeter_DataMap.electricity.wh_provided1/1000,3).c_str())) return --idCounter;
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/kwh_provided2", String((float)smartmeter_DataMap.electricity.wh_provided2/1000,3).c_str())) return --idCounter;
+  sprintf (valuestring, "%u.%u", smartmeter_DataMap.electricity.wh/1000, smartmeter_DataMap.electricity.wh % 1000);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/kwh", valuestring))return --idCounter;
+  
+  sprintf (valuestring, "%u.%u", smartmeter_DataMap.electricity.wh_used1/1000, smartmeter_DataMap.electricity.wh_used1 % 1000);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/kwh_used1", valuestring)) return --idCounter;
+  sprintf (valuestring, "%u.%u", smartmeter_DataMap.electricity.wh_used2/1000, smartmeter_DataMap.electricity.wh_used2 % 1000);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/kwh_used2", valuestring)) return --idCounter;
+  
+  sprintf (valuestring, "%u.%u", smartmeter_DataMap.electricity.wh/1000, smartmeter_DataMap.electricity.wh_provided1 % 1000);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/kwh_provided1", valuestring)) return --idCounter;
+  sprintf (valuestring, "%u.%u", smartmeter_DataMap.electricity.wh/1000, smartmeter_DataMap.electricity.wh_provided2 % 1000);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/kwh_provided2", valuestring)) return --idCounter;
+  
+  sprintf (valuestring, "%u.%u", smartmeter_DataMap.gas.liter/1000, smartmeter_DataMap.gas.liter % 1000);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "gas/m3", valuestring)) return --idCounter;
+  sprintf (valuestring, "%u.%u", smartmeter_DataMap.gas.lh/1000, smartmeter_DataMap.gas.lh % 1000);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "gas/m3h", valuestring)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "gas/datetime", smartmeter_DataMap.gas.datetime)) return --idCounter;
+#endif
 
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "gas/m3", String((float)smartmeter_DataMap.gas.liter/1000,3).c_str())) return --idCounter;
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "gas/m3h", String((float)smartmeter_DataMap.gas.lh/1000,3).c_str())) return --idCounter;
-#endif  
   return -1;
   yield();
 }
@@ -3753,9 +3764,18 @@ void smartmetercallback ()
   if (smartmeter_DataMap.status == ready) DataMap.status = online; else DataMap.status = commerror;
   for (uint8_t bitpointer = 0;  bitpointer < 8; bitpointer++)
   {
-     if (*(uint8_t*)&smartmeter_DataMap.electricity.changed | 1 << bitpointer)
+     if (*(uint8_t*)&smartmeter_DataMap.electricity.changed | (1 << bitpointer))
      {
+       *(uint8_t*)&smartmeter_DataMap.electricity.changed &=  ~(1 << bitpointer);
        setDataMapSendStatus(DATAMAP_BASELENGTH + bitpointer, true);
+     }
+   }
+  for (uint8_t bitpointer = 0;  bitpointer < 3; bitpointer++)
+  {
+     if (*(uint8_t*)&smartmeter_DataMap.gas.changed | (1 << bitpointer))
+     {
+       *(uint8_t*)&smartmeter_DataMap.gas.changed &=  ~(1 << bitpointer);
+       setDataMapSendStatus(DATAMAP_BASELENGTH + bitpointer + 8, true);
      }
    }
 }
@@ -4326,7 +4346,7 @@ void setup() {
 
 #ifdef  ESPMQTT_SMARTMETER
   smartmeter_init(smartmetercallback);
-  DataMap.length += 8;
+  DataMap.length += 11;
 #endif
 
 #ifdef  ESPMQTT_OPENTHERM
