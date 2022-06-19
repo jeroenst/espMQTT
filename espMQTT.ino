@@ -3764,7 +3764,7 @@ void smartmetercallback ()
   if (smartmeter_DataMap.status == ready) DataMap.status = online; else DataMap.status = commerror;
   for (uint8_t bitpointer = 0;  bitpointer < 8; bitpointer++)
   {
-     if (*(uint8_t*)&smartmeter_DataMap.electricity.changed | (1 << bitpointer))
+     if (*(uint8_t*)&smartmeter_DataMap.electricity.changed & (1 << bitpointer))
      {
        *(uint8_t*)&smartmeter_DataMap.electricity.changed &=  ~(1 << bitpointer);
        setDataMapSendStatus(DATAMAP_BASELENGTH + bitpointer, true);
@@ -3772,7 +3772,7 @@ void smartmetercallback ()
    }
   for (uint8_t bitpointer = 0;  bitpointer < 3; bitpointer++)
   {
-     if (*(uint8_t*)&smartmeter_DataMap.gas.changed | (1 << bitpointer))
+     if (*(uint8_t*)&smartmeter_DataMap.gas.changed & (1 << bitpointer))
      {
        *(uint8_t*)&smartmeter_DataMap.gas.changed &=  ~(1 << bitpointer);
        setDataMapSendStatus(DATAMAP_BASELENGTH + bitpointer + 8, true);

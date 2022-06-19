@@ -7,8 +7,8 @@ Smartmeter_DataMap_Struct smartmeter_DataMap;
 void smartmeter_init(void(*callback)(void))
 {
   _smartmeter_callback = callback;
-  
-  Serial.setRxBufferSize(100); 
+
+  Serial.setRxBufferSize(100);
   Serial.begin(115200);  //Init serial 115200 baud
   Serial.setDebugOutput(false);
 
@@ -21,7 +21,7 @@ int8_t smartmeter_handle()
   int8_t returnvalue = 0;
   int day, month, year, hour, minute, second;
   char summerwinter;
-  uint32_t uintvalue = 0; 
+  uint32_t uintvalue = 0;
   uint32_t uintdecimals = 0;
   static char buffer[100];
   static uint8_t bufpos = 0;
@@ -41,9 +41,9 @@ int8_t smartmeter_handle()
     if (input == '\n')
     { // We received a new line (data up to \n)
       buffer[bufpos - 1] = 0; // Remove newline character
-//      if (Debug.isActive(Debug.VERBOSE)) {
-        DEBUG("RECEIVED FROM SERIAL:%s\n", buffer);
-//      }
+
+      DEBUG_V("RECEIVED FROM SERIAL:%s\n", buffer);
+      
       if (buffer[0] == '/')
       {
         wh = 0;
@@ -56,7 +56,7 @@ int8_t smartmeter_handle()
         {
           smartmeter_DataMap.electricity.watt = watt;
           smartmeter_DataMap.electricity.changed.watt = 1;
-        }  
+        }
         if (wh != smartmeter_DataMap.electricity.wh)
         {
           smartmeter_DataMap.electricity.wh = wh;
@@ -148,7 +148,7 @@ int8_t smartmeter_handle()
         if (smartmeter_DataMap.electricity.watt_providing != uintvalue)
         {
           smartmeter_DataMap.electricity.watt_providing = uintvalue;
-          smartmeter_DataMap.electricity.changed.watt_using = 1;
+          smartmeter_DataMap.electricity.changed.watt_providing = 1;
         }
         returnvalue++;
       }
@@ -176,14 +176,14 @@ int8_t smartmeter_handle()
         static uint32_t oldgas = 0;
         if (oldhour != hour)
         {
-            uintvalue = (uintvalue - oldgas);
-            if (uintvalue != smartmeter_DataMap.gas.lh)
-            {
-              smartmeter_DataMap.gas.lh = uintvalue;
-              smartmeter_DataMap.gas.changed.lh = 1;
-            }
-            oldhour = hour;
-            oldgas = uintvalue;
+          uintvalue = (uintvalue - oldgas);
+          if (uintvalue != smartmeter_DataMap.gas.lh)
+          {
+            smartmeter_DataMap.gas.lh = uintvalue;
+            smartmeter_DataMap.gas.changed.lh = 1;
+          }
+          oldhour = hour;
+          oldgas = uintvalue;
         }
       }
 
