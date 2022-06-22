@@ -44,7 +44,7 @@ int8_t smartmeter_handle()
 
       DEBUG_V("RECEIVED FROM SERIAL:%s\n", buffer);
       
-      if (buffer[0] == '/')
+        if (buffer[0] == '/')
       {
         wh = 0;
         smartmeter_DataMap.status = receiving;
@@ -69,7 +69,7 @@ int8_t smartmeter_handle()
 
 
       // 1-0:1.8.1 = Electricity low tarif used
-      if (sscanf(buffer, "1-0:1.8.1(%u.%u" , &uintvalue, &uintdecimals) == 2)
+      if (sscanf(buffer, cF("1-0:1.8.1(%u.%u"), &uintvalue, &uintdecimals) == 2)
       {
         uintvalue = (uintvalue * 1000) + uintdecimals;
         wh += uintvalue;
@@ -82,7 +82,7 @@ int8_t smartmeter_handle()
       }
 
       // 1-0:1.8.2 = Electricity high tarif used (DSMR v4.0)
-      if (sscanf(buffer, "1-0:1.8.2(%u.%u" , &uintvalue, &uintdecimals) == 2)
+      if (sscanf(buffer, cF("1-0:1.8.2(%u.%u"), &uintvalue, &uintdecimals) == 2)
       {
         uintvalue = (uintvalue * 1000) + uintdecimals;
         DEBUG ("Received wh_used2=%d\n", uintvalue);
@@ -96,7 +96,7 @@ int8_t smartmeter_handle()
       }
 
       // 1-0:2.8.1 = Electricity low tarif provided
-      if (sscanf(buffer, "1-0:2.8.1(%u.%u" , &uintvalue, &uintdecimals) == 2)
+      if (sscanf(buffer, cF("1-0:2.8.1(%u.%u") , &uintvalue, &uintdecimals) == 2)
       {
         uintvalue = (uintvalue * 1000) + uintdecimals;
         wh -= uintvalue;
@@ -109,7 +109,7 @@ int8_t smartmeter_handle()
       }
 
       // 1-0:2.8.2 = Electricity high tarif provided (DSMR v4.0)
-      if (sscanf(buffer, "1-0:2.8.2(%u.%u" , &uintvalue, &uintdecimals) == 2)
+      if (sscanf(buffer, cF("1-0:2.8.2(%u.%u") , &uintvalue, &uintdecimals) == 2)
       {
         uintvalue = uintvalue * 1000 + uintdecimals;
         wh -= uintvalue;
@@ -122,7 +122,7 @@ int8_t smartmeter_handle()
       }
 
       // 1-0:1.7.0 = Electricity actual usage (DSMR v4.0)
-      if (sscanf(buffer, "1-0:1.7.0(%u.%u" , &uintvalue, &uintdecimals) == 2)
+      if (sscanf(buffer, cF("1-0:1.7.0(%u.%u") , &uintvalue, &uintdecimals) == 2)
       {
         uintvalue = uintvalue * 1000 + uintdecimals;
         watt = uintvalue;
@@ -135,7 +135,7 @@ int8_t smartmeter_handle()
       }
 
       // 1-0:2.7.0 = Electricity actual providing (DSMR v4.0)
-      if (sscanf(buffer, "1-0:2.7.0(%u.%u" , &uintvalue, &uintdecimals) == 2)
+      if (sscanf(buffer, cF("1-0:2.7.0(%u.%u"), &uintvalue, &uintdecimals) == 2)
       {
         DEBUG("Providing: %u.%u\n", uintvalue, uintdecimals);
         uintvalue = uintvalue * 1000 + uintdecimals;
@@ -154,7 +154,7 @@ int8_t smartmeter_handle()
       }
 
       // 0-1:24.2.1 = Gas (DSMR v4.0)
-      if (sscanf(buffer, "0-1:24.2.1(%2d%2d%2d%2d%2d%2d%c)(%d.%d", &day, &month, &year, &hour, &minute, &second, &summerwinter, &uintvalue, &uintdecimals) == 9)
+      if (sscanf(buffer, cF("0-1:24.2.1(%2d%2d%2d%2d%2d%2d%c)(%d.%d"), &day, &month, &year, &hour, &minute, &second, &summerwinter, &uintvalue, &uintdecimals) == 9)
       {
         uintvalue = uintvalue * 1000 + uintdecimals;
         if (smartmeter_DataMap.gas.liter != uintvalue)
@@ -164,7 +164,7 @@ int8_t smartmeter_handle()
         }
 
         char datetime[20];
-        sprintf(datetime, "%02d-%02d-%02d %d:%02d:%02d", day, month, year, hour, minute, second);
+        snprintf(datetime, 20, cF("%02d-%02d-%02d %d:%02d:%02d"), day, month, year, hour, minute, second);
         if (strcmp (datetime, smartmeter_DataMap.gas.datetime) != 0)
         {
           strcpy (smartmeter_DataMap.gas.datetime, datetime);
@@ -179,8 +179,16 @@ int8_t smartmeter_handle()
           uintvalue = (uintvalue - oldgas);
           if (uintvalue != smartmeter_DataMap.gas.lh)
           {
-            smartmeter_DataMap.gas.lh = uintvalue;
-            smartmeter_DataMap.gas.changed.lh = 1;
+            if (0 != oldgas)
+            {
+              smartmeter_DataMap.gas.lh = uintvalue;
+              smartmeter_DataMap.gas.changed.lh = 1;
+            }
+            else
+            {
+              smartmeter_DataMap.gas.lh = 0;
+              smartmeter_DataMap.gas.changed.lh = 1;
+            }
           }
           oldhour = hour;
           oldgas = uintvalue;
