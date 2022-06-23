@@ -1046,7 +1046,7 @@ int16_t getDataMap(char *key, char *value, uint8_t id = -1)
 
   snprintf (valuestring, 30, cF("%u.%03u"), smartmeter_DataMap.gas.liter / 1000, smartmeter_DataMap.gas.liter % 1000);
   if (getdatamap_checkandfill(key, value, id, idCounter++, "gas/m3", valuestring)) return --idCounter;
-  snprintf (valuestring, 30, cF("%u.%03u"), smartmeter_DataMap.gas.lh / 1000000), (smartmeter_DataMap.gas.lh / 1000));
+  snprintf (valuestring, 30, cF("%u.%03u"), smartmeter_DataMap.gas.lh / 1000000, smartmeter_DataMap.gas.lh / 1000);
   if (getdatamap_checkandfill(key, value, id, idCounter++, "gas/m3h", valuestring)) return --idCounter;
   if (getdatamap_checkandfill(key, value, id, idCounter++, "gas/datetime", smartmeter_DataMap.gas.datetime)) return --idCounter;
 #endif
