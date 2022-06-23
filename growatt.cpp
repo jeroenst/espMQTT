@@ -1,14 +1,14 @@
 #include "espMQTT.h"
 #include "growatt.h"
 
-#define _GROWATT_FAN_PID_P_GAIN 200
-#define _GROWATT_FAN_PID_I_GAIN 20
+#define _GROWATT_FAN_PID_P_GAIN 20
+#define _GROWATT_FAN_PID_I_GAIN 2
 #define _GROWATT_FAN_PID_D_GAIN 0
-#define _GROWATT_FAN_STOP_TEMP_DELTA -5
+#define _GROWATT_FAN_STOP_TEMP_DELTA -50
 #define _GROWAT_PWM_RANGE (PWMRANGE-GROWATT_FANSPEED_OFFSET)
 #define _GROWATT_FAN_PWM_FREQ 32
 
-void(*_growatt_callback)(const char *,String);
+void(*_growatt_callback)();
 static int _growatt_fanpin = 0;
 static int _growatt_fanspeed = 0;
 static float _growatt_fan_pid_p = 0;
@@ -17,14 +17,15 @@ static float _growatt_fan_pid_d = 0;
 static float _growatt_fan_pid_error = 0;
 static float _growatt_fan_pid_preverror = 0;
 
+Growatt_DataMap_Struct growatt_DataMap;
 
-void growatt_init(void(*callback)(const char *,String), int fanpin)
+void growatt_init(void(*callback)(), int fanpin)
 {
   _growatt_callback = callback;
   Serial.setRxBufferSize(100); 
   Serial.begin(9600);  //Init serial 9600 baud
   Serial.setDebugOutput(false);
-  _growatt_callback("grid/today/kwh", "0.0");
+  //_growatt_callback("grid/today/kwh", "0.0");
   if (fanpin >= 0)
   {
     _growatt_fanpin = fanpin;
@@ -36,9 +37,6 @@ void growatt_init(void(*callback)(const char *,String), int fanpin)
     _growatt_fan_pid_d = 0;
   }
 
-  _growatt_callback("grid/today/kwh", "-");
-  _growatt_callback("grid/total/kwh", "-");
-  _growatt_callback("inverter/hours", "-");
 }
 
 void growatt_send_command(uint8_t c1)
@@ -82,6 +80,8 @@ void growatt_handle()
 
     if (!RxPowerDataOk)
     {
+      growatt_DataMap.status = offline;
+      /*_growatt_callback();
       _growatt_callback("inverter/status", "offline");
       _growatt_callback("inverter/status/value", "-");
       _growatt_callback("pv/1/volt", "-");
@@ -100,9 +100,13 @@ void growatt_handle()
       {
          _growatt_callback("fanspeed", "0");
          analogWrite(_growatt_fanpin, 0);
-      }
+      }*/
     }
-    else _growatt_callback("status", "querying");
+    else 
+    {
+      growatt_DataMap.status = querying;
+      _growatt_callback();
+    }
     RxPowerDataOk = 0;
     growatt_send_command(0x41);
   }
@@ -135,38 +139,62 @@ void growatt_handle()
         if ((RxBuffer[3] == 0x32) && (RxBuffer[4] == 0x41) && (RxBufferPointer >= 34))
         {
           DEBUG_D("Received power data from Growatt Inverter...\n");
+          
           intvalue = RxBuffer[6];
-          _growatt_callback("inverter/status/value", String(intvalue));
-          _growatt_callback("inverter/status", intvalue == 0 ? "waiting" : intvalue == 1 ? "ready" : intvalue == 3 ? "fault" : "unknown");
-          value = double((uint16_t(RxBuffer[7]) << 8) + RxBuffer[8]) / 10;
-          pv1volt = value;
-          _growatt_callback("pv/1/volt", String(value, 1));
-          value = double((uint16_t(RxBuffer[9]) << 8) + RxBuffer[10]) / 10;
-          _growatt_callback("pv/2/volt", String(value, 1));
-          value = double((uint16_t(RxBuffer[11]) << 8) + RxBuffer[12]) / 10;
-          _growatt_callback("pv/watt", String(value, 1));
-          value = double((uint16_t(RxBuffer[13]) << 8) + RxBuffer[14]) / 10;
-          pvwatt = value;
-          _growatt_callback("grid/volt", String(value, 1));
-          value = double((uint16_t(RxBuffer[15]) << 8) + RxBuffer[16]) / 10;
-          _growatt_callback("grid/amp", String(value, 1));
-          value = double((uint16_t(RxBuffer[17]) << 8) + RxBuffer[18]) / 100;
-          _growatt_callback("grid/frequency", String(value, 1));
-          value = double((uint16_t(RxBuffer[19]) << 8) + RxBuffer[20]) / 10;
-          _growatt_callback("grid/watt", String(value, 1));
-          value = double((uint16_t(RxBuffer[33]) << 8) + RxBuffer[34]) / 10;
-          _growatt_callback("fault/temperature", String(value, 1));
-          intvalue = double((uint16_t(RxBuffer[35]) << 8) + RxBuffer[36]);
-          _growatt_callback("fault/type", String(intvalue));
-          value = double((uint16_t(RxBuffer[37]) << 8) + RxBuffer[38]) / 10;
-          _growatt_callback("temperature", String(value, 1));
+          growatt_DataMap.changed.inverter_status_value = intvalue != growatt_DataMap.inverter_status_value;
+          growatt_DataMap.inverter_status_value = intvalue;
+
+          growatt_DataMap.changed.inverter_status = intvalue != growatt_DataMap.inverter_status_value;
+          growatt_DataMap.inverter_status = (intvalue == 0 ? "waiting" : intvalue == 1 ? "ready" : intvalue == 3 ? "fault" : "unknown");
+          
+          intvalue = (uint16_t(RxBuffer[7]) << 8) + RxBuffer[8];
+          growatt_DataMap.changed.pv_1_voltage = intvalue != growatt_DataMap.pv_1_voltage;
+          growatt_DataMap.pv_1_voltage = intvalue;
+
+          intvalue = (uint16_t(RxBuffer[9]) << 8) + RxBuffer[10];
+          growatt_DataMap.changed.pv_2_voltage = intvalue != growatt_DataMap.pv_2_voltage;
+          growatt_DataMap.pv_2_voltage = intvalue;
+
+          intvalue = (uint16_t(RxBuffer[11]) << 8) + RxBuffer[12];
+          growatt_DataMap.changed.pv_power = intvalue != growatt_DataMap.pv_power;
+          growatt_DataMap.pv_power = intvalue;
+
+
+          intvalue = (uint16_t(RxBuffer[13]) << 8) + RxBuffer[14];
+          growatt_DataMap.changed.grid_voltage = intvalue != growatt_DataMap.grid_voltage;
+          growatt_DataMap.grid_voltage = intvalue;
+
+          intvalue = (uint16_t(RxBuffer[15]) << 8) + RxBuffer[16];
+          growatt_DataMap.changed.grid_current = intvalue != growatt_DataMap.grid_current;
+          growatt_DataMap.grid_current = intvalue;
+
+          intvalue = (uint16_t(RxBuffer[17]) << 8) + RxBuffer[18];
+          growatt_DataMap.changed.grid_frequency = intvalue != growatt_DataMap.grid_frequency;
+          growatt_DataMap.grid_frequency = intvalue;
+
+          intvalue = (uint16_t(RxBuffer[19]) << 8) + RxBuffer[20];
+          growatt_DataMap.changed.grid_power = intvalue != growatt_DataMap.grid_power;
+          growatt_DataMap.grid_power = intvalue;
+
+          intvalue = (uint16_t(RxBuffer[33]) << 8) + RxBuffer[34];
+          growatt_DataMap.changed.fault_temperature = intvalue != growatt_DataMap.fault_temperature;
+          growatt_DataMap.fault_temperature = intvalue;
+
+          intvalue = (uint16_t(RxBuffer[35]) << 8) + RxBuffer[36];
+          growatt_DataMap.changed.fault_type = intvalue != growatt_DataMap.fault_type;
+          growatt_DataMap.fault_type = intvalue;
+          
+          intvalue = (uint16_t(RxBuffer[37]) << 8) + RxBuffer[38];
+          growatt_DataMap.changed.temperature = intvalue != growatt_DataMap.temperature;
+          growatt_DataMap.temperature = intvalue;
+          
           if (_growatt_fanpin >= 0)
           {
             //if (value >= GROWATT_FANSPEED_MINTEMP) digitalWrite(_growatt_fanpin,1);
             //else digitalWrite(_growatt_fanpin, 0);
 
             // PID control of fans on top of growatt inverter
-            _growatt_fan_pid_error = value - GROWATT_FANSPEED_TEMP;
+            _growatt_fan_pid_error = growatt_DataMap.temperature - GROWATT_FANSPEED_TEMP;
             _growatt_fan_pid_preverror = _growatt_fan_pid_error;
             _growatt_fan_pid_p = _growatt_fan_pid_error * _GROWATT_FAN_PID_P_GAIN;
             _growatt_fan_pid_i = max(min(float(_GROWAT_PWM_RANGE), float(_growatt_fan_pid_i + (_growatt_fan_pid_error * _GROWATT_FAN_PID_I_GAIN))), float(0));
@@ -177,7 +205,11 @@ void growatt_handle()
             if (_growatt_fan_pid_error >= 0) fanstop = 0;
             if (fanstop == 1) _growatt_fanspeed = 0;
             analogWrite(_growatt_fanpin, _growatt_fanspeed);
-            _growatt_callback("fanspeed", String((100 * _growatt_fanspeed)/PWMRANGE));
+            
+            intvalue = (100 * _growatt_fanspeed)/PWMRANGE;
+            growatt_DataMap.changed.fanspeed = intvalue != growatt_DataMap.grid_today_energy;
+            growatt_DataMap.fanspeed = intvalue;
+
             DEBUG_D("Temperature=%.01f, Fanspeed=%d\n", value, _growatt_fanspeed);
           }
           RxPowerDataOk = 1;
@@ -186,13 +218,24 @@ void growatt_handle()
         if ((RxBuffer[3] == 0x32) && (RxBuffer[4] == 0x42) && (RxBufferPointer >= 22))
         {
           DEBUG_D("Received energy data from Growatt Inverter...\n");
-          value = double((uint16_t(RxBuffer[13]) << 8) + RxBuffer[14]) / 10;
-          if (pvwatt > 1) _growatt_callback("grid/today/kwh", String(value, 1)); // Only reset today value when pvwatt above 1 watt otherwise this gets resets during shutdown
-          value = double((uint32_t(RxBuffer[15]) << 24) + (uint32_t(RxBuffer[16]) << 16) + (uint16_t(RxBuffer[17]) << 8) + RxBuffer[18]) / 10;
-          _growatt_callback("grid/total/kwh", String(value, 1));
+          if (pvwatt > 1)  // Only reset today value when pvwatt above 1 watt otherwise this gets resets during shutdown
+          {
+            intvalue = (uint16_t(RxBuffer[13]) << 8) + RxBuffer[14];
+            growatt_DataMap.changed.grid_today_energy = intvalue != growatt_DataMap.grid_today_energy;
+            growatt_DataMap.grid_today_energy = intvalue;
+          }
+
+          intvalue = (uint32_t(RxBuffer[15]) << 24) + (uint32_t(RxBuffer[16]) << 16) + (uint16_t(RxBuffer[17]) << 8) + RxBuffer[18];
+          growatt_DataMap.changed.grid_total_energy = intvalue != growatt_DataMap.grid_total_energy;
+          growatt_DataMap.grid_total_energy = intvalue;
+
           intvalue = ((uint32_t(RxBuffer[19]) << 24) + (uint32_t(RxBuffer[20]) << 16) + (uint16_t(RxBuffer[21]) << 8) + RxBuffer[22]);
-          _growatt_callback("inverter/hours", String(intvalue));
-          _growatt_callback("status", "ready");
+          growatt_DataMap.changed.inverter_hours = intvalue != growatt_DataMap.inverter_hours;
+          growatt_DataMap.inverter_hours = intvalue;
+
+          
+          growatt_DataMap.status = ready;
+          _growatt_callback();
         }
         RxBufferPointer = 0;
       }

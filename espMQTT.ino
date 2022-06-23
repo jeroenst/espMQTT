@@ -1031,22 +1031,22 @@ int16_t getDataMap(char *key, char *value, uint8_t id = -1)
   if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/watt_using", String(smartmeter_DataMap.electricity.watt_using).c_str())) return --idCounter;
   if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/watt_providing", String(smartmeter_DataMap.electricity.watt_providing).c_str())) return --idCounter;
 
-  snprintf (valuestring, 30, cF("%u.%u"), smartmeter_DataMap.electricity.wh / 1000, smartmeter_DataMap.electricity.wh % 1000);
+  snprintf (valuestring, 30, cF("%u.%03u"), smartmeter_DataMap.electricity.wh / 1000, smartmeter_DataMap.electricity.wh % 1000);
   if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/kwh_total", valuestring))return --idCounter;
 
-  snprintf (valuestring, 30, cF("%u.%u"), smartmeter_DataMap.electricity.wh_used1 / 1000, smartmeter_DataMap.electricity.wh_used1 % 1000);
+  snprintf (valuestring, 30, cF("%u.%03u"), smartmeter_DataMap.electricity.wh_used1 / 1000, smartmeter_DataMap.electricity.wh_used1 % 1000);
   if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/kwh_used1", valuestring)) return --idCounter;
-  snprintf (valuestring, 30, cF("%u.%u"), smartmeter_DataMap.electricity.wh_used2 / 1000, smartmeter_DataMap.electricity.wh_used2 % 1000);
+  snprintf (valuestring, 30, cF("%u.%03u"), smartmeter_DataMap.electricity.wh_used2 / 1000, smartmeter_DataMap.electricity.wh_used2 % 1000);
   if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/kwh_used2", valuestring)) return --idCounter;
 
-  snprintf (valuestring, 30, cF("%u.%u"), smartmeter_DataMap.electricity.wh / 1000, smartmeter_DataMap.electricity.wh_provided1 % 1000);
+  snprintf (valuestring, 30, cF("%u.%03u"), smartmeter_DataMap.electricity.wh / 1000, smartmeter_DataMap.electricity.wh_provided1 % 1000);
   if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/kwh_provided1", valuestring)) return --idCounter;
-  snprintf (valuestring, 30, cF("%u.%u"), smartmeter_DataMap.electricity.wh / 1000, smartmeter_DataMap.electricity.wh_provided2 % 1000);
+  snprintf (valuestring, 30, cF("%u.%03u"), smartmeter_DataMap.electricity.wh / 1000, smartmeter_DataMap.electricity.wh_provided2 % 1000);
   if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/kwh_provided2", valuestring)) return --idCounter;
 
-  snprintf (valuestring, 30, cF("%u.%u"), smartmeter_DataMap.gas.liter / 1000, smartmeter_DataMap.gas.liter % 1000);
+  snprintf (valuestring, 30, cF("%u.%03u"), smartmeter_DataMap.gas.liter / 1000, smartmeter_DataMap.gas.liter % 1000);
   if (getdatamap_checkandfill(key, value, id, idCounter++, "gas/m3", valuestring)) return --idCounter;
-  snprintf (valuestring, 30, cF("%u.%u"), smartmeter_DataMap.gas.lh / 1000, smartmeter_DataMap.gas.lh % 1000);
+  snprintf (valuestring, 30, cF("%u.%03u"), smartmeter_DataMap.gas.lh / 1000000), (smartmeter_DataMap.gas.lh / 1000));
   if (getdatamap_checkandfill(key, value, id, idCounter++, "gas/m3h", valuestring)) return --idCounter;
   if (getdatamap_checkandfill(key, value, id, idCounter++, "gas/datetime", smartmeter_DataMap.gas.datetime)) return --idCounter;
 #endif
@@ -3746,14 +3746,8 @@ void openthermcallback (const char *topic, String payload)
 }
 
 #ifdef  ESPMQTT_GROWATT
-void growattcallback (const char *topic, String payload)
+void growattcallback ()
 {
-  if (strcmp(topic, "status") == 0)
-  {
-    if (payload == "ready") digitalWrite(NODEMCULEDPIN, 0);
-    else digitalWrite(NODEMCULEDPIN, 1);
-  }
-  putdatamap(topic, payload);
 }
 #endif
 
