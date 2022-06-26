@@ -25,11 +25,11 @@ struct Growatt_DataMap_Struct
       uint16_t fault_type : 1;
       uint16_t temperature : 1;    
       uint16_t grid_today_energy : 1;
-      uint32_t grid_total_energy : 1;
+      uint16_t grid_total_energy : 1;
       uint16_t inverter_hours : 1;
       uint16_t fanspeed : 1;
     } changed;
-    int16_t inverter_status_value;
+    uint16_t inverter_status_value;
     const char *inverter_status;
     uint16_t pv_1_voltage; // 0.1 volt precision
     uint16_t pv_2_voltage; // 0.1 volt precision

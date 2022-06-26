@@ -36,8 +36,8 @@
 // #define ESPMQTT_BATHROOM
 // #define ESPMQTT_BEDROOM2
 // #define ESPMQTT_OPENTHERM
-#define ESPMQTT_SMARTMETER
-// #define ESPMQTT_GROWATT
+// #define ESPMQTT_SMARTMETER
+#define ESPMQTT_GROWATT
 // #define ESPMQTT_GROWATT_MODBUS
 // #define ESPMQTT_SDM120
 // #define ESPMQTT_DDM18SD
@@ -1049,6 +1049,51 @@ int16_t getDataMap(char *key, char *value, uint8_t id = -1)
   snprintf (valuestring, 30, cF("%u.%03u"), smartmeter_DataMap.gas.lh / 1000000, smartmeter_DataMap.gas.lh / 1000);
   if (getdatamap_checkandfill(key, value, id, idCounter++, "gas/m3h", valuestring)) return --idCounter;
   if (getdatamap_checkandfill(key, value, id, idCounter++, "gas/datetime", smartmeter_DataMap.gas.datetime)) return --idCounter;
+#endif
+
+#ifdef ESPMQTT_GROWATT
+    if (getdatamap_checkandfill(key, value, id, idCounter++, "inverter/status/value", String(growatt_DataMap.inverter_status_value).c_str())) return --idCounter;
+    if (getdatamap_checkandfill(key, value, id, idCounter++, "inverter/status/value", growatt_DataMap.inverter_status)) return --idCounter;
+
+  snprintf (valuestring, 30, cF("%u.%01u"), growatt_DataMap.pv_1_voltage / 10, growatt_DataMap.pv_1_voltage % 10);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "pv/1/volt", valuestring)) return --idCounter;
+  snprintf (valuestring, 30, cF("%u.%01u"), growatt_DataMap.pv_2_voltage / 10, growatt_DataMap.pv_2_voltage % 10);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "pv/2/volt", valuestring)) return --idCounter;
+  snprintf (valuestring, 30, cF("%u.%01u"), growatt_DataMap.pv_power / 10, growatt_DataMap.pv_power % 10);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "pv/watt", valuestring)) return --idCounter;
+
+  snprintf (valuestring, 30, cF("%u.%01u"), growatt_DataMap.grid_voltage / 10, growatt_DataMap.grid_voltage % 10);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/volt", valuestring)) return --idCounter;
+
+  snprintf (valuestring, 30, cF("%u.%01u"), growatt_DataMap.grid_current / 10, growatt_DataMap.grid_current % 10);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/amp", valuestring)) return --idCounter;
+
+  snprintf (valuestring, 30, cF("%u.%02u"), growatt_DataMap.grid_frequency / 100, growatt_DataMap.grid_frequency % 100);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/frequency", valuestring)) return --idCounter;
+
+  snprintf (valuestring, 30, cF("%u.%01u"), growatt_DataMap.grid_power / 10, growatt_DataMap.grid_power % 10);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/watt", valuestring)) return --idCounter;
+
+  snprintf (valuestring, 30, cF("%u.%01u"), growatt_DataMap.fault_temperature / 10, growatt_DataMap.fault_temperature % 10);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "fault/temperature", valuestring)) return --idCounter;
+
+  snprintf (valuestring, 30, cF("%u"), growatt_DataMap.fault_type);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "fault/type", valuestring)) return --idCounter;
+
+  snprintf (valuestring, 30, cF("%u.%01u"), growatt_DataMap.temperature / 10, growatt_DataMap.temperature % 10);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "temperature", valuestring)) return --idCounter;
+
+  snprintf (valuestring, 30, cF("%u.%01u"), growatt_DataMap.grid_today_energy / 10, growatt_DataMap.grid_today_energy % 10);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/today/kwh", valuestring)) return --idCounter;
+
+  snprintf (valuestring, 30, cF("%u.%01u"), growatt_DataMap.grid_total_energy / 10, growatt_DataMap.grid_total_energy % 10);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/total/kwh", valuestring)) return --idCounter;
+
+  snprintf (valuestring, 30, cF("%u"), growatt_DataMap.inverter_hours);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "inverter/hours", valuestring)) return --idCounter;
+
+  snprintf (valuestring, 30, cF("%u"), growatt_DataMap.fanspeed);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "fanspeed", valuestring)) return --idCounter;
 #endif
 
   return -1;
@@ -3747,7 +3792,16 @@ void openthermcallback (const char *topic, String payload)
 
 #ifdef  ESPMQTT_GROWATT
 void growattcallback ()
-{
+{  
+  if (growatt_DataMap.status == ready) DataMap.status = online; else DataMap.status = commerror;
+  for (uint8_t bitpointer = 0;  bitpointer < 16; bitpointer++)
+  {
+    if (*(uint16_t*)&growatt_DataMap.changed & (1 << bitpointer))
+    {
+      *(uint16_t*)&growatt_DataMap.changed &=  ~(1 << bitpointer);
+      setDataMapSendStatus(DATAMAP_BASELENGTH + bitpointer, true);
+    }
+  }
 }
 #endif
 
@@ -4373,6 +4427,7 @@ void setup() {
 
 #ifdef  ESPMQTT_GROWATT
   growatt_init(growattcallback, FANPIN);
+    DataMap.length += 16;
 #endif
 
 #ifdef  ESPMQTT_GOODWE

@@ -70,9 +70,7 @@ void growatt_handle()
   static uint8_t RxBuffer[50];
   static uint8_t RxBufferPointer = 0;
   static bool RxPowerDataOk = 0;
-  static double pv1volt = 0;
-  static double pvwatt = 0;
-
+  
   if (millis() > nextupdatetime)
   {
     RxBufferPointer = 0;
@@ -173,7 +171,7 @@ void growatt_handle()
           growatt_DataMap.grid_frequency = intvalue;
 
           intvalue = (uint16_t(RxBuffer[19]) << 8) + RxBuffer[20];
-          growatt_DataMap.changed.grid_power = intvalue != growatt_DataMap.grid_power;
+          growatt_DataMap.changed.grid_power = (intvalue != growatt_DataMap.grid_power);
           growatt_DataMap.grid_power = intvalue;
 
           intvalue = (uint16_t(RxBuffer[33]) << 8) + RxBuffer[34];
@@ -207,7 +205,7 @@ void growatt_handle()
             analogWrite(_growatt_fanpin, _growatt_fanspeed);
             
             intvalue = (100 * _growatt_fanspeed)/PWMRANGE;
-            growatt_DataMap.changed.fanspeed = intvalue != growatt_DataMap.grid_today_energy;
+            growatt_DataMap.changed.fanspeed = intvalue != growatt_DataMap.fanspeed;
             growatt_DataMap.fanspeed = intvalue;
 
             DEBUG_D("Temperature=%.01f, Fanspeed=%d\n", value, _growatt_fanspeed);
@@ -218,7 +216,7 @@ void growatt_handle()
         if ((RxBuffer[3] == 0x32) && (RxBuffer[4] == 0x42) && (RxBufferPointer >= 22))
         {
           DEBUG_D("Received energy data from Growatt Inverter...\n");
-          if (pvwatt > 1)  // Only reset today value when pvwatt above 1 watt otherwise this gets resets during shutdown
+          if (growatt_DataMap.pv_power > 10)  // Only reset today value when pvwatt above 1 watt otherwise this gets resets during shutdown
           {
             intvalue = (uint16_t(RxBuffer[13]) << 8) + RxBuffer[14];
             growatt_DataMap.changed.grid_today_energy = intvalue != growatt_DataMap.grid_today_energy;
