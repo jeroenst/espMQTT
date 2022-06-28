@@ -8,21 +8,20 @@
 #include "growattmodbus.h"
 #include "modbus.h"
 
+GrowattModbus_DataMap_Struct growattModbus_DataMap;
+
 bool growattModbus_RxReady = false;
 uint8_t growattModbus_itteration = 0;
 uint8_t growattModbus_errorCounter = 0;
 
-void(*_growattModbus_callback)(const char*, String);
+void(*_growattModbus_callback)();
 
-void growattModbus_init(void(*callback)(const char *, String))
+void growattModbus_init(void(*callback)())
 {
   _growattModbus_callback = callback;
   Serial.setRxBufferSize(100);
   Serial.begin(9600);  //Init serial 9600 baud
   Serial.setDebugOutput(false);
-
-  _growattModbus_callback("grid/today/kwh", "-");
-  _growattModbus_callback("grid/total/kwh", "-");
 }
 
 
@@ -36,7 +35,8 @@ uint8_t growattModbus_request() {
     default:
     case 0:
       growattModbus_itteration = 0;
-      _growattModbus_callback("status", "querying");
+      growattModbus_DataMap.status = GrowattModbus_status::querying;
+      _growattModbus_callback();
       modbus_request_function_code(1, 4, 0, 11);
       break;
     case 1:
@@ -63,44 +63,61 @@ int8_t growattModbus_read()
       case 0:
         switch (modbus_get_register(0))
         {
-          case 0: _growattModbus_callback("inverter/status", "waiting");
+          case 0: growattModbus_DataMap.inverter_status = "waiting";
             break;
-          case 1: _growattModbus_callback("inverter/status", "normal");
+          case 1: growattModbus_DataMap.inverter_status = "normal";
             break;
-          case 3: _growattModbus_callback("inverter/status", "fault");
+          case 3: growattModbus_DataMap.inverter_status = "fault";
             break;
         }
 
+        growattModbus_DataMap.changed.inverter_status = modbus_get_register(0) != growattModbus_DataMap.inverter_status_value;
+        growattModbus_DataMap.changed.inverter_status_value = modbus_get_register(0) != growattModbus_DataMap.inverter_status_value;
+        growattModbus_DataMap.inverter_status_value = modbus_get_register(0);
 
-        _growattModbus_callback("inverter/status/value", String((int)modbus_get_register(0)));
+        growattModbus_DataMap.changed.pv_power = growattModbus_DataMap.pv_power != modbus_get_two_register_uint(1);
+        growattModbus_DataMap.pv_power = modbus_get_two_register_uint(1);
 
-        _growattModbus_callback("pv/watt", String(modbus_get_two_register_double(1, 10), 1));
+        growattModbus_DataMap.changed.pv_1_voltage = growattModbus_DataMap.pv_1_voltage != modbus_get_register(3);
+        growattModbus_DataMap.pv_1_voltage = modbus_get_register(3);
+        growattModbus_DataMap.changed.pv_1_current = growattModbus_DataMap.pv_1_current != modbus_get_register(4);
+        growattModbus_DataMap.pv_1_current = modbus_get_register(4);
+        growattModbus_DataMap.changed.pv_1_power = growattModbus_DataMap.pv_1_power != modbus_get_two_register_uint(5);
+        growattModbus_DataMap.pv_1_power = modbus_get_two_register_uint(5);
 
-        _growattModbus_callback("pv/1/volt", String((float)modbus_get_register(3) / 10, 1));
-        _growattModbus_callback("pv/1/amp",  String((float)modbus_get_register(4) / 10, 1));
-        _growattModbus_callback("pv/1/watt", String(modbus_get_two_register_double(5, 10), 1));
-
-        _growattModbus_callback("pv/2/volt", String((float)modbus_get_register(7) / 10, 1));
-        _growattModbus_callback("pv/2/amp",  String((float)modbus_get_register(8) / 10, 1));
-        _growattModbus_callback("pv/2/watt", String(modbus_get_two_register_double(9, 10), 1));
+        growattModbus_DataMap.changed.pv_2_voltage = growattModbus_DataMap.pv_2_voltage != modbus_get_register(7);
+        growattModbus_DataMap.pv_2_voltage = modbus_get_register(7);
+        growattModbus_DataMap.changed.pv_2_current = growattModbus_DataMap.pv_2_current != modbus_get_register(8);
+        growattModbus_DataMap.pv_2_current = modbus_get_register(8);
+        growattModbus_DataMap.changed.pv_2_power = growattModbus_DataMap.pv_2_power != modbus_get_two_register_uint(9);
+        growattModbus_DataMap.pv_2_power = modbus_get_two_register_uint(9);
         break;
 
       case 1:
-        _growattModbus_callback("grid/watt", String(modbus_get_two_register_double(0, 10), 1));
-        _growattModbus_callback("grid/frequency", String((float)modbus_get_register(2) / 100, 1));
-        _growattModbus_callback("grid/volt", String((float)modbus_get_register(3) / 10, 1));
-        _growattModbus_callback("grid/amp", String((float)modbus_get_register(4) / 10, 1));
+        growattModbus_DataMap.changed.grid_power = growattModbus_DataMap.grid_power != modbus_get_two_register_uint(0);
+        growattModbus_DataMap.grid_power = modbus_get_two_register_uint(0);
+        growattModbus_DataMap.changed.grid_frequency = growattModbus_DataMap.grid_frequency != modbus_get_register(2);
+        growattModbus_DataMap.grid_frequency = modbus_get_register(2);
+        growattModbus_DataMap.changed.grid_voltage = growattModbus_DataMap.grid_voltage != modbus_get_register(3);
+        growattModbus_DataMap.grid_voltage = modbus_get_register(3);
+        growattModbus_DataMap.changed.grid_current = growattModbus_DataMap.grid_current != modbus_get_register(4);
+        (growattModbus_DataMap.grid_current = modbus_get_register(4));
         break;
 
       case 2:
-        _growattModbus_callback("grid/today/kwh", String(modbus_get_two_register_double(0, 10), 1));
-        _growattModbus_callback("grid/total/kwh", String(modbus_get_two_register_double(2, 10), 1));
-        _growattModbus_callback("inverter/seconds", String(modbus_get_two_register_double(4, 10), 1));
+        growattModbus_DataMap.changed.grid_today_energy = growattModbus_DataMap.grid_today_energy != modbus_get_two_register_uint(0);
+        growattModbus_DataMap.grid_today_energy = modbus_get_two_register_uint(0);
+        growattModbus_DataMap.changed.grid_total_energy = growattModbus_DataMap.grid_total_energy != modbus_get_two_register_uint(2);
+        growattModbus_DataMap.grid_total_energy = modbus_get_two_register_uint(2);
+        growattModbus_DataMap.changed.inverter_time = growattModbus_DataMap.inverter_time != modbus_get_two_register_uint(4);
+        growattModbus_DataMap.inverter_time = modbus_get_two_register_uint(4);
         break;
 
       case 3:
-        _growattModbus_callback("inverter/temperature", String((float)modbus_get_register(0) / 10, 1));
-        _growattModbus_callback("status", "ready");
+        growattModbus_DataMap.changed.temperature = growattModbus_DataMap.temperature != modbus_get_register(0);
+        growattModbus_DataMap.temperature = modbus_get_register(0);
+        growattModbus_DataMap.status = GrowattModbus_status::ready;
+        _growattModbus_callback();
         break;
     }
     modbus_clear_buffer();
@@ -111,7 +128,7 @@ int8_t growattModbus_read()
 
 void growattModbus_handle()
 {
-  static long long timeout = GROWATTMODBUS_WAIT_AFTER_STARTUP_TIMEOUT;
+  static long long timeout = GROWATTMODBUS_WAIT;
   static bool communicationFinished = false;
 
   // When receiving has finished request next packet if it's not the last packet of sequence
@@ -130,7 +147,7 @@ void growattModbus_handle()
       communicationFinished = true;
     }
     growattModbus_errorCounter = 0;
-    timeout = millis() + (GROWATTMODBUS_TIMEOUT * 1000);
+    timeout = millis() + (GROWATTMODBUS_WAIT * 1000);
   }
 
   // If timeout has reached errorcounter is increased and a retry to get modbus data
@@ -139,21 +156,9 @@ void growattModbus_handle()
   {
       if (growattModbus_errorCounter > 4)
       {
-        _growattModbus_callback("inverter/status", "offline");
-        _growattModbus_callback("inverter/status/value", "-");
-        _growattModbus_callback("pv/watt", "-");
-        _growattModbus_callback("pv/1/volt", "-");
-        _growattModbus_callback("pv/1/amp", "-");
-        _growattModbus_callback("pv/1/watt", "-");
-        _growattModbus_callback("pv/2/volt", "-");
-        _growattModbus_callback("pv/2/amp", "-");
-        _growattModbus_callback("pv/2/watt", "-");
-        _growattModbus_callback("grid/volt", "-");
-        _growattModbus_callback("grid/amp", "-");
-        _growattModbus_callback("grid/frequency", "-");
-        _growattModbus_callback("grid/watt", "-");
-        _growattModbus_callback("inverter/temperature", "-");
-        _growattModbus_callback("status", "commerror");
+        growattModbus_DataMap.inverter_status = "offline";
+        growattModbus_DataMap.status = GrowattModbus_status::offline;
+        _growattModbus_callback();
       }
       else 
       {

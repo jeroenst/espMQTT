@@ -37,8 +37,8 @@
 // #define ESPMQTT_BEDROOM2
 // #define ESPMQTT_OPENTHERM
 // #define ESPMQTT_SMARTMETER
-#define ESPMQTT_GROWATT
-// #define ESPMQTT_GROWATT_MODBUS
+// #define ESPMQTT_GROWATT
+#define ESPMQTT_GROWATT_MODBUS
 // #define ESPMQTT_SDM120
 // #define ESPMQTT_DDM18SD
 // #define ESPMQTT_WATERMETER
@@ -670,7 +670,7 @@ AsyncMqttClient mqttClient;
 #include <HLW8012.h>
 #endif
 
-char _gFmtBuf[100+1];
+char _gFmtBuf[100 + 1];
 
 struct Triggers {
   bool wificonnected = false;
@@ -819,14 +819,14 @@ void ICACHE_RAM_ATTR hlw8012_cf_interrupt() {
 #endif
 
 
-int replacechar(char *str,const char orig,const char rep) {
-    char *ix = str;
-    int n = 0;
-    while((ix = strchr(ix, orig)) != NULL) {
-        *ix++ = rep;
-        n++;
-    }
-    return n;
+int replacechar(char *str, const char orig, const char rep) {
+  char *ix = str;
+  int n = 0;
+  while ((ix = strchr(ix, orig)) != NULL) {
+    *ix++ = rep;
+    n++;
+  }
+  return n;
 }
 
 
@@ -897,27 +897,28 @@ void updateexternalip();
 
 #define DATAMAP_BASELENGTH 25
 
-enum DataMapStatus {initializing, wifierror, mqtterror, commerror, online};
+enum DataMapStatus {initializing, wifierror, mqtterror, commerror, online, receiving, querying, ready};
 enum DataMapStatusUpgrade {notchecked, uptodate, fail};
 
 struct
 {
-  uint64_t sendIds[2] = {0, 0};
-  uint64_t publishRegularIds[2] = {0, 0};
-  int8_t length = DATAMAP_BASELENGTH;
-  char firmware_upgradekey[11] = "";
-  DataMapStatus status = initializing;
-  DataMapStatusUpgrade status_upgrade = notchecked;
-  char externalip[17] = "";
+  uint64_t sendIds[2] = {0, 0}; // Ids that are queued to be send to mqtt broker
+  uint64_t publishRegularIds[2] = {0, 0}; // Ids that will be send to mqtt broker regulary
+  int8_t length = DATAMAP_BASELENGTH; // Length of datamap
+  char firmware_upgradekey[11] = ""; // Key that has to be provided by mqtt upgrade command before upgrading to prevent upgrade loop
+  DataMapStatus status = initializing; // The main status of this esp
+  bool sendStatusAfterPublishCompleted = false; // When true, the status will be send to mqtt broker when all other other data has been published (usually for a ready message after sending out new values)
+  DataMapStatusUpgrade status_upgrade = notchecked; // Upgrade status
+  char externalip[17] = ""; // For storing the external ip discovered.
 } DataMap;
 
 
-bool getdatamap_checkandfill(char *key, char *outputvalue, uint8_t id, uint8_t idCounter, const char *searchkey, const char *inputvalue)
+bool getdatamap_checkandfill(char *key, char *outputvalue, int8_t id, uint8_t idCounter, const char *searchkey, const char *inputvalue)
 {
   if (((strcmp (key, searchkey) == 0) || (id == idCounter)) && (id < DataMap.length))
   {
     strcpy (outputvalue, inputvalue);
-    strcpy (key, searchkey);
+    if (id >= 0) strcpy (key, searchkey);
     return true;
   }
   return false;
@@ -950,6 +951,7 @@ void PublishRegular(uint8_t id, bool value)
 
 bool getDataMapSendStatus(uint8_t id)
 {
+  if (DataMap.sendStatusAfterPublishCompleted && DataMap.sendIds[0] == 0 && DataMap.sendIds[1] == 0 && id == 1) return 1; 
   if (id < 64) return ((DataMap.sendIds[0] & (uint64_t(1) << id)) > 0);
   else return ((DataMap.sendIds[1] & (uint64_t(1) << (id - 64))) > 0);
 }
@@ -965,22 +967,25 @@ String uint64_to_binstr (uint64_t n)
   return output;
 }
 
-void setDataMapSendStatus(uint8_t id, bool sendstatus = true)
+bool setDataMapSendStatus(uint8_t id, bool sendstatus = true)
 {
+  if (id == 1) DataMap.sendStatusAfterPublishCompleted = false;
   if (id < 64)
   {
     if (sendstatus) DataMap.sendIds[0] |= (uint64_t(1) << id);
     else DataMap.sendIds[0] &= ~(uint64_t(1) << id);
   }
-  else
+  else if (id < 128)
   {
     if (sendstatus) DataMap.sendIds[1] |= (uint64_t(1) << (id - 64));
     else DataMap.sendIds[1] &= ~(uint64_t(1) << (id - 64));
   }
-  DEBUG("id=%d, sendstatus=%d sendids[0]=%s sendids[1]=%s\n", id, sendstatus, uint64_to_binstr(DataMap.sendIds[0]).c_str(), uint64_to_binstr(DataMap.sendIds[1]).c_str());
+  else return true;
+  //DEBUG("id=%d, sendstatus=%d sendids[0]=%s sendids[1]=%s\n", id, sendstatus, uint64_to_binstr(DataMap.sendIds[0]).c_str(), uint64_to_binstr(DataMap.sendIds[1]).c_str());
+  return false;
 }
 
-int16_t getDataMap(char *key, char *value, uint8_t id = -1)
+int16_t getDataMap(char *key, char *value, int8_t id = -1)
 {
   uint8_t idCounter = 0;
   char valuestring[30] = "";
@@ -988,7 +993,14 @@ int16_t getDataMap(char *key, char *value, uint8_t id = -1)
   if (getdatamap_checkandfill(key, value, id, idCounter++, "hostname", WiFi.hostname().c_str())) return --idCounter;
 
   // Return Status Items
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "status", (DataMap.status == initializing) ? "initializing" : (DataMap.status == online) ? "online" : (DataMap.status == commerror) ? "commerror" : "")) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "status",
+                              (DataMap.status == initializing) ? "initializing" :
+                              (DataMap.status == online) ? "online" :
+                              (DataMap.status == commerror) ? "commerror" :
+                              (DataMap.status == receiving) ? "receiving" :
+                              (DataMap.status == querying) ? "querying" :
+                              (DataMap.status == ready) ? "ready" :
+                              "")) return --idCounter;
   if (getdatamap_checkandfill(key, value, id, idCounter++, "status/upgrade", (DataMap.status_upgrade == notchecked) ? "not checked" : (DataMap.status_upgrade == uptodate) ? "up to date" : (DataMap.status_upgrade == fail) ? "check failed" : "")) return --idCounter;
 
   // Return Firmware Items
@@ -1052,8 +1064,8 @@ int16_t getDataMap(char *key, char *value, uint8_t id = -1)
 #endif
 
 #ifdef ESPMQTT_GROWATT
-    if (getdatamap_checkandfill(key, value, id, idCounter++, "inverter/status/value", String(growatt_DataMap.inverter_status_value).c_str())) return --idCounter;
-    if (getdatamap_checkandfill(key, value, id, idCounter++, "inverter/status/value", growatt_DataMap.inverter_status)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "inverter/status/value", String(growatt_DataMap.inverter_status_value).c_str())) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "inverter/status", growatt_DataMap.inverter_status)) return --idCounter;
 
   snprintf (valuestring, 30, cF("%u.%01u"), growatt_DataMap.pv_1_voltage / 10, growatt_DataMap.pv_1_voltage % 10);
   if (getdatamap_checkandfill(key, value, id, idCounter++, "pv/1/volt", valuestring)) return --idCounter;
@@ -1089,11 +1101,63 @@ int16_t getDataMap(char *key, char *value, uint8_t id = -1)
   snprintf (valuestring, 30, cF("%u.%01u"), growatt_DataMap.grid_total_energy / 10, growatt_DataMap.grid_total_energy % 10);
   if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/total/kwh", valuestring)) return --idCounter;
 
-  snprintf (valuestring, 30, cF("%u"), growatt_DataMap.inverter_hours);
+  snprintf (valuestring, 30, cF("%u"), growatt_DataMap.inverter_time);
   if (getdatamap_checkandfill(key, value, id, idCounter++, "inverter/hours", valuestring)) return --idCounter;
 
   snprintf (valuestring, 30, cF("%u"), growatt_DataMap.fanspeed);
   if (getdatamap_checkandfill(key, value, id, idCounter++, "fanspeed", valuestring)) return --idCounter;
+#endif
+
+#ifdef ESPMQTT_GROWATT_MODBUS
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "inverter/status/value", String(growattModbus_DataMap.inverter_status_value).c_str())) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "inverter/status", growattModbus_DataMap.inverter_status)) return --idCounter;
+
+  snprintf (valuestring, 30, cF("%u.%01u"), growattModbus_DataMap.pv_1_voltage / 10, growattModbus_DataMap.pv_1_voltage % 10);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "pv/1/volt", valuestring)) return --idCounter;
+  snprintf (valuestring, 30, cF("%u.%01u"), growattModbus_DataMap.pv_1_current / 10, growattModbus_DataMap.pv_1_current % 10);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "pv/1/amp", valuestring)) return --idCounter;
+  snprintf (valuestring, 30, cF("%u.%01u"), growattModbus_DataMap.pv_1_power / 10, growattModbus_DataMap.pv_1_power % 10);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "pv/1/watt", valuestring)) return --idCounter;
+
+  snprintf (valuestring, 30, cF("%u.%01u"), growattModbus_DataMap.pv_2_voltage / 10, growattModbus_DataMap.pv_2_voltage % 10);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "pv/2/volt", valuestring)) return --idCounter;
+  snprintf (valuestring, 30, cF("%u.%01u"), growattModbus_DataMap.pv_2_current / 10, growattModbus_DataMap.pv_2_current % 10);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "pv/2/amp", valuestring)) return --idCounter;
+  snprintf (valuestring, 30, cF("%u.%01u"), growattModbus_DataMap.pv_2_power / 10, growattModbus_DataMap.pv_2_power % 10);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "pv/2/watt", valuestring)) return --idCounter;
+
+  snprintf (valuestring, 30, cF("%u.%01u"), growattModbus_DataMap.pv_power / 10, growattModbus_DataMap.pv_power % 10);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "pv/watt", valuestring)) return --idCounter;
+
+  snprintf (valuestring, 30, cF("%u.%01u"), growattModbus_DataMap.grid_voltage / 10, growattModbus_DataMap.grid_voltage % 10);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/volt", valuestring)) return --idCounter;
+
+  snprintf (valuestring, 30, cF("%u.%01u"), growattModbus_DataMap.grid_current / 10, growattModbus_DataMap.grid_current % 10);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/amp", valuestring)) return --idCounter;
+
+  snprintf (valuestring, 30, cF("%u.%02u"), growattModbus_DataMap.grid_frequency / 100, growattModbus_DataMap.grid_frequency % 100);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/frequency", valuestring)) return --idCounter;
+
+  snprintf (valuestring, 30, cF("%u.%01u"), growattModbus_DataMap.grid_power / 10, growattModbus_DataMap.grid_power % 10);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/watt", valuestring)) return --idCounter;
+
+  snprintf (valuestring, 30, cF("%u.%01u"), growattModbus_DataMap.fault_temperature / 10, growattModbus_DataMap.fault_temperature % 10);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "fault/temperature", valuestring)) return --idCounter;
+
+  snprintf (valuestring, 30, cF("%u"), growattModbus_DataMap.fault_type);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "fault/type", valuestring)) return --idCounter;
+
+  snprintf (valuestring, 30, cF("%u.%01u"), growattModbus_DataMap.temperature / 10, growattModbus_DataMap.temperature % 10);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "temperature", valuestring)) return --idCounter;
+
+  snprintf (valuestring, 30, cF("%u.%01u"), growattModbus_DataMap.grid_today_energy / 10, growattModbus_DataMap.grid_today_energy % 10);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/today/kwh", valuestring)) return --idCounter;
+
+  snprintf (valuestring, 30, cF("%u.%01u"), growattModbus_DataMap.grid_total_energy / 10, growattModbus_DataMap.grid_total_energy % 10);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/total/kwh", valuestring)) return --idCounter;
+
+  snprintf (valuestring, 30, cF("%u"), growattModbus_DataMap.inverter_time / 2);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "inverter/seconds", valuestring)) return --idCounter;
 #endif
 
   return -1;
@@ -1130,18 +1194,35 @@ String getDataMapValue(uint8_t id)
 }
 
 
-String getDataMapValue(String key)
+String getDataMapValue(const char *key)
 {
   char value[30] = "";
   char keyarray[30] = "";
-  strcpy(keyarray, key.c_str());
+  strcpy(keyarray, key);
   getDataMap(keyarray, value);
   return String(value);
 }
 
+int16_t getDataMapId(const char *key)
+{
+  char value[30] = "";
+  char keyarray[30] = "";
+  strcpy(keyarray, key);
+  DEBUG("getDataMapId key=%s, keyarray=%s\n", key, keyarray);
+  return getDataMap(keyarray, value);
+}
+
+bool setDataMapSendStatus(const char *key, bool sendstatus = true)
+{
+  int16_t id = getDataMapId(key);
+  DEBUG("setDataMapSendStatus key=%s, id=%d\n", key, id);
+  if (id < 0) return 1;
+  return setDataMapSendStatus(id, sendstatus);
+}
+
 String getdatamap(String key)
 {
-  return getDataMapValue(key);
+  return getDataMapValue(key.c_str());
 }
 
 void showdatamap()
@@ -1613,7 +1694,7 @@ void onMqttPublish(uint16_t packetId)
 
 void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties, size_t len, size_t, size_t) {
   String payloadstring = "";
-  #define TOPIC_BUFFER_SIZE 50
+#define TOPIC_BUFFER_SIZE 50
   char topic_buffer[TOPIC_BUFFER_SIZE];
   for (unsigned int i = 0; i < len; i++)
   {
@@ -2504,6 +2585,7 @@ void espmqtt_handle_modules()
 #ifdef  ESPMQTT_GROWATT
   growatt_handle();
 #endif
+
 
 #ifdef  ESPMQTT_GOODWE
   goodwe_handle();
@@ -3567,7 +3649,7 @@ void handleWWWSettings()
         }
       }
       if (webserver.argName(i) == "hostname") snprintf(esp_hostname, ESP_HOSTNAME_SIZE, "%s", webserver.arg(i).c_str());
-      replacechar(esp_hostname,'_', '-'); // RFC doesn't alllow underscores.
+      replacechar(esp_hostname, '_', '-'); // RFC doesn't alllow underscores.
 #ifdef  ESPMQTT_WATERMETER
       if (webserver.argName(i) == "watermeterliter")
       {
@@ -3792,14 +3874,40 @@ void openthermcallback (const char *topic, String payload)
 
 #ifdef  ESPMQTT_GROWATT
 void growattcallback ()
-{  
-  if (growatt_DataMap.status == ready) DataMap.status = online; else DataMap.status = commerror;
+{
   for (uint8_t bitpointer = 0;  bitpointer < 16; bitpointer++)
   {
     if (*(uint16_t*)&growatt_DataMap.changed & (1 << bitpointer))
     {
       *(uint16_t*)&growatt_DataMap.changed &=  ~(1 << bitpointer);
       setDataMapSendStatus(DATAMAP_BASELENGTH + bitpointer, true);
+    }
+  }
+
+  if (growatt_DataMap.status == Growatt_status::ready)
+  {
+    if (DataMap.status != ready)
+    {
+      DataMap.status = ready;
+      DataMap.sendStatusAfterPublishCompleted = true;
+    }
+  }
+
+  if (growatt_DataMap.status == Growatt_status::querying)
+  {
+    if (DataMap.status != querying)
+    {
+      DataMap.status = querying;
+      setDataMapSendStatus("status", true);
+    }
+  }
+
+  if (growatt_DataMap.status == Growatt_status::offline)
+  {
+    if (DataMap.status != commerror)
+    {
+      DataMap.status = commerror;
+      setDataMapSendStatus("status", true);
     }
   }
 }
@@ -3818,14 +3926,44 @@ void goodwecallback (const char *topic, String payload)
 #endif
 
 #ifdef  ESPMQTT_GROWATT_MODBUS
-void growattModbuscallback (const char *topic, String payload)
+void growattModbuscallback ()
 {
-  if (strcmp(topic, "status"))
+  DEBUG("changed=%u\n", *(uint16_t*)&growattModbus_DataMap.changed);
+  for (uint8_t bitpointer = 0;  bitpointer < GROWATT_MODBUS_DATAMAP_LENGTH; bitpointer++)
   {
-    if (payload == "ready") digitalWrite(NODEMCULEDPIN, 0);
-    else digitalWrite(NODEMCULEDPIN, 1);
+    if (*(uint32_t*)&growattModbus_DataMap.changed & (1 << bitpointer))
+    {
+      *(uint32_t*)&growattModbus_DataMap.changed &=  ~(1 << bitpointer);
+      setDataMapSendStatus(DATAMAP_BASELENGTH + bitpointer, true);
+    }
   }
-  putdatamap(topic, payload);
+
+  if (growattModbus_DataMap.status == GrowattModbus_status::ready)
+  {
+    if (DataMap.status != ready)
+    {
+      DataMap.status = ready;
+      DataMap.sendStatusAfterPublishCompleted = true;
+    }
+  }
+
+  if (growattModbus_DataMap.status == GrowattModbus_status::querying)
+  {
+    if (DataMap.status != querying)
+    {
+      DataMap.status = querying;
+      setDataMapSendStatus("status", true);
+    }
+  }
+
+  if (growattModbus_DataMap.status == GrowattModbus_status::offline)
+  {
+    if (DataMap.status != commerror)
+    {
+      DataMap.status = commerror;
+      setDataMapSendStatus("status", true);
+    }
+  }
 }
 #endif
 
@@ -4066,7 +4204,7 @@ uint16_t eeprom_write(const char *value, uint16_t eeprompos)
   DEBUG_D("eeprom_write %d,%s\n", eeprompos, value);
   uint16_t eeprompointer = eeprompos;
   uint8_t checksum = 20;
-  EEPROM.write(eeprompointer++, strlen(value)+1);
+  EEPROM.write(eeprompointer++, strlen(value) + 1);
   for (uint16_t valueindex = 0; valueindex < strlen(value); valueindex++)
   {
     char valuechar = value[valueindex];
@@ -4087,7 +4225,7 @@ void eeprom_save_variables()
   pos = eeprom_write(esp_password, pos);
   pos = eeprom_write(esp_hostname, pos);
   char buffer [10];
-  snprintf (buffer, 10, "%d",mqtt_port);
+  snprintf (buffer, 10, "%d", mqtt_port);
   pos = eeprom_write(buffer, pos);
   pos = eeprom_write(mqtt_ssl ? "1" : "0", pos);
   pos = eeprom_write(mqtt_topicprefix, pos);
@@ -4147,8 +4285,8 @@ void eeprom_load_variables()
     DEBUG_E("Error reading hostname from internal eeprom\n");
     snprintf (esp_hostname, ESP_HOSTNAME_SIZE, "%s-%s", FIRMWARE_TARGET, chipid.c_str());
   }
-  
-  replacechar (esp_hostname,'_', '-'); // RFC doesn't alllow underscores.
+
+  replacechar (esp_hostname, '_', '-'); // RFC doesn't alllow underscores.
   DEBUG_I("Hostname=%s\n", esp_hostname);
 
   char buffer[8];
@@ -4169,7 +4307,7 @@ void eeprom_load_variables()
   else
   {
     mqtt_ssl = 0;
-    if (strcmp(buffer,"1") == 0) mqtt_ssl = 1;
+    if (strcmp(buffer, "1") == 0) mqtt_ssl = 1;
   }
   DEBUG_D("mqtt ssl=%d\n", mqtt_ssl);
 
@@ -4427,7 +4565,7 @@ void setup() {
 
 #ifdef  ESPMQTT_GROWATT
   growatt_init(growattcallback, FANPIN);
-    DataMap.length += 16;
+  DataMap.length += 16;
 #endif
 
 #ifdef  ESPMQTT_GOODWE
@@ -4436,6 +4574,7 @@ void setup() {
 
 #ifdef  ESPMQTT_GROWATT_MODBUS
   growattModbus_init(growattModbuscallback);
+  DataMap.length += GROWATT_MODBUS_DATAMAP_LENGTH;
 #endif
 
 #ifdef  ESPMQTT_AMGPELLETSTOVE

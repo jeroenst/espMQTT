@@ -198,3 +198,15 @@ double modbus_get_two_register_double(uint8_t registerstartid, double devide)
     return NAN;
   }
 }
+
+uint16_t modbus_get_two_register_uint(uint8_t registerstartid)
+{
+  if (registerstartid * 2 < modbus_RxBufferPointer)
+  {
+    return glue(modbus_get_register(registerstartid), modbus_get_register(registerstartid+1));
+  }
+  else
+  {
+    return 0xFFFF;
+  }
+}
