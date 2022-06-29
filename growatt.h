@@ -45,6 +45,7 @@ struct Growatt_DataMap_Struct
     uint32_t inverter_time; // hour precision
     uint16_t fanspeed;
     enum Growatt_status status = Growatt_status::offline;
+    bool dataReady = false;
 };
 
 extern Growatt_DataMap_Struct growatt_DataMap;

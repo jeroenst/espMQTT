@@ -117,6 +117,7 @@ int8_t growattModbus_read()
         growattModbus_DataMap.changed.temperature = growattModbus_DataMap.temperature != modbus_get_register(0);
         growattModbus_DataMap.temperature = modbus_get_register(0);
         growattModbus_DataMap.status = GrowattModbus_status::ready;
+        growattModbus_DataMap.dataReady = true;
         _growattModbus_callback();
         break;
     }
@@ -158,6 +159,7 @@ void growattModbus_handle()
       {
         growattModbus_DataMap.inverter_status = "offline";
         growattModbus_DataMap.status = GrowattModbus_status::offline;
+        growattModbus_DataMap.dataReady = false;
         _growattModbus_callback();
       }
       else 

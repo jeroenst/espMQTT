@@ -47,7 +47,7 @@ int8_t smartmeter_handle()
         if (buffer[0] == '/')
       {
         wh = 0;
-        smartmeter_DataMap.status = receiving;
+        smartmeter_DataMap.status = Smartmeter_status::receiving;
       }
 
       if (buffer[0] == '!')
@@ -62,7 +62,8 @@ int8_t smartmeter_handle()
           smartmeter_DataMap.electricity.wh = wh;
           smartmeter_DataMap.electricity.changed.wh = wh;
         }
-        smartmeter_DataMap.status = ready;
+        smartmeter_DataMap.status = Smartmeter_status::ready;
+        smartmeter_DataMap.dataReady = true;
         _smartmeter_callback();
         watt = 0;
       }

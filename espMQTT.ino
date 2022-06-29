@@ -36,9 +36,9 @@
 // #define ESPMQTT_BATHROOM
 // #define ESPMQTT_BEDROOM2
 // #define ESPMQTT_OPENTHERM
-// #define ESPMQTT_SMARTMETER
+#define ESPMQTT_SMARTMETER
 // #define ESPMQTT_GROWATT
-#define ESPMQTT_GROWATT_MODBUS
+// #define ESPMQTT_GROWATT_MODBUS
 // #define ESPMQTT_SDM120
 // #define ESPMQTT_DDM18SD
 // #define ESPMQTT_WATERMETER
@@ -913,11 +913,13 @@ struct
 } DataMap;
 
 
-bool getdatamap_checkandfill(char *key, char *outputvalue, int8_t id, uint8_t idCounter, const char *searchkey, const char *inputvalue)
+
+bool getdatamap_checkandfill(char *key, char *outputvalue, int8_t id, uint8_t idCounter, const char *searchkey, const char *inputvalue, const bool dataValid = true)
 {
   if (((strcmp (key, searchkey) == 0) || (id == idCounter)) && (id < DataMap.length))
   {
-    strcpy (outputvalue, inputvalue);
+    if (dataValid) strcpy (outputvalue, inputvalue);
+    else strcpy (outputvalue, "-");
     if (id >= 0) strcpy (key, searchkey);
     return true;
   }
@@ -1064,100 +1066,100 @@ int16_t getDataMap(char *key, char *value, int8_t id = -1)
 #endif
 
 #ifdef ESPMQTT_GROWATT
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "inverter/status/value", String(growatt_DataMap.inverter_status_value).c_str())) return --idCounter;
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "inverter/status", growatt_DataMap.inverter_status)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "inverter/status/value", String(growatt_DataMap.inverter_status_value).c_str(), growatt_DataMap.dataReady)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "inverter/status", growatt_DataMap.inverter_status, growatt_DataMap.dataReady)) return --idCounter;
 
   snprintf (valuestring, 30, cF("%u.%01u"), growatt_DataMap.pv_1_voltage / 10, growatt_DataMap.pv_1_voltage % 10);
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "pv/1/volt", valuestring)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "pv/1/volt", valuestring, growatt_DataMap.dataReady)) return --idCounter;
   snprintf (valuestring, 30, cF("%u.%01u"), growatt_DataMap.pv_2_voltage / 10, growatt_DataMap.pv_2_voltage % 10);
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "pv/2/volt", valuestring)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "pv/2/volt", valuestring, growatt_DataMap.dataReady)) return --idCounter;
   snprintf (valuestring, 30, cF("%u.%01u"), growatt_DataMap.pv_power / 10, growatt_DataMap.pv_power % 10);
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "pv/watt", valuestring)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "pv/watt", valuestring, growatt_DataMap.dataReady)) return --idCounter;
 
   snprintf (valuestring, 30, cF("%u.%01u"), growatt_DataMap.grid_voltage / 10, growatt_DataMap.grid_voltage % 10);
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/volt", valuestring)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/volt", valuestring, growatt_DataMap.dataReady)) return --idCounter;
 
   snprintf (valuestring, 30, cF("%u.%01u"), growatt_DataMap.grid_current / 10, growatt_DataMap.grid_current % 10);
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/amp", valuestring)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/amp", valuestring, growatt_DataMap.dataReady)) return --idCounter;
 
   snprintf (valuestring, 30, cF("%u.%02u"), growatt_DataMap.grid_frequency / 100, growatt_DataMap.grid_frequency % 100);
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/frequency", valuestring)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/frequency", valuestring, growatt_DataMap.dataReady)) return --idCounter;
 
   snprintf (valuestring, 30, cF("%u.%01u"), growatt_DataMap.grid_power / 10, growatt_DataMap.grid_power % 10);
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/watt", valuestring)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/watt", valuestring, growatt_DataMap.dataReady)) return --idCounter;
 
   snprintf (valuestring, 30, cF("%u.%01u"), growatt_DataMap.fault_temperature / 10, growatt_DataMap.fault_temperature % 10);
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "fault/temperature", valuestring)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "fault/temperature", valuestring, growatt_DataMap.dataReady)) return --idCounter;
 
   snprintf (valuestring, 30, cF("%u"), growatt_DataMap.fault_type);
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "fault/type", valuestring)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "fault/type", valuestring, growatt_DataMap.dataReady)) return --idCounter;
 
   snprintf (valuestring, 30, cF("%u.%01u"), growatt_DataMap.temperature / 10, growatt_DataMap.temperature % 10);
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "temperature", valuestring)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "temperature", valuestring, growatt_DataMap.dataReady)) return --idCounter;
 
   snprintf (valuestring, 30, cF("%u.%01u"), growatt_DataMap.grid_today_energy / 10, growatt_DataMap.grid_today_energy % 10);
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/today/kwh", valuestring)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/today/kwh", valuestring, growatt_DataMap.dataReady)) return --idCounter;
 
   snprintf (valuestring, 30, cF("%u.%01u"), growatt_DataMap.grid_total_energy / 10, growatt_DataMap.grid_total_energy % 10);
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/total/kwh", valuestring)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/total/kwh", valuestring, growatt_DataMap.dataReady)) return --idCounter;
 
   snprintf (valuestring, 30, cF("%u"), growatt_DataMap.inverter_time);
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "inverter/hours", valuestring)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "inverter/hours", valuestring, growatt_DataMap.dataReady)) return --idCounter;
 
   snprintf (valuestring, 30, cF("%u"), growatt_DataMap.fanspeed);
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "fanspeed", valuestring)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "fanspeed", valuestring, growatt_DataMap.dataReady)) return --idCounter;
 #endif
 
 #ifdef ESPMQTT_GROWATT_MODBUS
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "inverter/status/value", String(growattModbus_DataMap.inverter_status_value).c_str())) return --idCounter;
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "inverter/status", growattModbus_DataMap.inverter_status)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "inverter/status/value", String(growattModbus_DataMap.inverter_status_value).c_str(), growattModbus_DataMap.dataReady)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "inverter/status", growattModbus_DataMap.inverter_status, growattModbus_DataMap.dataReady)) return --idCounter;
 
   snprintf (valuestring, 30, cF("%u.%01u"), growattModbus_DataMap.pv_1_voltage / 10, growattModbus_DataMap.pv_1_voltage % 10);
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "pv/1/volt", valuestring)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "pv/1/volt", valuestring, growattModbus_DataMap.dataReady)) return --idCounter;
   snprintf (valuestring, 30, cF("%u.%01u"), growattModbus_DataMap.pv_1_current / 10, growattModbus_DataMap.pv_1_current % 10);
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "pv/1/amp", valuestring)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "pv/1/amp", valuestring, growattModbus_DataMap.dataReady)) return --idCounter;
   snprintf (valuestring, 30, cF("%u.%01u"), growattModbus_DataMap.pv_1_power / 10, growattModbus_DataMap.pv_1_power % 10);
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "pv/1/watt", valuestring)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "pv/1/watt", valuestring, growattModbus_DataMap.dataReady)) return --idCounter;
 
   snprintf (valuestring, 30, cF("%u.%01u"), growattModbus_DataMap.pv_2_voltage / 10, growattModbus_DataMap.pv_2_voltage % 10);
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "pv/2/volt", valuestring)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "pv/2/volt", valuestring, growattModbus_DataMap.dataReady)) return --idCounter;
   snprintf (valuestring, 30, cF("%u.%01u"), growattModbus_DataMap.pv_2_current / 10, growattModbus_DataMap.pv_2_current % 10);
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "pv/2/amp", valuestring)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "pv/2/amp", valuestring, growattModbus_DataMap.dataReady)) return --idCounter;
   snprintf (valuestring, 30, cF("%u.%01u"), growattModbus_DataMap.pv_2_power / 10, growattModbus_DataMap.pv_2_power % 10);
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "pv/2/watt", valuestring)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "pv/2/watt", valuestring, growattModbus_DataMap.dataReady)) return --idCounter;
 
   snprintf (valuestring, 30, cF("%u.%01u"), growattModbus_DataMap.pv_power / 10, growattModbus_DataMap.pv_power % 10);
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "pv/watt", valuestring)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "pv/watt", valuestring, growattModbus_DataMap.dataReady)) return --idCounter;
 
   snprintf (valuestring, 30, cF("%u.%01u"), growattModbus_DataMap.grid_voltage / 10, growattModbus_DataMap.grid_voltage % 10);
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/volt", valuestring)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/volt", valuestring, growattModbus_DataMap.dataReady)) return --idCounter;
 
   snprintf (valuestring, 30, cF("%u.%01u"), growattModbus_DataMap.grid_current / 10, growattModbus_DataMap.grid_current % 10);
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/amp", valuestring)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/amp", valuestring, growattModbus_DataMap.dataReady)) return --idCounter;
 
   snprintf (valuestring, 30, cF("%u.%02u"), growattModbus_DataMap.grid_frequency / 100, growattModbus_DataMap.grid_frequency % 100);
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/frequency", valuestring)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/frequency", valuestring, growattModbus_DataMap.dataReady)) return --idCounter;
 
   snprintf (valuestring, 30, cF("%u.%01u"), growattModbus_DataMap.grid_power / 10, growattModbus_DataMap.grid_power % 10);
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/watt", valuestring)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/watt", valuestring, growattModbus_DataMap.dataReady)) return --idCounter;
 
   snprintf (valuestring, 30, cF("%u.%01u"), growattModbus_DataMap.fault_temperature / 10, growattModbus_DataMap.fault_temperature % 10);
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "fault/temperature", valuestring)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "fault/temperature", valuestring, growattModbus_DataMap.dataReady)) return --idCounter;
 
   snprintf (valuestring, 30, cF("%u"), growattModbus_DataMap.fault_type);
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "fault/type", valuestring)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "fault/type", valuestring, growattModbus_DataMap.dataReady)) return --idCounter;
 
   snprintf (valuestring, 30, cF("%u.%01u"), growattModbus_DataMap.temperature / 10, growattModbus_DataMap.temperature % 10);
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "temperature", valuestring)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "temperature", valuestring, growattModbus_DataMap.dataReady)) return --idCounter;
 
   snprintf (valuestring, 30, cF("%u.%01u"), growattModbus_DataMap.grid_today_energy / 10, growattModbus_DataMap.grid_today_energy % 10);
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/today/kwh", valuestring)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/today/kwh", valuestring, growattModbus_DataMap.dataReady)) return --idCounter;
 
   snprintf (valuestring, 30, cF("%u.%01u"), growattModbus_DataMap.grid_total_energy / 10, growattModbus_DataMap.grid_total_energy % 10);
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/total/kwh", valuestring)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "grid/total/kwh", valuestring, growattModbus_DataMap.dataReady)) return --idCounter;
 
   snprintf (valuestring, 30, cF("%u"), growattModbus_DataMap.inverter_time / 2);
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "inverter/seconds", valuestring)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "inverter/seconds", valuestring, growattModbus_DataMap.dataReady)) return --idCounter;
 #endif
 
   return -1;
@@ -3875,15 +3877,6 @@ void openthermcallback (const char *topic, String payload)
 #ifdef  ESPMQTT_GROWATT
 void growattcallback ()
 {
-  for (uint8_t bitpointer = 0;  bitpointer < 16; bitpointer++)
-  {
-    if (*(uint16_t*)&growatt_DataMap.changed & (1 << bitpointer))
-    {
-      *(uint16_t*)&growatt_DataMap.changed &=  ~(1 << bitpointer);
-      setDataMapSendStatus(DATAMAP_BASELENGTH + bitpointer, true);
-    }
-  }
-
   if (growatt_DataMap.status == Growatt_status::ready)
   {
     if (DataMap.status != ready)
@@ -3893,7 +3886,7 @@ void growattcallback ()
     }
   }
 
-  if (growatt_DataMap.status == Growatt_status::querying)
+  if ((DataMap.status != querying) && (DataMap.status != commerror))
   {
     if (DataMap.status != querying)
     {
@@ -3909,7 +3902,17 @@ void growattcallback ()
       DataMap.status = commerror;
       setDataMapSendStatus("status", true);
     }
+ }
+
+  for (uint8_t bitpointer = 0;  bitpointer < 16; bitpointer++)
+  {
+    if (*(uint16_t*)&growatt_DataMap.changed & (1 << bitpointer))
+    {
+      *(uint16_t*)&growatt_DataMap.changed &=  ~(1 << bitpointer);
+      setDataMapSendStatus(DATAMAP_BASELENGTH + bitpointer, true);
+    }
   }
+
 }
 #endif
 
@@ -3928,7 +3931,7 @@ void goodwecallback (const char *topic, String payload)
 #ifdef  ESPMQTT_GROWATT_MODBUS
 void growattModbuscallback ()
 {
-  DEBUG("changed=%u\n", *(uint16_t*)&growattModbus_DataMap.changed);
+  //DEBUG("changed=%u\n", *(uint16_t*)&growattModbus_DataMap.changed);
   for (uint8_t bitpointer = 0;  bitpointer < GROWATT_MODBUS_DATAMAP_LENGTH; bitpointer++)
   {
     if (*(uint32_t*)&growattModbus_DataMap.changed & (1 << bitpointer))
@@ -3949,7 +3952,7 @@ void growattModbuscallback ()
 
   if (growattModbus_DataMap.status == GrowattModbus_status::querying)
   {
-    if (DataMap.status != querying)
+    if ((DataMap.status != querying) && (DataMap.status != commerror))
     {
       DataMap.status = querying;
       setDataMapSendStatus("status", true);
@@ -3970,7 +3973,8 @@ void growattModbuscallback ()
 #ifdef  ESPMQTT_SMARTMETER
 void smartmetercallback ()
 {
-  if (smartmeter_DataMap.status == ready) DataMap.status = online; else DataMap.status = commerror;
+  if (smartmeter_DataMap.status == Smartmeter_status::ready) DataMap.status = online;
+  if (smartmeter_DataMap.status == Smartmeter_status::disconnected) DataMap.status = commerror;
   for (uint8_t bitpointer = 0;  bitpointer < 8; bitpointer++)
   {
     if (*(uint8_t*)&smartmeter_DataMap.electricity.changed & (1 << bitpointer))

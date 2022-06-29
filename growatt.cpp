@@ -79,6 +79,7 @@ void growatt_handle()
     if (!RxPowerDataOk)
     {
       growatt_DataMap.status = Growatt_status::offline;
+      growatt_DataMap.dataReady = false;
       _growatt_callback();
     }
     else 
@@ -214,6 +215,7 @@ void growatt_handle()
 
           
           growatt_DataMap.status = Growatt_status::ready;
+          growatt_DataMap.dataReady = true;
           _growatt_callback();
         }
         RxBufferPointer = 0;

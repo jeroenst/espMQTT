@@ -1,11 +1,11 @@
 int8_t smartmeter_handle();
 void smartmeter_init(void(*callback)(void));
 
-enum Smartmeter_status {disconnected, receiving, ready};
+enum class Smartmeter_status {disconnected, receiving, ready};
 
 struct Smartmeter_DataMap_Struct
 {
-  enum Smartmeter_status status = disconnected;
+  enum Smartmeter_status status = Smartmeter_status::disconnected;
   struct
   {
     struct 
@@ -40,6 +40,7 @@ struct Smartmeter_DataMap_Struct
     uint32_t liter;
     char datetime[20];
   } gas;
+  bool dataReady = false;
 };
 
 

@@ -51,6 +51,7 @@ struct GrowattModbus_DataMap_Struct
     uint32_t grid_total_energy = 0; // 0.1 kWh precision
     uint32_t inverter_time = 0; // 0.5 second precision
     enum GrowattModbus_status status = GrowattModbus_status::offline;
+    bool dataReady = false;
 };
 
 extern GrowattModbus_DataMap_Struct growattModbus_DataMap;
