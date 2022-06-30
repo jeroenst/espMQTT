@@ -1053,9 +1053,9 @@ int16_t getDataMap(char *key, char *value, int8_t id = -1)
   snprintf (valuestring, 30, cF("%u.%03u"), smartmeter_DataMap.electricity.wh_used2 / 1000, smartmeter_DataMap.electricity.wh_used2 % 1000);
   if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/kwh_used2", valuestring)) return --idCounter;
 
-  snprintf (valuestring, 30, cF("%u.%03u"), smartmeter_DataMap.electricity.wh / 1000, smartmeter_DataMap.electricity.wh_provided1 % 1000);
+  snprintf (valuestring, 30, cF("%u.%03u"), smartmeter_DataMap.electricity.wh_provided1 / 1000, smartmeter_DataMap.electricity.wh_provided1 % 1000);
   if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/kwh_provided1", valuestring)) return --idCounter;
-  snprintf (valuestring, 30, cF("%u.%03u"), smartmeter_DataMap.electricity.wh / 1000, smartmeter_DataMap.electricity.wh_provided2 % 1000);
+  snprintf (valuestring, 30, cF("%u.%03u"), smartmeter_DataMap.electricity.wh_provided2 / 1000, smartmeter_DataMap.electricity.wh_provided2 % 1000);
   if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/kwh_provided2", valuestring)) return --idCounter;
 
   snprintf (valuestring, 30, cF("%u.%03u"), smartmeter_DataMap.gas.liter / 1000, smartmeter_DataMap.gas.liter % 1000);
@@ -3973,7 +3973,7 @@ void growattModbuscallback ()
 #ifdef  ESPMQTT_SMARTMETER
 void smartmetercallback ()
 {
-  if (smartmeter_DataMap.status == Smartmeter_status::ready) DataMap.status = online;
+  if (smartmeter_DataMap.status == Smartmeter_status::ready) DataMap.status = ready;
   if (smartmeter_DataMap.status == Smartmeter_status::disconnected) DataMap.status = commerror;
   for (uint8_t bitpointer = 0;  bitpointer < 8; bitpointer++)
   {

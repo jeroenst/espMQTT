@@ -21,14 +21,14 @@ int8_t smartmeter_handle()
   int8_t returnvalue = 0;
   int day, month, year, hour, minute, second;
   char summerwinter;
-  uint32_t uintvalue = 0;
-  uint32_t uintdecimals = 0;
   static char buffer[100];
   static uint8_t bufpos = 0;
   static int16_t watt = 0;
 
 
   while (Serial.available()) {
+    uint32_t uintvalue = 0;
+    uint32_t uintdecimals = 0;
     char input = Serial.read() & 127;
     // Fill buffer up to and including a new line (\n)
     if (bufpos < 100)
@@ -86,7 +86,6 @@ int8_t smartmeter_handle()
       if (sscanf(buffer, cF("1-0:1.8.2(%u.%u"), &uintvalue, &uintdecimals) == 2)
       {
         uintvalue = (uintvalue * 1000) + uintdecimals;
-        DEBUG ("Received wh_used2=%d\n", uintvalue);
         wh += uintvalue;
         if (smartmeter_DataMap.electricity.wh_used2 != uintvalue)
         {
@@ -112,7 +111,7 @@ int8_t smartmeter_handle()
       // 1-0:2.8.2 = Electricity high tarif provided (DSMR v4.0)
       if (sscanf(buffer, cF("1-0:2.8.2(%u.%u") , &uintvalue, &uintdecimals) == 2)
       {
-        uintvalue = uintvalue * 1000 + uintdecimals;
+        uintvalue = (uintvalue * 1000) + uintdecimals;
         wh -= uintvalue;
         if (smartmeter_DataMap.electricity.wh_provided2 != uintvalue)
         {
@@ -125,7 +124,7 @@ int8_t smartmeter_handle()
       // 1-0:1.7.0 = Electricity actual usage (DSMR v4.0)
       if (sscanf(buffer, cF("1-0:1.7.0(%u.%u") , &uintvalue, &uintdecimals) == 2)
       {
-        uintvalue = uintvalue * 1000 + uintdecimals;
+        uintvalue = (uintvalue * 1000) + uintdecimals;
         watt = uintvalue;
         if (smartmeter_DataMap.electricity.watt_using != uintvalue)
         {
@@ -139,7 +138,7 @@ int8_t smartmeter_handle()
       if (sscanf(buffer, cF("1-0:2.7.0(%u.%u"), &uintvalue, &uintdecimals) == 2)
       {
         DEBUG("Providing: %u.%u\n", uintvalue, uintdecimals);
-        uintvalue = uintvalue * 1000 + uintdecimals;
+        uintvalue = (uintvalue * 1000) + uintdecimals;
         watt -= uintvalue;
         if ((smartmeter_DataMap.electricity.watt != watt))
         {
@@ -157,7 +156,7 @@ int8_t smartmeter_handle()
       // 0-1:24.2.1 = Gas (DSMR v4.0)
       if (sscanf(buffer, cF("0-1:24.2.1(%2d%2d%2d%2d%2d%2d%c)(%d.%d"), &day, &month, &year, &hour, &minute, &second, &summerwinter, &uintvalue, &uintdecimals) == 9)
       {
-        uintvalue = uintvalue * 1000 + uintdecimals;
+        uintvalue = (uintvalue * 1000) + uintdecimals;
         if (smartmeter_DataMap.gas.liter != uintvalue)
         {
           smartmeter_DataMap.gas.liter = uintvalue;
