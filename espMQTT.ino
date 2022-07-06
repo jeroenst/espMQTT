@@ -36,7 +36,7 @@
 // #define ESPMQTT_BATHROOM
 // #define ESPMQTT_BEDROOM2
 // #define ESPMQTT_OPENTHERM
-#define ESPMQTT_SMARTMETER
+// #define ESPMQTT_SMARTMETER
 // #define ESPMQTT_GROWATT
 // #define ESPMQTT_GROWATT_MODBUS
 // #define ESPMQTT_SDM120
@@ -44,7 +44,7 @@
 // #define ESPMQTT_WATERMETER
 // #define ESPMQTT_DDNS
 // #define ESPMQTT_GENERIC8266
-// #define ESPMQTT_GENERIC8266_NEO
+#define ESPMQTT_GENERIC8266_NEO
 // #define ESPMQTT_MAINPOWERMETER
 // #define ESPMQTT_OBD2
 // #define ESPMQTT_NOISE
@@ -232,7 +232,7 @@ QsWifiSwitch qswifiswitch(QSWIFISWITCHCHANNELS);
 #ifdef  ESPMQTT_GENERIC8266_NEO
 #define FIRMWARE_TARGET "GENERIC8266"
 #define FLASHBUTTON D3
-#define NEOPIXELPIN D2
+#define NEOPIXELPIN D8
 #define ESPLED D4
 #define SERIALLOG
 #define APONBOOT
@@ -1500,7 +1500,8 @@ void obd2_handle()
 void startWifiAP()
 {
   DEBUG_E("Starting WiFi Accesspoint\n");
-  if (WiFi.softAP(WiFi.hostname().c_str(), DEFAULT_PASSWORD, 6, 0))
+  bool apok = 0;
+  if ((apok = WiFi.softAP(WiFi.hostname().c_str(), DEFAULT_PASSWORD, 6, 0)))
   {
     mainstate.accesspoint = true;
     DEBUG_E("WiFi Accesspoint Activated\n");
@@ -1515,6 +1516,7 @@ void startWifiAP()
     //tuya_apmode();
 #endif
   }
+  else DEBUG_E("Starting WiFi Accesspoint failed.");
 }
 
 void stopWifiAP()
@@ -1526,6 +1528,11 @@ void stopWifiAP()
 
 void connectToWifi()
 {
+  WiFi.hostname(esp_hostname);
+  ArduinoOTA.setHostname(esp_hostname);
+  ArduinoOTA.setPassword(esp_password);
+  Debug.setPassword(esp_password);
+  
   // If no ssid was configured start accesspoint
   if (0 != wifissid[0])
   {
@@ -1538,12 +1545,7 @@ void connectToWifi()
       WiFi.setSleepMode(WIFI_MODEM_SLEEP);
       //WiFi.setSleepMode(WIFI_NONE_SLEEP); // When sleep is on regular disconnects occur https://github.com/esp8266/Arduino/issues/5083
       WiFi.setOutputPower(20);        // 10dBm == 10mW, 14dBm = 25mW, 17dBm = 50mW, 20dBm = 100mW
-      WiFi.hostname(esp_hostname);
       WiFi.mode(WIFI_STA);
-
-      ArduinoOTA.setHostname(esp_hostname);
-      ArduinoOTA.setPassword(esp_password);
-      Debug.setPassword(esp_password);
 
       mainstate.accesspoint = false;
       mainstate.defaultpassword = false;
@@ -4163,28 +4165,30 @@ int16_t eeprom_read(char *data, uint8_t eepromindex, uint8_t length)
   uint16_t eeprompointer = 0;
   uint16_t eepromdatastartpointer = 0;
   uint8_t index = 0;
+  data[0] = '\0';
   while (eeprompointer < 512)
   {
     eepromdatastartpointer = eeprompointer;
     uint8_t datasize = EEPROM.read(eeprompointer++);
     DEBUG("datasize=%d\n", datasize);
-    if (datasize == 0) return (-1);
+    if (datasize == 0) return -1;
     byte checksum = 20;
     for (int pos = 0; pos < datasize - 1; pos++)
     {
-      if (pos < length - 1)
+      if ((index == eepromindex) && (pos < length - 1))
       {
         data[pos] = char(EEPROM.read(eeprompointer));
-        data[pos + 1] = 0;
+        data[pos + 1] = '\0';
+        checksum += char(EEPROM.read(eeprompointer++));
       }
-      checksum += char(EEPROM.read(eeprompointer++));
     }
     byte eepromchecksum = EEPROM.read(eeprompointer++);
     if (index == eepromindex)
     {
       if (eepromchecksum != checksum)
       {
-        DEBUG_E("Error reading eeprom index %d (wrong checksum)!", index);
+        DEBUG_E("Error reading eeprom index %d (wrong checksum)!\n", index);
+        data[0] = '\0';
         return -1;
       }
       DEBUG_D("Read from eeprom %d=\"%s\" (checksum %d=%d)\n", eeprompointer, data, checksum, eepromchecksum);
@@ -4255,19 +4259,19 @@ void eeprom_load_variables()
 {
   // Read settings from EEPROM
   DEBUG_D("Reading internal EEPROM...\n");
-  if (!eeprom_read(mqtt_server, 0, MQTT_SERVER_SIZE))
+  if (0 >= eeprom_read(mqtt_server, 0, MQTT_SERVER_SIZE))
   {
     DEBUG_E("Error reading mqtt server from internal eeprom\n");
   }
   DEBUG_D("mqtt server=%s\n", mqtt_server);
 
-  if (!eeprom_read(mqtt_username, 1, MQTT_USERNAME_SIZE))
+  if (0 >= eeprom_read(mqtt_username, 1, MQTT_USERNAME_SIZE))
   {
     DEBUG_E("Error reading mqtt username from internal eeprom\n");
   }
   DEBUG_D("mqtt username=%s\n", mqtt_username);
 
-  if (!eeprom_read(mqtt_password, 2, MQTT_PASSWORD_SIZE))
+  if (0 >= eeprom_read(mqtt_password, 2, MQTT_PASSWORD_SIZE))
   {
     DEBUG_E("Error reading mqtt password from internal eeprom\n");
   }
@@ -4278,13 +4282,13 @@ void eeprom_load_variables()
 
   DEBUG_D("mqtt password=%s\n", mqtt_password);
 
-  if (!eeprom_read(esp_password, 3, ESP_PASSWORD_SIZE))
+  if (0 >= eeprom_read(esp_password, 3, ESP_PASSWORD_SIZE))
   {
     DEBUG_E("Error reading esp password from internal eeprom\n");
   }
   DEBUG_D("esp password=%s\n", esp_password);
 
-  if (!eeprom_read(esp_hostname, 4, ESP_HOSTNAME_SIZE))
+  if (0 >= eeprom_read(esp_hostname, 4, ESP_HOSTNAME_SIZE))
   {
     DEBUG_E("Error reading hostname from internal eeprom\n");
     snprintf (esp_hostname, ESP_HOSTNAME_SIZE, "%s-%s", FIRMWARE_TARGET, chipid.c_str());
@@ -4293,8 +4297,10 @@ void eeprom_load_variables()
   replacechar (esp_hostname, '_', '-'); // RFC doesn't alllow underscores.
   DEBUG_I("Hostname=%s\n", esp_hostname);
 
+  WiFi.hostname(esp_hostname);
+
   char buffer[8];
-  if (!eeprom_read(buffer, 5, 8))
+  if (0 >= eeprom_read(buffer, 5, 8))
   {
     DEBUG_E("Error reading mqttport from internal eeprom\n");
   }
@@ -4304,7 +4310,7 @@ void eeprom_load_variables()
   }
   DEBUG_D("mqtt port=%d\n", mqtt_port);
 
-  if (!eeprom_read(buffer, 6, 8))
+  if (0 >= eeprom_read(buffer, 6, 8))
   {
     DEBUG_E("Error reading mqtt ssl from internal eeprom\n");
   }
@@ -4315,7 +4321,7 @@ void eeprom_load_variables()
   }
   DEBUG_D("mqtt ssl=%d\n", mqtt_ssl);
 
-  if (!eeprom_read(mqtt_topicprefix, 7, MQTT_TOPICPREFIX_SIZE))
+  if (0 >= eeprom_read(mqtt_topicprefix, 7, MQTT_TOPICPREFIX_SIZE))
   {
     DEBUG_E("Error reading mqtt main topic from internal eeprom\n");
     snprintf(mqtt_topicprefix, MQTT_TOPICPREFIX_SIZE, "home/%s/", esp_hostname);
@@ -4324,7 +4330,7 @@ void eeprom_load_variables()
 
 #ifdef ESPMQTT_QSWIFIDIMMERD01
   char dimoffset[4] = "0";
-  if (!eeprom_read(dimoffset, 8, 4))
+  if (0 >= eeprom_read(dimoffset, 8, 4))
   {
     DEBUG_E("Error reading dimmer offset from internal eeprom\n");
     strcpy (dimoffset, "20");
@@ -4335,14 +4341,14 @@ void eeprom_load_variables()
 
 #ifdef ESPMQTT_QSWIFIDIMMERD02
   char dimoffsetarray[4] = "0";
-  if (!eeprom_read(dimoffset, 8, 4))
+  if (0 >= eeprom_read(dimoffset, 8, 4))
   {
     DEBUG_E("Error reading dimmer offset 0 from internal eeprom\n");
     strcpy (dimoffset, "20");
   }
   qswifidimmer_setdimoffset(atoi(dimoffset), 0);
   dimoffset[0] = 0;
-  if (!eeprom_read(dimoffset, 9, 4))
+  if (0 >= eeprom_read(dimoffset, 9, 4))
   {
     DEBUG_E("Error reading dimmer offset 1 from internal eeprom\n");
     strcpy (dimoffset, "20");
@@ -4352,7 +4358,7 @@ void eeprom_load_variables()
   putdatamap("dimoffset/1", String(qswifidimmer_getdimoffset(1)));
 #endif
 
-  if (!eeprom_read(wifissid, 10, WIFISSID_SIZE))
+  if (0 >= eeprom_read(wifissid, 10, WIFISSID_SIZE))
   {
     DEBUG_E("Error reading wifi ssid from internal eeprom\n");
     snprintf(wifissid, WIFISSID_SIZE, "%s", WiFi.SSID().c_str());
@@ -4360,7 +4366,7 @@ void eeprom_load_variables()
   if (0 == wifissid[0]) snprintf(wifissid, WIFISSID_SIZE, "%s", WiFi.SSID().c_str());
   DEBUG_D("wifi ssid=%s\n", wifissid);
 
-  if (!eeprom_read(wifipsk, 11, WIFIPSK_SIZE))
+  if (0 >= eeprom_read(wifipsk, 11, WIFIPSK_SIZE))
   {
     DEBUG_E("Error reading wifi key from internal eeprom\n");
     snprintf(wifipsk, WIFIPSK_SIZE, "%s", WiFi.psk().c_str());
