@@ -3136,13 +3136,11 @@ void loop()
       snprintf(uptimestr, 20, cF("%d:%02d:%02d:%02d"), uptime / 86400, (uptime / 3600) % 24, (uptime / 60) % 60, uptime % 60);
       time_t now;
       time(&now);
-      String strtime = ctime(&now);
-      strtime.replace("\n", "");
-      if (mainstate.wificonnected)
-      {
-        //syslogI("Uptime=%s DateTime=%s\n", uptimestr, strtime.c_str());
-      }
-      DEBUG_I("Uptime=%s DateTime=%s\n", uptimestr, strtime.c_str());
+      struct tm * timeinfo;
+      timeinfo = localtime (&now);
+      char strtime[20];
+      strftime(strtime, 20, cF("%d-%m-%Y %T"), timeinfo);
+      DEBUG_I("Uptime=%s DateTime=%s\n", uptimestr, strtime);
     }
     yield();
     ESP.wdtFeed(); // Prevent watchdog to kick in...
@@ -4012,10 +4010,10 @@ void processCmdRemoteDebug()
     DEBUG("  showdatamap\n");
     DEBUG("  ping [hostname]\n");
     DEBUG("  route\n");
-    DEBUG("  mqttconnect\n");
+    DEBUG("  mqttconnect ((re)connects to MQTT broker)\n");
     DEBUG("  showmainstate\n");
     DEBUG("  factoryreset\n");
-    DEBUG("  showeeprommap\n");
+    DEBUG("  showeeprom\n");
     DEBUG("  scanwifinetworks (scan for stronger wifi network and connect to it)\n");
     DEBUG("  showtime\n");
     DEBUG("  getrestartreason\n");
@@ -4144,8 +4142,19 @@ void processCmdRemoteDebug()
   }
 #endif
 
-  if (lastCmd == "showeeprommap")
+  if (lastCmd == "showeeprom")
   {
+    uint16_t eeprompointer = 0;
+    while (eeprompointer < 512) 
+    {
+      DEBUG("%d: %c (%d)\n",eeprompointer, EEPROM.read(eeprompointer), EEPROM.read(eeprompointer));
+      eeprompointer++;
+    }
+  }
+
+  if (lastCmd == "writeeeprom")
+  {
+    eeprom_save_variables();
   }
 
 #ifdef ESPMQTT_OPENTHERM
@@ -4159,7 +4168,7 @@ void processCmdRemoteDebug()
 
 
 
-int16_t eeprom_read(char *data, uint8_t eepromindex, uint8_t length)
+int16_t eeprom_read(char *data, uint8_t eepromindex, uint8_t maxlength)
 {
   DEBUG_D("eeprom_read index=%d;\n", eepromindex);
   uint16_t eeprompointer = 0;
@@ -4170,32 +4179,34 @@ int16_t eeprom_read(char *data, uint8_t eepromindex, uint8_t length)
   {
     eepromdatastartpointer = eeprompointer;
     uint8_t datasize = EEPROM.read(eeprompointer++);
-    DEBUG("datasize=%d\n", datasize);
+    //DEBUG_D("datasize=%d\n", datasize);
     if (datasize == 0) return -1;
-    byte checksum = 20;
-    for (int pos = 0; pos < datasize - 1; pos++)
-    {
-      if ((index == eepromindex) && (pos < length - 1))
-      {
-        data[pos] = char(EEPROM.read(eeprompointer));
-        data[pos + 1] = '\0';
-        checksum += char(EEPROM.read(eeprompointer++));
-      }
-    }
-    byte eepromchecksum = EEPROM.read(eeprompointer++);
+    uint8_t checksum = 20;
     if (index == eepromindex)
     {
+      for (uint8_t pos = 0; pos < datasize - 1; pos++)
+      {
+        if (pos < maxlength - 2)
+        {
+          data[pos] = char(EEPROM.read(eeprompointer));
+          data[pos + 1] = '\0';
+          checksum += char(EEPROM.read(eeprompointer++));
+        }
+      }
+      uint8_t eepromchecksum = EEPROM.read(eeprompointer++);
       if (eepromchecksum != checksum)
       {
-        DEBUG_E("Error reading eeprom index %d (wrong checksum)!\n", index);
+        DEBUG_E("Read from eeprom index=%d datapointerstart=%d data=\"%s\" (checksum %d=%d)\n", eepromindex, eepromdatastartpointer, data, checksum, eepromchecksum);
         data[0] = '\0';
         return -1;
       }
-      DEBUG_D("Read from eeprom %d=\"%s\" (checksum %d=%d)\n", eeprompointer, data, checksum, eepromchecksum);
+      DEBUG_D("Read from eeprom index=%d datapointerstart=%d data=\"%s\" (checksum %d=%d)\n", eepromindex, eepromdatastartpointer, data, checksum, eepromchecksum);
       return eepromdatastartpointer;
     }
+    eeprompointer += datasize;
     index++;
   }
+  DEBUG_E("Read from eeprom failed, index not found. Index=%d\n", eepromindex);
   return -1;
 }
 
@@ -4209,19 +4220,18 @@ void eeprom_erase()
 
 uint16_t eeprom_write(const char *value, uint16_t eeprompos)
 {
-  DEBUG_D("eeprom_write %d,%s\n", eeprompos, value);
-  uint16_t eeprompointer = eeprompos;
   uint8_t checksum = 20;
-  EEPROM.write(eeprompointer++, strlen(value) + 1);
+  DEBUG_D("eeprom_write %d,%s\n", eeprompos, value);
+  EEPROM.write(eeprompos++, strlen(value) + 1);
   for (uint16_t valueindex = 0; valueindex < strlen(value); valueindex++)
   {
-    char valuechar = value[valueindex];
-    EEPROM.write(eeprompointer++, valuechar);
-    checksum += valuechar;
+    EEPROM.write(eeprompos++, value[valueindex]);
+    checksum += value[valueindex];
   }
-  EEPROM.write(eeprompointer++, checksum);
-  EEPROM.write(eeprompointer + 1, 0);
-  return eeprompointer;
+  EEPROM.write(eeprompos++, checksum);
+  EEPROM.write(eeprompos + 1, 0);
+  DEBUG_D("checksum=%d, eepromposend=%d\n", checksum, eeprompos);
+  return eeprompos;
 }
 
 void eeprom_save_variables()
@@ -4259,19 +4269,19 @@ void eeprom_load_variables()
 {
   // Read settings from EEPROM
   DEBUG_D("Reading internal EEPROM...\n");
-  if (0 >= eeprom_read(mqtt_server, 0, MQTT_SERVER_SIZE))
+  if (0 > eeprom_read(mqtt_server, 0, MQTT_SERVER_SIZE))
   {
     DEBUG_E("Error reading mqtt server from internal eeprom\n");
   }
   DEBUG_D("mqtt server=%s\n", mqtt_server);
 
-  if (0 >= eeprom_read(mqtt_username, 1, MQTT_USERNAME_SIZE))
+  if (0 > eeprom_read(mqtt_username, 1, MQTT_USERNAME_SIZE))
   {
     DEBUG_E("Error reading mqtt username from internal eeprom\n");
   }
   DEBUG_D("mqtt username=%s\n", mqtt_username);
 
-  if (0 >= eeprom_read(mqtt_password, 2, MQTT_PASSWORD_SIZE))
+  if (0 > eeprom_read(mqtt_password, 2, MQTT_PASSWORD_SIZE))
   {
     DEBUG_E("Error reading mqtt password from internal eeprom\n");
   }
@@ -4282,13 +4292,14 @@ void eeprom_load_variables()
 
   DEBUG_D("mqtt password=%s\n", mqtt_password);
 
-  if (0 >= eeprom_read(esp_password, 3, ESP_PASSWORD_SIZE))
+  if (0 > eeprom_read(esp_password, 3, ESP_PASSWORD_SIZE))
   {
     DEBUG_E("Error reading esp password from internal eeprom\n");
   }
+  if (strlen(esp_password) == 0) strcpy(esp_password, "esplogin");
   DEBUG_D("esp password=%s\n", esp_password);
 
-  if (0 >= eeprom_read(esp_hostname, 4, ESP_HOSTNAME_SIZE))
+  if (0 > eeprom_read(esp_hostname, 4, ESP_HOSTNAME_SIZE))
   {
     DEBUG_E("Error reading hostname from internal eeprom\n");
     snprintf (esp_hostname, ESP_HOSTNAME_SIZE, "%s-%s", FIRMWARE_TARGET, chipid.c_str());
@@ -4300,7 +4311,7 @@ void eeprom_load_variables()
   WiFi.hostname(esp_hostname);
 
   char buffer[8];
-  if (0 >= eeprom_read(buffer, 5, 8))
+  if (0 > eeprom_read(buffer, 5, 8))
   {
     DEBUG_E("Error reading mqttport from internal eeprom\n");
   }
@@ -4310,7 +4321,7 @@ void eeprom_load_variables()
   }
   DEBUG_D("mqtt port=%d\n", mqtt_port);
 
-  if (0 >= eeprom_read(buffer, 6, 8))
+  if (0 > eeprom_read(buffer, 6, 8))
   {
     DEBUG_E("Error reading mqtt ssl from internal eeprom\n");
   }
@@ -4321,7 +4332,7 @@ void eeprom_load_variables()
   }
   DEBUG_D("mqtt ssl=%d\n", mqtt_ssl);
 
-  if (0 >= eeprom_read(mqtt_topicprefix, 7, MQTT_TOPICPREFIX_SIZE))
+  if (0 > eeprom_read(mqtt_topicprefix, 7, MQTT_TOPICPREFIX_SIZE))
   {
     DEBUG_E("Error reading mqtt main topic from internal eeprom\n");
     snprintf(mqtt_topicprefix, MQTT_TOPICPREFIX_SIZE, "home/%s/", esp_hostname);
@@ -4330,7 +4341,7 @@ void eeprom_load_variables()
 
 #ifdef ESPMQTT_QSWIFIDIMMERD01
   char dimoffset[4] = "0";
-  if (0 >= eeprom_read(dimoffset, 8, 4))
+  if (0 > eeprom_read(dimoffset, 8, 4))
   {
     DEBUG_E("Error reading dimmer offset from internal eeprom\n");
     strcpy (dimoffset, "20");
@@ -4341,14 +4352,14 @@ void eeprom_load_variables()
 
 #ifdef ESPMQTT_QSWIFIDIMMERD02
   char dimoffsetarray[4] = "0";
-  if (0 >= eeprom_read(dimoffset, 8, 4))
+  if (0 > eeprom_read(dimoffset, 8, 4))
   {
     DEBUG_E("Error reading dimmer offset 0 from internal eeprom\n");
     strcpy (dimoffset, "20");
   }
   qswifidimmer_setdimoffset(atoi(dimoffset), 0);
   dimoffset[0] = 0;
-  if (0 >= eeprom_read(dimoffset, 9, 4))
+  if (0 > eeprom_read(dimoffset, 9, 4))
   {
     DEBUG_E("Error reading dimmer offset 1 from internal eeprom\n");
     strcpy (dimoffset, "20");
@@ -4358,7 +4369,7 @@ void eeprom_load_variables()
   putdatamap("dimoffset/1", String(qswifidimmer_getdimoffset(1)));
 #endif
 
-  if (0 >= eeprom_read(wifissid, 10, WIFISSID_SIZE))
+  if (0 > eeprom_read(wifissid, 10, WIFISSID_SIZE))
   {
     DEBUG_E("Error reading wifi ssid from internal eeprom\n");
     snprintf(wifissid, WIFISSID_SIZE, "%s", WiFi.SSID().c_str());
@@ -4366,7 +4377,7 @@ void eeprom_load_variables()
   if (0 == wifissid[0]) snprintf(wifissid, WIFISSID_SIZE, "%s", WiFi.SSID().c_str());
   DEBUG_D("wifi ssid=%s\n", wifissid);
 
-  if (0 >= eeprom_read(wifipsk, 11, WIFIPSK_SIZE))
+  if (0 > eeprom_read(wifipsk, 11, WIFIPSK_SIZE))
   {
     DEBUG_E("Error reading wifi key from internal eeprom\n");
     snprintf(wifipsk, WIFIPSK_SIZE, "%s", WiFi.psk().c_str());
