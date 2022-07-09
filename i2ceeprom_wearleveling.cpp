@@ -37,7 +37,10 @@ uint8_t i2cEeprom_ReadByte(uint32_t theMemoryAddress)
   Wire.write( (theMemoryAddress >> 8) & 0xFF );
   Wire.write( (theMemoryAddress >> 0) & 0xFF );
   Wire.endTransmission();
- if (Wire.requestFrom(_i2cEeprom_address, 1) == 0) DEBUG_E("Failing reading I2C eeprom!\n");
+  if (Wire.requestFrom(_i2cEeprom_address, 1) == 0)
+  {
+    //DEBUG_E("Failing reading I2C eeprom!\n");
+  }
   u8retVal = Wire.read();
   return u8retVal ;
 }
@@ -72,10 +75,10 @@ uint32_t i2cEeprom_Readuint32crc(uint16_t memoryPage)
   uint8_t readcrc = i2cEeprom_ReadByte(theMemoryAddress + 4);
   if (readcrc != calccrc)
   {
-    DEBUG_E("Read i2c eeprom CRC error, page=%d, value=%d, readcrc=%d, calccrc=%d\n", memoryPage, returnval, readcrc, calccrc);
-    returnval = 0xFFFF;
+    //DEBUG_E("Read i2c eeprom CRC error, page=%d, value=%d, readcrc=%d, calccrc=%d\n", memoryPage, returnval, readcrc, calccrc);
+    returnval = 0;
   }
-  DEBUG_V("Read i2c eeprom startaddress=%d, value=%d, crc=%d, calccrc=%d\n", theMemoryAddress, returnval, readcrc, calccrc);
+  //DEBUG_V("Read i2c eeprom startaddress=%d, value=%d, crc=%d, calccrc=%d\n", theMemoryAddress, returnval, readcrc, calccrc);
   return returnval;
 }
 

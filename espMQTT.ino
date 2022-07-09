@@ -41,10 +41,11 @@
 // #define ESPMQTT_GROWATT_MODBUS
 // #define ESPMQTT_SDM120
 // #define ESPMQTT_DDM18SD
-// #define ESPMQTT_WATERMETER
+#define ESPMQTT_WATERMETER
+// #define ESPMQTT_WATERMETER2
 // #define ESPMQTT_DDNS
 // #define ESPMQTT_GENERIC8266
-#define ESPMQTT_GENERIC8266_NEO
+// #define ESPMQTT_GENERIC8266_NEO
 // #define ESPMQTT_MAINPOWERMETER
 // #define ESPMQTT_OBD2
 // #define ESPMQTT_NOISE
@@ -330,11 +331,6 @@ static bool sonoffch_timeout_enabled[4] = {1, 1, 1, 0};
 #define  ESPMQTT_SONOFF4CH
 #endif
 
-#ifdef NEOPIXELPIN
-#include <Adafruit_NeoPixel.h>
-Adafruit_NeoPixel neopixelleds = Adafruit_NeoPixel(2, NEOPIXELPIN, NEO_RGB + NEO_KHZ400);
-#endif
-
 #ifdef  ESPMQTT_SONOFF4CH
 #ifndef FIRMWARE_TARGET
 #define FIRMWARE_TARGET "SONOFF4CH"
@@ -544,6 +540,17 @@ static bool sonoff_oldbuttons[1] = {1};
 #include "i2ceeprom_wearleveling.h"
 #endif
 
+#ifdef  ESPMQTT_WATERMETER2
+#define FIRMWARE_TARGET "WATERMETER2"
+#define NODEMCULEDPIN D0
+#define FLASHBUTTON D3
+#define ESPLED D4
+#define NEOPIXELPIN D8
+#define WATERPULSEPIN D5
+#include "watermeter.h"
+#include "i2ceeprom_wearleveling.h"
+#endif
+
 #ifdef  ESPMQTT_GARDEN2
 #define FIRMWARE_TARGET "GARDEN2"
 #define FLASHBUTTON D3
@@ -621,6 +628,10 @@ static bool sonoff_oldbuttons[1] = {1};
 #define ESPLED D4
 #endif
 
+#ifdef NEOPIXELPIN
+#include <Adafruit_NeoPixel.h>
+Adafruit_NeoPixel neopixelleds = Adafruit_NeoPixel(2, NEOPIXELPIN, NEO_RGB + NEO_KHZ400);
+#endif
 
 
 // ################################################################################################################# END OF DEFINES ####################################################################################################################
@@ -672,7 +683,7 @@ AsyncMqttClient mqttClient;
 
 char _gFmtBuf[100 + 1];
 
-struct Triggers {
+struct {
   bool wificonnected = false;
   bool wifidisconnected = false;
   bool mqttconnected = false;
@@ -682,7 +693,7 @@ struct Triggers {
   String firmwareupgrade = "";
 } triggers;
 
-struct Mainstate {
+struct {
   bool wificonnected = false;
   bool wificonnectedonce = false;
   bool mqttconnected = false;
@@ -694,25 +705,12 @@ struct Mainstate {
   uint16_t mqttlastpublishedpacketid = 0;
   bool defaultpassword = true;
   bool accesspoint = false;
-  bool statusok = false;
+  bool statusok = true;
 } mainstate;
 
-struct dataMapStruct {
-  char *payload = (char *) "";
-  bool send = true;
-  bool onair = false;
-  bool publishregular = false;
-};
 
 int wifichannel = 0;
 int wifinetworksfound = 0;
-
-SimpleMap<const char*, dataMapStruct> *dataMap = new SimpleMap<const char*, dataMapStruct>([](const char* &a, const char* &b) -> int {
-  if (a == b) return 0;      // a and b are equal
-  else if (a > b) return 1;  // a is bigger than b
-  else return -1;            // a is smaller than b
-});
-
 
 bool updatemqtt = 0;
 
@@ -845,36 +843,44 @@ size_t strlcpy(char* dst, const char* src, size_t bufsize)
   return result;
 }
 
+#ifdef NEOPIXELPIN
 void update_neoled_status()
 {
-#ifdef NEOPIXELPIN
+  static uint8_t ledtimer = 0;
+  static uint8_t ledtimeout = 0;
+  if (ledtimer++ == ledtimeout)
+  {
+    ledtimer = 0;
+    neopixelleds.setPixelColor(0, neopixelleds.Color(0, 0, 0));
+  }
+
   if (mainstate.accesspoint) {
     neopixelleds.setPixelColor(0, neopixelleds.Color(50, 0, 15));
-    neopixelleds.show();
   }
   else if (mainstate.defaultpassword) {
     neopixelleds.setPixelColor(0, neopixelleds.Color(50, 40, 20));
-    neopixelleds.show();
   }
-  else if (mainstate.statusok) {
-    neopixelleds.setPixelColor(0, neopixelleds.Color(0, 50, 0));
-    neopixelleds.show();
+  else if ((mainstate.statusok) && (mainstate.mqttconnected)) {
+    if (ledtimer == 19) neopixelleds.setPixelColor(0, neopixelleds.Color(0, 50, 0));
+    ledtimeout = 20;
   }
   else if (mainstate.mqttconnected) {
-    neopixelleds.setPixelColor(0, neopixelleds.Color(0, 0, 50));
-    neopixelleds.show();
+    if (ledtimer == 5) neopixelleds.setPixelColor(0, neopixelleds.Color(0, 0, 50));
+    ledtimeout = 10;
   }
   else if (mainstate.wificonnected) {
-    neopixelleds.setPixelColor(0, neopixelleds.Color(50, 20, 0));
-    neopixelleds.show();
+    if (ledtimer == 5) neopixelleds.setPixelColor(0, neopixelleds.Color(50, 20, 0));
+    ledtimeout = 10;
   }
   else
   {
-    neopixelleds.setPixelColor(0, neopixelleds.Color(50, 0, 0));
-    neopixelleds.show();
+    if (ledtimer == 5) neopixelleds.setPixelColor(0, neopixelleds.Color(50, 0, 0));
+    ledtimeout = 10;
   }
-#endif
+
+  neopixelleds.show();
 }
+#endif
 
 void publishdatamap(int32_t packetId = -1, bool publishall = false, bool init = false, bool publishregular = false);
 
@@ -897,8 +903,8 @@ void updateexternalip();
 
 #define DATAMAP_BASELENGTH 25
 
-enum DataMapStatus {initializing, wifierror, mqtterror, commerror, online, receiving, querying, ready};
-enum DataMapStatusUpgrade {notchecked, uptodate, fail};
+enum class DataMapStatus {initializing, wifierror, mqtterror, commerror, online, receiving, querying, ready, rebooting, upgrading};
+enum class DataMapStatusUpgrade {notchecked, uptodate, httperror, upgrading, upgradedone, incorrectupgradekey };
 
 struct
 {
@@ -906,9 +912,9 @@ struct
   uint64_t publishRegularIds[2] = {0, 0}; // Ids that will be send to mqtt broker regulary
   int8_t length = DATAMAP_BASELENGTH; // Length of datamap
   char firmware_upgradekey[11] = ""; // Key that has to be provided by mqtt upgrade command before upgrading to prevent upgrade loop
-  DataMapStatus status = initializing; // The main status of this esp
+  DataMapStatus status = DataMapStatus::initializing; // The main status of this esp
   bool sendStatusAfterPublishCompleted = false; // When true, the status will be send to mqtt broker when all other other data has been published (usually for a ready message after sending out new values)
-  DataMapStatusUpgrade status_upgrade = notchecked; // Upgrade status
+  DataMapStatusUpgrade status_upgrade = DataMapStatusUpgrade::notchecked; // Upgrade status
   char externalip[17] = ""; // For storing the external ip discovered.
 } DataMap;
 
@@ -933,11 +939,11 @@ uint8_t getDataMapLength()
 
 bool getDataMapPublishRegular(uint8_t id)
 {
-  if (id < 64) return (DataMap.publishRegularIds[0] && (2 ^ id));
-  else return (DataMap.publishRegularIds[1] && (2 ^ (id - 64)));
+  if (id < 64) return ((DataMap.publishRegularIds[0] & (uint64_t(1) << id)) > 0);
+  else return ((DataMap.publishRegularIds[1] & (uint64_t(1) << (id - 64))) > 0);
 }
 
-void PublishRegular(uint8_t id, bool value)
+void setDataMapPublishRegular(uint8_t id, bool value)
 {
   if (id < 64)
   {
@@ -953,7 +959,7 @@ void PublishRegular(uint8_t id, bool value)
 
 bool getDataMapSendStatus(uint8_t id)
 {
-  if (DataMap.sendStatusAfterPublishCompleted && DataMap.sendIds[0] == 0 && DataMap.sendIds[1] == 0 && id == 1) return 1; 
+  if (DataMap.sendStatusAfterPublishCompleted && DataMap.sendIds[0] == 0 && DataMap.sendIds[1] == 0 && id == 1) return 1;
   if (id < 64) return ((DataMap.sendIds[0] & (uint64_t(1) << id)) > 0);
   else return ((DataMap.sendIds[1] & (uint64_t(1) << (id - 64))) > 0);
 }
@@ -996,14 +1002,23 @@ int16_t getDataMap(char *key, char *value, int8_t id = -1)
 
   // Return Status Items
   if (getdatamap_checkandfill(key, value, id, idCounter++, "status",
-                              (DataMap.status == initializing) ? "initializing" :
-                              (DataMap.status == online) ? "online" :
-                              (DataMap.status == commerror) ? "commerror" :
-                              (DataMap.status == receiving) ? "receiving" :
-                              (DataMap.status == querying) ? "querying" :
-                              (DataMap.status == ready) ? "ready" :
+                              (DataMap.status == DataMapStatus::initializing) ? cF("initializing") :
+                              (DataMap.status == DataMapStatus::online) ? cF("online") :
+                              (DataMap.status == DataMapStatus::commerror) ? cF("commerror") :
+                              (DataMap.status == DataMapStatus::receiving) ? cF("receiving") :
+                              (DataMap.status == DataMapStatus::querying) ? cF("querying") :
+                              (DataMap.status == DataMapStatus::ready) ? cF("ready") :
+                              (DataMap.status == DataMapStatus::rebooting) ? cF("rebooting") :
+                              (DataMap.status == DataMapStatus::upgrading) ? cF("upgrading") :
                               "")) return --idCounter;
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "status/upgrade", (DataMap.status_upgrade == notchecked) ? "not checked" : (DataMap.status_upgrade == uptodate) ? "up to date" : (DataMap.status_upgrade == fail) ? "check failed" : "")) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "status/upgrade", 
+                              (DataMap.status_upgrade == DataMapStatusUpgrade::notchecked) ? cF("not checked") : 
+                              (DataMap.status_upgrade == DataMapStatusUpgrade::uptodate) ? cF("up to date") : 
+                              (DataMap.status_upgrade == DataMapStatusUpgrade::httperror) ? cF("http error") : 
+                              (DataMap.status_upgrade == DataMapStatusUpgrade::upgrading) ? cF("upgrading") :
+                              (DataMap.status_upgrade == DataMapStatusUpgrade::incorrectupgradekey) ? cF("incorrect upgradekey") :
+                              (DataMap.status_upgrade == DataMapStatusUpgrade::upgradedone) ? cF("upgrade done") :
+                              "")) return --idCounter;
 
   // Return Firmware Items
   String firmwarename = __FILE__;
@@ -1162,6 +1177,18 @@ int16_t getDataMap(char *key, char *value, int8_t id = -1)
   if (getdatamap_checkandfill(key, value, id, idCounter++, "inverter/seconds", valuestring, growattModbus_DataMap.dataReady)) return --idCounter;
 #endif
 
+#if (defined ESPMQTT_WATERMETER) || (defined ESPMQTT_WATERMETER2)
+  snprintf (valuestring, 30, cF("%.1f"), watermeter_getflow());
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "water/lmin", valuestring)) return --idCounter;
+  snprintf (valuestring, 30, cF("%.3f"), watermeter_getflow() * 0.06);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "water/m3h", valuestring)) return --idCounter;
+  snprintf (valuestring, 30, cF("%u"), watermeter_getliters());
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "water/liter", valuestring)) return --idCounter;
+  snprintf (valuestring, 30, cF("%u.%03u"), watermeter_getliters() / 1000, watermeter_getliters() % 1000);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "water/m3", valuestring)) return --idCounter;
+#endif
+
+
   return -1;
   yield();
 }
@@ -1205,6 +1232,12 @@ String getDataMapValue(const char *key)
   return String(value);
 }
 
+String getDataMap(const char *key)
+{
+  return getDataMapValue(key);
+}
+
+
 int16_t getDataMapId(const char *key)
 {
   char value[30] = "";
@@ -1242,52 +1275,6 @@ void showdatamap()
   char buf[256];
   snprintf(buf, 255, "snprintf-s: %s", (char *)F("PROGMEM-STRING"));
   DEBUG("%s\n", buf);
-}
-
-void putdatamap(const char *topic, String value, bool sendupdate = true, bool forceupdate = false, bool publishregular = true)
-{
-  dataMapStruct datamapstruct;
-
-  if (dataMap->has(topic))
-  {
-    datamapstruct = dataMap->get(topic);
-    if ((strcmp (datamapstruct.payload , value.c_str()) == 0) && !forceupdate) return;
-
-    if (strcmp(topic, "status") == 0)
-    {
-      if (strcmp (datamapstruct.payload, "upgrading") == 0)
-      {
-        // When upgrading only accept upgradefailed or upgradedone as value
-        if ((value != "upgrade_exit") && (value != "rebooting")) return;
-        if (value == "upgrade_exit") value = "online";
-      }
-    }
-  }
-
-  // Do not output debug for uptime
-  if (strcmp(topic, "system/uptime") != 0) DEBUG_D ("DATAMAP %s=%s (sendupdate=%d, oldval=%s oldsend=%d forceupdate=%d)\n", topic, value.c_str(), sendupdate, datamapstruct.payload, datamapstruct.send, forceupdate);
-
-  datamapstruct.onair = false;
-  datamapstruct.send = sendupdate;
-  datamapstruct.publishregular = publishregular;
-
-  int n = value.length() + 1;
-
-  // declaring character array
-  char *char_array;
-  char_array = (char*) malloc(n * sizeof(char));
-
-  // copying the contents of the
-  // string to char array
-  strcpy(char_array, value.c_str());
-
-  if (dataMap->has(topic))
-  {
-    free(datamapstruct.payload);
-  }
-
-  datamapstruct.payload = char_array;
-  dataMap->put(topic, datamapstruct);
 }
 
 #ifdef  ESPMQTT_BBQTEMP
@@ -1532,7 +1519,7 @@ void connectToWifi()
   ArduinoOTA.setHostname(esp_hostname);
   ArduinoOTA.setPassword(esp_password);
   Debug.setPassword(esp_password);
-  
+
   // If no ssid was configured start accesspoint
   if (0 != wifissid[0])
   {
@@ -2254,22 +2241,14 @@ void zmai90_handle()
 }
 #endif
 
-#ifdef  ESPMQTT_WATERMETER
+#if  (defined ESPMQTT_WATERMETER) || (defined ESPMQTT_WATERMETER2)
 void espmqtt_watermeter_handle()
 {
-  static uint32_t watermeter_liters = watermeter_getliters();
   if (watermeter_handle())
   {
-    putdatamap("water/lmin", String(watermeter_getflow(), 1));
-    putdatamap("water/m3h", String(watermeter_getflow() * 0.06, 3));
-
-    if (watermeter_liters != watermeter_getliters())
+    for (uint8_t bitpointer = 0;  bitpointer < 4; bitpointer++)
     {
-      watermeter_liters = watermeter_getliters();
-      i2cEeprom_write(watermeter_liters);
-      //syslogN("Watermeter Liters Changed=%d\n", watermeter_liters);
-      putdatamap("water/liter", String(watermeter_liters));
-      putdatamap("water/m3", String((double(watermeter_liters) / 1000), 3));
+      setDataMapSendStatus(DATAMAP_BASELENGTH + bitpointer, true);
     }
   }
 }
@@ -2810,6 +2789,24 @@ void loop()
   my_sleep = millis();
 #endif
 
+  switch (DataMap.status)
+  {
+    case DataMapStatus::online:
+    case DataMapStatus::ready:
+      mainstate.statusok = true;
+      break;
+
+    case DataMapStatus::receiving:
+    case DataMapStatus::querying:
+    case DataMapStatus::upgrading:
+    case DataMapStatus::rebooting:
+      // do not change statusok
+      break;
+
+    default:
+      mainstate.statusok = false;
+      break;
+  }
 
   if (WiFi.status() == WL_CONNECTED)
   {
@@ -2952,7 +2949,8 @@ void loop()
     if (waitbeforeupgrade == 0)
     {
       DEBUG_I ("Received startfirmwareupgrade, upgrade pending...\n");
-      putdatamap("status", "upgrading");
+      DataMap.status = DataMapStatus::upgrading;
+      DataMap.status_upgrade = DataMapStatusUpgrade::upgrading;
       waitbeforeupgrade = uptime + 5;
     }
     else if (waitbeforeupgrade < uptime)
@@ -2975,37 +2973,34 @@ void loop()
         if (upgradeversion == ESPMQTT_VERSION)
         {
           DEBUG_I ("Upgrade canceled, version is the same\n");
-          putdatamap("status/upgrade", "up to date, same firmware version");
-          putdatamap("status", "upgrade_exit");
+          DataMap.status_upgrade = DataMapStatusUpgrade::uptodate;
         }
         else if (getdatamap("firmware/upgradekey") != upgradekey)
         {
           DEBUG_I ("Upgrade canceled, upgradekey is incorrect\n");
-          putdatamap("status/upgrade", "error, incorrect upgradekey");
-          putdatamap("status", "upgrade_exit");
+          DataMap.status_upgrade = DataMapStatusUpgrade::incorrectupgradekey;
         }
         else
         {
           DEBUG_I ("Starting upgrade from:%s\n", upgradeurl.c_str());
-          putdatamap("status/upgrade", "upgrading");
+          DataMap.status_upgrade = DataMapStatusUpgrade::upgrading;
+          DataMap.status = DataMapStatus::upgrading;
           WiFiClient upgradeclient;
           t_httpUpdate_return ret = ESPhttpUpdate.update(upgradeclient, upgradeurl, ESPMQTT_VERSION);
           switch (ret)
           {
             case HTTP_UPDATE_FAILED:
               DEBUG_E("Firmware upgrade failed: %s.\n", ESPhttpUpdate.getLastErrorString().c_str());
-              putdatamap("status/upgrade", String("error http: " + ESPhttpUpdate.getLastErrorString()));
-              putdatamap("status", "upgrade_exit");
+              DataMap.status_upgrade = DataMapStatusUpgrade::httperror;
               break;
             case HTTP_UPDATE_NO_UPDATES:
               DEBUG_E("Firmware upgrade check finished, no new version available.");
-              putdatamap("status/upgrade", "up to date, same firmware version");
-              putdatamap("status", "upgrade_exit");
+              DataMap.status_upgrade = DataMapStatusUpgrade::uptodate;
               break;
             case HTTP_UPDATE_OK:
               DEBUG_E("Firmware upgrade done!\n"); // may not be called since we reboot the ESP
-              putdatamap("status/upgrade", "upgrade finished");
-              putdatamap("status", "rebooting");
+              DataMap.status_upgrade = DataMapStatusUpgrade::upgradedone;
+              DataMap.status = DataMapStatus::rebooting;
               break;
           }
         }
@@ -3090,7 +3085,6 @@ void loop()
   if (timertick == 1) // Every 0.1 second read next SDM120 register
   {
     espmqtt_handle_modules_100ms();
-    update_neoled_status();
   }
   yield();
   ESP.wdtFeed(); // Prevent watchdog to kick in...
@@ -3338,7 +3332,7 @@ void publishdatamap(int32_t packetId, bool publishall, bool init, bool publishre
     nextpacketId = -1;
   }
 
-  if ((packetId != -1) || publishall) DEBUG_V("Publishdatamap packetId=%d publishall=%d datamappointer=%d datamapsize=%d nextpacketid=%d waitingforack=%d\n", packetId, publishall, datamappointer, dataMap->size(), nextpacketId, waitingforack);
+  if ((packetId != -1) || publishall) DEBUG_V("Publishdatamap packetId=%d publishall=%d datamappointer=%d datamapsize=%d nextpacketid=%d waitingforack=%d\n", packetId, publishall, datamappointer, getDataMapLength(), nextpacketId, waitingforack);
 
   yield();
 
@@ -3471,7 +3465,9 @@ void systemTimerCallback()
   if (ledtimer >= ledontime + ledofftime) ledtimer = 0;
 #endif
 
-
+#ifdef NEOPIXELPIN
+  update_neoled_status();
+#endif
 }
 
 #ifdef MH_Z19
@@ -3659,8 +3655,6 @@ void handleWWWSettings()
         {
           watermeter_setliters(atoi(webserver.arg(i).c_str()));
           i2cEeprom_write(watermeter_getliters());
-          putdatamap("water/liter", String(watermeter_getliters()));
-          putdatamap("water/m3", String(double(watermeter_getliters()) / 1000, 3));
         }
       }
 #endif
@@ -3746,7 +3740,7 @@ void handleWWWSettings()
     webserver.sendContent (F("</TD></TR>"));
 #ifdef  ESPMQTT_WATERMETER
     webserver.sendContent (F("<TR><TD>Watermeter Liter</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"64\" name=\"watermeterliter\" value=\""));
-    webserver.sendContent (getdatamap("water/liter"));
+    webserver.sendContent (getDataMap("water/liter"));
     webserver.sendContent (F("\"></TD></TR>"));
 #endif
 #ifdef  ESPMQTT_QSWIFIDIMMERD01
@@ -3849,29 +3843,29 @@ void qswifiswitch_switchcallback(uint8_t channel, bool switchstate)
 
 void ducoboxcallback (const char *topic, String payload)
 {
-  putdatamap(topic, payload);
+//  putdatamap(topic, payload);
 }
 
 void amgpelletstovecallback (const char *topic, String payload)
 {
-  putdatamap(topic, payload);
+//  putdatamap(topic, payload);
 }
 
 void bht002callback (const char *topic, String payload)
 {
-  putdatamap(topic, payload);
+//  putdatamap(topic, payload);
   yield();
 }
 
 void tuyacallback (const char *topic, String payload)
 {
-  putdatamap(topic, payload);
+//  putdatamap(topic, payload);
   yield();
 }
 
 void openthermcallback (const char *topic, String payload)
 {
-  putdatamap(topic, payload);
+//  putdatamap(topic, payload);
 }
 
 #ifdef  ESPMQTT_GROWATT
@@ -3902,7 +3896,7 @@ void growattcallback ()
       DataMap.status = commerror;
       setDataMapSendStatus("status", true);
     }
- }
+  }
 
   for (uint8_t bitpointer = 0;  bitpointer < 16; bitpointer++)
   {
@@ -3924,7 +3918,7 @@ void goodwecallback (const char *topic, String payload)
     if (payload == "ready") digitalWrite(NODEMCULEDPIN, 0);
     else digitalWrite(NODEMCULEDPIN, 1);
   }
-  putdatamap(topic, payload);
+  //putdatamap(topic, payload);
 }
 #endif
 
@@ -4130,7 +4124,7 @@ void processCmdRemoteDebug()
   }
   if (lastCmd == "watermeterwriteeeprom")
   {
-    DEBUG("i2cEeprom write liters=%d\n", watermeter_getliters());
+    DEBUG("i2cEeprom write lfiters=%d\n", watermeter_getliters());
     i2cEeprom_write(watermeter_getliters());
   }
 #endif
@@ -4145,9 +4139,9 @@ void processCmdRemoteDebug()
   if (lastCmd == "showeeprom")
   {
     uint16_t eeprompointer = 0;
-    while (eeprompointer < 512) 
+    while (eeprompointer < 512)
     {
-      DEBUG("%d: %c (%d)\n",eeprompointer, EEPROM.read(eeprompointer), EEPROM.read(eeprompointer));
+      DEBUG("%d: %c (%d)\n", eeprompointer, EEPROM.read(eeprompointer), EEPROM.read(eeprompointer));
       eeprompointer++;
     }
   }
@@ -4492,13 +4486,16 @@ void setup() {
 #endif
 
 #ifdef  ESPMQTT_WATERMETER
-  i2cEeprom_init(I2C_SDA, I2C_SCL, I2C_EEPROM_ADDRESS, (uint32_t)EE24LC512MAXBYTES);
+  i2cEeprom_init(I2C_SDA, I2C_SCL, I2C_EEPROM_ADDRESS, EE24LC512MAXBYTES);
   uint32_t watermeter_liters = i2cEeprom_read();
   watermeter_init(WATERPULSEPIN, NODEMCULEDPIN, watermeter_liters);
-  putdatamap("water/lmin", "0");
-  putdatamap("water/m3h", "0");
-  putdatamap("water/liter", String(watermeter_liters));
-  putdatamap("water/m3", String(double(watermeter_liters) / 1000, 3));
+  DataMap.length += 4;
+  DataMap.status = DataMapStatus::online;
+#endif
+
+#ifdef ESPMQTT_WATERMETER2
+  DataMap.length += 3;
+  DataMap.status = online;
 #endif
 
 #ifdef  ESPMQTT_MAINPOWERMETER
