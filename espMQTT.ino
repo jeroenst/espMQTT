@@ -22,13 +22,13 @@
 #define CPUSLEEP 50
 
 #ifdef ESPMQTT_BUILDSCRIPT
-#define DEBUGLEVEL Debug.DEBUG
+#define DEBUGLEVEL Debug.INFO
 #else
 // Only use defines when when firmware is not compiled from the build script...
 /* SETTINGS */
 #define SERIALLOG
 #define MYTZ TZ_Europe_Amsterdam
-#define DEBUGLEVEL Debug.VERBOSE
+#define DEBUGLEVEL Debug.DEBUG
 
 /* ESP8266 */
 // #define ESPMQTT_WEATHER
@@ -41,8 +41,8 @@
 // #define ESPMQTT_GROWATT_MODBUS
 // #define ESPMQTT_SDM120
 // #define ESPMQTT_DDM18SD
-#define ESPMQTT_WATERMETER
-// #define ESPMQTT_WATERMETER2
+// #define ESPMQTT_WATERMETER
+#define ESPMQTT_WATERMETER2
 // #define ESPMQTT_DDNS
 // #define ESPMQTT_GENERIC8266
 // #define ESPMQTT_GENERIC8266_NEO
@@ -2250,6 +2250,7 @@ void espmqtt_watermeter_handle()
     {
       setDataMapSendStatus(DATAMAP_BASELENGTH + bitpointer, true);
     }
+    DataMap.status = DataMapStatus::online;
   }
 }
 #endif
@@ -3937,27 +3938,27 @@ void growattModbuscallback ()
 
   if (growattModbus_DataMap.status == GrowattModbus_status::ready)
   {
-    if (DataMap.status != ready)
+    if (DataMap.status != DataMapStatus::ready)
     {
-      DataMap.status = ready;
+      DataMap.status = DataMapStatus::ready;
       DataMap.sendStatusAfterPublishCompleted = true;
     }
   }
 
   if (growattModbus_DataMap.status == GrowattModbus_status::querying)
   {
-    if ((DataMap.status != querying) && (DataMap.status != commerror))
+    if ((DataMap.status != DataMapStatus::querying) && (DataMap.status != DataMapStatus::commerror))
     {
-      DataMap.status = querying;
+      DataMap.status = DataMapStatus::querying;
       setDataMapSendStatus("status", true);
     }
   }
 
   if (growattModbus_DataMap.status == GrowattModbus_status::offline)
   {
-    if (DataMap.status != commerror)
+    if (DataMap.status != DataMapStatus::commerror)
     {
-      DataMap.status = commerror;
+      DataMap.status = DataMapStatus::commerror;
       setDataMapSendStatus("status", true);
     }
   }
@@ -4490,12 +4491,10 @@ void setup() {
   uint32_t watermeter_liters = i2cEeprom_read();
   watermeter_init(WATERPULSEPIN, NODEMCULEDPIN, watermeter_liters);
   DataMap.length += 4;
-  DataMap.status = DataMapStatus::online;
 #endif
 
 #ifdef ESPMQTT_WATERMETER2
-  DataMap.length += 3;
-  DataMap.status = online;
+  DataMap.length += 4;
 #endif
 
 #ifdef  ESPMQTT_MAINPOWERMETER
