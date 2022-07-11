@@ -272,7 +272,7 @@ struct
   uint16_t rain_minute_pulses = 0;
   uint16_t rain_lastminute_pulses = 0;
 } weather;
-#define ADDEDDATAMAPLENGTH 11
+#define DATAMAPLENGTH 11
 #undef SERIALLOG
 #undef CPUSLEEP
 #define CPUSLEEP 5
@@ -549,7 +549,7 @@ static bool sonoff_oldbuttons[1] = {1};
 #define EE24LC512MAXBYTES  512000
 #include "watermeter.h"
 #include "i2ceeprom_wearleveling.h"
-#define ADDEDDATAMAPLENGTH 4
+#define DATAMAPLENGTH_ADD 4
 #endif
 
 #ifdef  ESPMQTT_WATERMETER2
@@ -561,7 +561,7 @@ static bool sonoff_oldbuttons[1] = {1};
 #define WATERPULSEPIN D5
 #include "watermeter.h"
 #include "i2ceeprom_wearleveling.h"
-#define ADDEDDATAMAPLENGTH 4
+#define DATAMAPLENGTH_ADD 4
 #endif
 
 #ifdef  ESPMQTT_GARDEN2
@@ -4528,8 +4528,8 @@ void setup() {
   display.display();
 #endif
 
-#ifdef ADDEDDATAMAPLENGTH
-  DataMap.length += ADDEDDATAMAPLENGTH;
+#ifdef DATAMAPLENGTH_ADD
+  DataMap.length += DATAMAPLENGTH_ADD;
 #endif
 
 #ifdef  ESPMQTT_WATERMETER
