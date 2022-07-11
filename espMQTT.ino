@@ -31,7 +31,7 @@
 #define DEBUGLEVEL Debug.VERBOSE
 
 /* ESP8266 */
-#define ESPMQTT_WEATHER
+// #define ESPMQTT_WEATHER
 // #define ESPMQTT_AMGPELLETSTOVE
 // #define ESPMQTT_BATHROOM
 // #define ESPMQTT_BEDROOM2
@@ -42,7 +42,7 @@
 // #define ESPMQTT_SDM120
 // #define ESPMQTT_DDM18SD
 // #define ESPMQTT_WATERMETER
-// #define ESPMQTT_WATERMETER2
+#define ESPMQTT_WATERMETER2
 // #define ESPMQTT_DDNS
 // #define ESPMQTT_GENERIC8266
 // #define ESPMQTT_GENERIC8266_NEO
@@ -4553,7 +4553,12 @@ void setup() {
   DataMap.length += DATAMAPLENGTH_ADD;
 #endif
 
+#ifdef ESPMQTT_WATERMETER2
+  DataMap.status = DataMapStatus::online;
+#endif
+
 #ifdef  ESPMQTT_WATERMETER
+  DataMap.status = DataMapStatus::online;
   i2cEeprom_init(I2C_SDA, I2C_SCL, I2C_EEPROM_ADDRESS, EE24LC512MAXBYTES);
   uint32_t watermeter_liters = i2cEeprom_read();
   watermeter_init(WATERPULSEPIN, NODEMCULEDPIN, watermeter_liters);
