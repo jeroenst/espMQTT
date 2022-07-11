@@ -272,7 +272,7 @@ struct
   uint16_t rain_minute_pulses = 0;
   uint16_t rain_lastminute_pulses = 0;
 } weather;
-#define DATAMAPLENGTH 11
+#define DATAMAPLENGTH_ADD 11
 #undef SERIALLOG
 #undef CPUSLEEP
 #define CPUSLEEP 5
@@ -956,7 +956,7 @@ bool getDataMapPublishRegular(uint8_t id)
   else return ((DataMap.publishRegularIds[1] & (uint64_t(1) << (id - 64))) > 0);
 }
 
-void setDataMapPublishRegular(uint8_t id, bool value)
+void setDataMapPublishRegular(uint8_t id, bool value = true)
 {
   if (id < 64)
   {
@@ -1024,10 +1024,10 @@ int16_t getDataMap(char *key, char *value, int8_t id = -1)
                               (DataMap.status == DataMapStatus::rebooting) ? cF("rebooting") :
                               (DataMap.status == DataMapStatus::upgrading) ? cF("upgrading") :
                               "")) return --idCounter;
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "status/upgrade", 
-                              (DataMap.status_upgrade == DataMapStatusUpgrade::notchecked) ? cF("not checked") : 
-                              (DataMap.status_upgrade == DataMapStatusUpgrade::uptodate) ? cF("up to date") : 
-                              (DataMap.status_upgrade == DataMapStatusUpgrade::httperror) ? cF("http error") : 
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "status/upgrade",
+                              (DataMap.status_upgrade == DataMapStatusUpgrade::notchecked) ? cF("not checked") :
+                              (DataMap.status_upgrade == DataMapStatusUpgrade::uptodate) ? cF("up to date") :
+                              (DataMap.status_upgrade == DataMapStatusUpgrade::httperror) ? cF("http error") :
                               (DataMap.status_upgrade == DataMapStatusUpgrade::upgrading) ? cF("upgrading") :
                               (DataMap.status_upgrade == DataMapStatusUpgrade::incorrectupgradekey) ? cF("incorrect upgradekey") :
                               (DataMap.status_upgrade == DataMapStatusUpgrade::upgradedone) ? cF("upgrade done") :
@@ -2391,10 +2391,13 @@ void rainmeter_handle()
     weather.rain_hour_pulses++;
     weather.rain_minute_pulses++;
     count = 0;
-    
+
     setDataMapSendStatus(DATAMAP_BASELENGTH + 1, true);
     setDataMapSendStatus(DATAMAP_BASELENGTH + 2, true);
     setDataMapSendStatus(DATAMAP_BASELENGTH + 3, true);
+    setDataMapSendStatus(DATAMAP_BASELENGTH + 4, true);
+    setDataMapSendStatus(DATAMAP_BASELENGTH + 7, true);
+    setDataMapSendStatus(DATAMAP_BASELENGTH + 8, true);
   }
   if (rainpinstate == 0)
   {
@@ -2407,12 +2410,15 @@ void rainmeter_handle()
   {
     if (!hourreg)
     {
+      if ((weather.rain_lasthour_pulses > 0) || (weather.rain_hour_pulses > 0))
+      {
+        setDataMapSendStatus(DATAMAP_BASELENGTH + 3, true);
+        setDataMapSendStatus(DATAMAP_BASELENGTH + 4, true);
+        setDataMapSendStatus(DATAMAP_BASELENGTH + 5, true);
+        setDataMapSendStatus(DATAMAP_BASELENGTH + 6, true);
+      }
       weather.rain_lasthour_pulses = weather.rain_hour_pulses;
       weather.rain_hour_pulses = 0;
-      setDataMapSendStatus(DATAMAP_BASELENGTH + 4, true);
-      setDataMapSendStatus(DATAMAP_BASELENGTH + 5, true);
-      setDataMapSendStatus(DATAMAP_BASELENGTH + 6, true);
-      setDataMapSendStatus(DATAMAP_BASELENGTH + 7, true);
       hourreg = true;
     }
   }
@@ -2423,12 +2429,15 @@ void rainmeter_handle()
   {
     if (!minutereg)
     {
+      if ((weather.rain_lastminute_pulses > 0) || (weather.rain_minute_pulses > 0))
+      {
+        setDataMapSendStatus(DATAMAP_BASELENGTH + 7, true);
+        setDataMapSendStatus(DATAMAP_BASELENGTH + 8, true);
+        setDataMapSendStatus(DATAMAP_BASELENGTH + 9, true);
+        setDataMapSendStatus(DATAMAP_BASELENGTH + 10, true);
+      }
       weather.rain_lastminute_pulses = weather.rain_minute_pulses;
       weather.rain_minute_pulses = 0;
-      setDataMapSendStatus(DATAMAP_BASELENGTH + 8, true);
-      setDataMapSendStatus(DATAMAP_BASELENGTH + 9, true);
-      setDataMapSendStatus(DATAMAP_BASELENGTH + 10, true);
-      setDataMapSendStatus(DATAMAP_BASELENGTH + 11, true);
       minutereg = true;
     }
   }
@@ -2747,9 +2756,14 @@ void espmqtt_handle_modules_1sec()
 #endif
 #ifdef  ESPMQTT_WEATHER
     temperature = oneWireSensors.getTempC(onewire_OutsideAddress);
+    if (!isnan(temperature)) temperature = float(int(temperature * 10)) / 10;
     DEBUG_I("Outside Temperature=%f\n", temperature);
-    if ((temperature != -127) && (temperature != 85)) weather.temperature = temperature;
-    else weather.temperature = NAN;
+    if ((temperature == -127) || (temperature == 85)) temperature = NAN;
+    if (weather.temperature != temperature)
+    {
+      if (!(isnan(weather.temperature) && isnan(temperature))) setDataMapSendStatus(DATAMAP_BASELENGTH, true);
+      weather.temperature = temperature;
+    }
     yield();
 #endif
 #ifdef  ESPMQTT_SONOFF_FLOORHEATING
@@ -2967,7 +2981,7 @@ void loop()
   if (triggers.mqttsubscribed)
   {
     triggers.mqttsubscribed = false;
-    publishdatamap(-1, true, true);
+    publishdatamap(-1, true, false);
   }
   yield();
   ESP.wdtFeed(); // Prevent watchdog to kick in...
@@ -3158,13 +3172,20 @@ void loop()
     yield();
     ESP.wdtFeed(); // Prevent watchdog to kick in...
 
-    // Every 10 minutes (+/- 60 seconds) publish all mqtt data
-    static int8_t dividefactor = random(-60, 60);
-    if ((uptime > 60) && (((uptime + dividefactor) % 600) == 0))
+    // Every 1 minutes publish all regular mqtt data
+    if ((uptime % 60) == 0)
     {
       DEBUG_I ("Regular publishing datamap...\n");
       publishdatamap(-1, false, false, true);
     }
+
+    // Every 10 minutes publish all regular mqtt data
+    if ((uptime % 600) == 0)
+    {
+      DEBUG_I ("Publishing full datamap...\n");
+      publishdatamap(-1, false, true, false);
+    }
+
     yield();
     ESP.wdtFeed(); // Prevent watchdog to kick in...
 
@@ -3887,29 +3908,29 @@ void qswifiswitch_switchcallback(uint8_t channel, bool switchstate)
 
 void ducoboxcallback (const char *topic, String payload)
 {
-//  putdatamap(topic, payload);
+  //  putdatamap(topic, payload);
 }
 
 void amgpelletstovecallback (const char *topic, String payload)
 {
-//  putdatamap(topic, payload);
+  //  putdatamap(topic, payload);
 }
 
 void bht002callback (const char *topic, String payload)
 {
-//  putdatamap(topic, payload);
+  //  putdatamap(topic, payload);
   yield();
 }
 
 void tuyacallback (const char *topic, String payload)
 {
-//  putdatamap(topic, payload);
+  //  putdatamap(topic, payload);
   yield();
 }
 
 void openthermcallback (const char *topic, String payload)
 {
-//  putdatamap(topic, payload);
+  //  putdatamap(topic, payload);
 }
 
 #ifdef  ESPMQTT_GROWATT
@@ -4560,6 +4581,7 @@ void setup() {
 #endif
 
 #ifdef  ESPMQTT_WEATHER
+  DataMap.status = DataMapStatus::online;
   if (!oneWireSensors.getAddress(onewire_OutsideAddress, 0)) {
     DEBUG_E("Unable to find address for onewire_outsidetemp\n");
   }
@@ -4699,6 +4721,11 @@ void setup() {
 
   strcpy(DataMap.firmware_upgradekey, getRandomString(10).c_str()); // Set firmware_upgradekey to a random string
 
+  setDataMapPublishRegular(10); //uptime
+  setDataMapPublishRegular(11); //freeram
+  setDataMapPublishRegular(15); //bssid
+  setDataMapPublishRegular(16); //rssi
+  setDataMapPublishRegular(17); //channel
   connectToWifi(); // After everything is set, connect to wifi.
 }
 
