@@ -31,7 +31,7 @@
 #define DEBUGLEVEL Debug.VERBOSE
 
 /* ESP8266 */
-// #define ESPMQTT_WEATHER
+#define ESPMQTT_WEATHER
 // #define ESPMQTT_AMGPELLETSTOVE
 // #define ESPMQTT_BATHROOM
 // #define ESPMQTT_BEDROOM2
@@ -42,7 +42,7 @@
 // #define ESPMQTT_SDM120
 // #define ESPMQTT_DDM18SD
 // #define ESPMQTT_WATERMETER
-#define ESPMQTT_WATERMETER2
+// #define ESPMQTT_WATERMETER2
 // #define ESPMQTT_DDNS
 // #define ESPMQTT_GENERIC8266
 // #define ESPMQTT_GENERIC8266_NEO
@@ -4589,7 +4589,9 @@ void setup() {
   DataMap.status = DataMapStatus::online;
   if (!oneWireSensors.getAddress(onewire_OutsideAddress, 0)) {
     DEBUG_E("Unable to find address for onewire_outsidetemp\n");
+    DataMap.status = DataMapStatus::commerror;
   }
+  else DataMap.status = DataMapStatus::online;
 #endif
 
 #ifdef  ESPMQTT_SONOFFTH
