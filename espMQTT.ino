@@ -28,10 +28,10 @@
 /* SETTINGS */
 #define SERIALLOG
 #define MYTZ TZ_Europe_Amsterdam
-#define DEBUGLEVEL Debug.DEBUG
+#define DEBUGLEVEL Debug.VERBOSE
 
 /* ESP8266 */
-// #define ESPMQTT_WEATHER
+#define ESPMQTT_WEATHER
 // #define ESPMQTT_AMGPELLETSTOVE
 // #define ESPMQTT_BATHROOM
 // #define ESPMQTT_BEDROOM2
@@ -42,7 +42,7 @@
 // #define ESPMQTT_SDM120
 // #define ESPMQTT_DDM18SD
 // #define ESPMQTT_WATERMETER
-#define ESPMQTT_WATERMETER2
+// #define ESPMQTT_WATERMETER2
 // #define ESPMQTT_DDNS
 // #define ESPMQTT_GENERIC8266
 // #define ESPMQTT_GENERIC8266_NEO
@@ -263,7 +263,18 @@ QsWifiSwitch qswifiswitch(QSWIFISWITCHCHANNELS);
 #define ONEWIREPIN D5
 #define RAINMETERPIN D1
 #define RAINMETERPULSEMM 0.3636
+struct
+{
+  float temperature = NAN;
+  uint16_t rain_pulses = 0;
+  uint16_t rain_hour_pulses = 0;
+  uint16_t rain_lasthour_pulses = 0;
+  uint16_t rain_minute_pulses = 0;
+  uint16_t rain_lastminute_pulses = 0;
+} weather;
+#define ADDEDDATAMAPLENGTH 11
 #undef SERIALLOG
+#undef CPUSLEEP
 #define CPUSLEEP 5
 #endif
 
@@ -538,6 +549,7 @@ static bool sonoff_oldbuttons[1] = {1};
 #define EE24LC512MAXBYTES  512000
 #include "watermeter.h"
 #include "i2ceeprom_wearleveling.h"
+#define ADDEDDATAMAPLENGTH 4
 #endif
 
 #ifdef  ESPMQTT_WATERMETER2
@@ -549,6 +561,7 @@ static bool sonoff_oldbuttons[1] = {1};
 #define WATERPULSEPIN D5
 #include "watermeter.h"
 #include "i2ceeprom_wearleveling.h"
+#define ADDEDDATAMAPLENGTH 4
 #endif
 
 #ifdef  ESPMQTT_GARDEN2
@@ -1188,6 +1201,41 @@ int16_t getDataMap(char *key, char *value, int8_t id = -1)
   if (getdatamap_checkandfill(key, value, id, idCounter++, "water/m3", valuestring)) return --idCounter;
 #endif
 
+#ifdef ESPMQTT_WEATHER
+  if (isnan(weather.temperature)) snprintf (valuestring, 30, "-");
+  else snprintf (valuestring, 30, cF("%.1f"), weather.temperature);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "temperature", valuestring)) return --idCounter;
+
+  snprintf (valuestring, 30, cF("%d"), weather.rain_pulses);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "rain/pulses", valuestring)) return --idCounter;
+
+  snprintf (valuestring, 30, cF("%.1f"), float(weather.rain_pulses) * RAINMETERPULSEMM);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "rain/mm", valuestring)) return --idCounter;
+
+  snprintf (valuestring, 30, cF("%d"), weather.rain_hour_pulses);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "rain/hour/pulses", valuestring)) return --idCounter;
+
+  snprintf (valuestring, 30, cF("%.1f"), float(weather.rain_hour_pulses) * RAINMETERPULSEMM);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "rain/hour/mm", valuestring)) return --idCounter;
+
+  snprintf (valuestring, 30, cF("%d"), weather.rain_lasthour_pulses);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "rain/lasthour/pulses", valuestring)) return --idCounter;
+
+  snprintf (valuestring, 30, cF("%.1f"), float(weather.rain_lasthour_pulses) * RAINMETERPULSEMM);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "rain/lasthour/mm", valuestring)) return --idCounter;
+
+  snprintf (valuestring, 30, cF("%d"), weather.rain_minute_pulses);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "rain/minute/pulses", valuestring)) return --idCounter;
+
+  snprintf (valuestring, 30, cF("%.1f"), float(weather.rain_minute_pulses) * RAINMETERPULSEMM);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "rain/minute/mm", valuestring)) return --idCounter;
+
+  snprintf (valuestring, 30, cF("%d"), weather.rain_lastminute_pulses);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "rain/lastminute/pulses", valuestring)) return --idCounter;
+
+  snprintf (valuestring, 30, cF("%.1f"), float(weather.rain_lastminute_pulses) * RAINMETERPULSEMM);
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "rain/lastminute/mm", valuestring)) return --idCounter;
+#endif
 
   return -1;
   yield();
@@ -1578,7 +1626,7 @@ void mqttdosubscriptions(int32_t packetId = -1)
   static int32_t nextpacketid = 1;
   static uint16_t nextsubscribe = 0;
   char subscribetopic[20];
-  DEBUG_D("mqttdosubscriptions (packetId=%d, nextpacketId=%d, nextsubscribe=%d)\n", packetId, nextpacketid, nextsubscribe);
+  DEBUG_V("mqttdosubscriptions (packetId=%d, nextpacketId=%d, nextsubscribe=%d)\n", packetId, nextpacketid, nextsubscribe);
 
   if (packetId == -1)
   {
@@ -2334,62 +2382,57 @@ void sonoffpow2_handle()
 void rainmeter_handle()
 {
   static uint32_t rainpinmillis = 0;
-  static uint32_t rainpulses = 0;
-  static uint32_t rainpulsesminute = 0;
-  static uint32_t rainpulseshour = 0;
   bool rainpinstate = 0;
   static bool count = 0;
   rainpinstate = digitalRead(RAINMETERPIN);
-  if ((rainpinstate == 1) && (millis() - 50 > rainpinmillis) && count) // Pulse has to settle for 50ms before counting
+  if ((rainpinstate == 1) && (millis() - 50 > rainpinmillis) && count) // Pulse has to settle for 50ms before counting for filtering spikes
   {
-    rainpulses++;
-    rainpulseshour++;
-    rainpulsesminute++;
-    String mqtttopic = String(mqtt_topicprefix + "rain/pulse");
-    mqttClient.publish(mqtttopic.c_str(), 0, false, "1");
+    weather.rain_pulses++;
+    weather.rain_hour_pulses++;
+    weather.rain_minute_pulses++;
     count = 0;
+    
+    setDataMapSendStatus(DATAMAP_BASELENGTH + 1, true);
+    setDataMapSendStatus(DATAMAP_BASELENGTH + 2, true);
+    setDataMapSendStatus(DATAMAP_BASELENGTH + 3, true);
   }
   if (rainpinstate == 0)
   {
     rainpinmillis = millis();
     count = 1;
   }
-  putdatamap ("rain/pulses", String(rainpulses));
-  putdatamap ("rain/mm", String((double(rainpulses)*RAINMETERPULSEMM), 1));
 
   static bool hourreg = false;
-  static bool firsthourreg = true;
-  if ((uptime % 3600) || (firsthourreg))
+  if ((uptime % 3600) == 0)
   {
-    putdatamap ("rain/hour/pulses", String(rainpulseshour));
-    putdatamap ("rain/hour/mm", String((double(rainpulseshour)*RAINMETERPULSEMM), 1));
-    firsthourreg = false;
     if (!hourreg)
     {
-      putdatamap ("rain/lasthour/pulses", String(rainpulseshour));
-      putdatamap ("rain/lasthour/mm", String((double(rainpulseshour)*RAINMETERPULSEMM), 1));
-      rainpulseshour = 0;
+      weather.rain_lasthour_pulses = weather.rain_hour_pulses;
+      weather.rain_hour_pulses = 0;
+      setDataMapSendStatus(DATAMAP_BASELENGTH + 4, true);
+      setDataMapSendStatus(DATAMAP_BASELENGTH + 5, true);
+      setDataMapSendStatus(DATAMAP_BASELENGTH + 6, true);
+      setDataMapSendStatus(DATAMAP_BASELENGTH + 7, true);
       hourreg = true;
     }
   }
   else hourreg = false;
 
-  static bool minreg = false;
-  static bool firstminreg = true;
-  if ((uptime % 60) || (firstminreg))
+  static bool minutereg = false;
+  if ((uptime % 60) == 0)
   {
-    putdatamap ("rain/minute/pulses", String(rainpulsesminute));
-    putdatamap ("rain/minute/mm", String((double(rainpulsesminute)*RAINMETERPULSEMM), 1));
-    firstminreg = false;
-    if (!minreg)
+    if (!minutereg)
     {
-      putdatamap ("rain/lastminute/pulses", String(rainpulsesminute));
-      putdatamap ("rain/lastminute/mm", String((double(rainpulsesminute)*RAINMETERPULSEMM), 1));
-      rainpulsesminute = 0;
-      minreg = true;
+      weather.rain_lastminute_pulses = weather.rain_minute_pulses;
+      weather.rain_minute_pulses = 0;
+      setDataMapSendStatus(DATAMAP_BASELENGTH + 8, true);
+      setDataMapSendStatus(DATAMAP_BASELENGTH + 9, true);
+      setDataMapSendStatus(DATAMAP_BASELENGTH + 10, true);
+      setDataMapSendStatus(DATAMAP_BASELENGTH + 11, true);
+      minutereg = true;
     }
   }
-  else minreg = false;
+  else minutereg = false;
 
   digitalWrite(NODEMCULEDPIN, rainpinstate);
 }
@@ -2705,8 +2748,8 @@ void espmqtt_handle_modules_1sec()
 #ifdef  ESPMQTT_WEATHER
     temperature = oneWireSensors.getTempC(onewire_OutsideAddress);
     DEBUG_I("Outside Temperature=%f\n", temperature);
-    if ((temperature != -127) && (temperature != 85)) putdatamap("temperature", String(temperature, 1));
-    else putdatamap("temperature", "-");
+    if ((temperature != -127) && (temperature != 85)) weather.temperature = temperature;
+    else weather.temperature = NAN;
     yield();
 #endif
 #ifdef  ESPMQTT_SONOFF_FLOORHEATING
@@ -3344,7 +3387,7 @@ void publishdatamap(int32_t packetId, bool publishall, bool init, bool publishre
     {
       if (publishall) setDataMapSendStatus(id, true);
       if ((publishregular) && (getDataMapPublishRegular(id))) setDataMapSendStatus(id, true);
-      DEBUG("id=%d datamaplength=%d publishall=%d publishregular=%d\n", id, getDataMapLength(), publishall, publishregular);
+      DEBUG_V("id=%d datamaplength=%d publishall=%d publishregular=%d publishregularid=%d\n", id, getDataMapLength(), publishall, publishregular, getDataMapPublishRegular(id));
       id++;
       yield();
     }
@@ -3907,7 +3950,6 @@ void growattcallback ()
       setDataMapSendStatus(DATAMAP_BASELENGTH + bitpointer, true);
     }
   }
-
 }
 #endif
 
@@ -4486,15 +4528,14 @@ void setup() {
   display.display();
 #endif
 
+#ifdef ADDEDDATAMAPLENGTH
+  DataMap.length += ADDEDDATAMAPLENGTH;
+#endif
+
 #ifdef  ESPMQTT_WATERMETER
   i2cEeprom_init(I2C_SDA, I2C_SCL, I2C_EEPROM_ADDRESS, EE24LC512MAXBYTES);
   uint32_t watermeter_liters = i2cEeprom_read();
   watermeter_init(WATERPULSEPIN, NODEMCULEDPIN, watermeter_liters);
-  DataMap.length += 4;
-#endif
-
-#ifdef ESPMQTT_WATERMETER2
-  DataMap.length += 4;
 #endif
 
 #ifdef  ESPMQTT_MAINPOWERMETER
