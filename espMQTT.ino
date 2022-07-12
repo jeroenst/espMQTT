@@ -265,7 +265,7 @@ QsWifiSwitch qswifiswitch(QSWIFISWITCHCHANNELS);
 #define RAINMETERPULSEMM 0.3636
 struct
 {
-  float temperature = NAN;
+  int16_t temperature = INT16_MAX; //In 0.1 degree celcius
   uint16_t rain_pulses = 0;
   uint16_t rain_hour_pulses = 0;
   uint16_t rain_lasthour_pulses = 0;
@@ -1202,8 +1202,8 @@ int16_t getDataMap(char *key, char *value, int8_t id = -1)
 #endif
 
 #ifdef ESPMQTT_WEATHER
-  if (isnan(weather.temperature)) snprintf (valuestring, 30, "-");
-  else snprintf (valuestring, 30, cF("%.1f"), weather.temperature);
+  if (weather.temperature != INT16_MAX) snprintf (valuestring, 30, cF("%u.%01u"), weather.temperature / 10, weather.temperature % 10);
+  else snprintf (valuestring, 30, "-");
   if (getdatamap_checkandfill(key, value, id, idCounter++, "temperature", valuestring)) return --idCounter;
 
   snprintf (valuestring, 30, cF("%d"), weather.rain_pulses);
@@ -2736,7 +2736,7 @@ void espmqtt_handle_modules_1sec()
   {
     DEBUG_V("Requesting DS18B20 temperatures...\n");
     oneWireSensors.requestTemperatures();
-    float temperature;
+    int temperature;
 #ifdef  ESPMQTT_SONOFFTH
     temperature = oneWireSensors.getTempC(onewire_address);
     DEBUG_I("temperature=%f\n", temperature);
@@ -2755,10 +2755,9 @@ void espmqtt_handle_modules_1sec()
     yield();
 #endif
 #ifdef  ESPMQTT_WEATHER
-    temperature = oneWireSensors.getTempC(onewire_OutsideAddress);
-    if (!isnan(temperature)) temperature = float(int(temperature * 10)) / 10;
-    DEBUG_I("Outside Temperature=%f\n", temperature);
-    if ((temperature == -127) || (temperature == 85)) temperature = NAN;
+    temperature = (oneWireSensors.getTempC(onewire_OutsideAddress) * 10);
+    DEBUG_I("Outside Temperature=%u.%01u\n", weather.temperature / 10, weather.temperature % 10);
+    if ((temperature == -1270) || (temperature == 850)) temperature = INT16_MAX;
     if (weather.temperature != temperature)
     {
       if (!(isnan(weather.temperature) && isnan(temperature))) setDataMapSendStatus(DATAMAP_BASELENGTH, true);
