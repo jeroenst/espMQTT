@@ -31,14 +31,14 @@
 #define DEBUGLEVEL Debug.VERBOSE
 
 /* ESP8266 */
-#define ESPMQTT_WEATHER
+// #define ESPMQTT_WEATHER
 // #define ESPMQTT_AMGPELLETSTOVE
 // #define ESPMQTT_BATHROOM
 // #define ESPMQTT_BEDROOM2
 // #define ESPMQTT_OPENTHERM
 // #define ESPMQTT_SMARTMETER
 // #define ESPMQTT_GROWATT
-// #define ESPMQTT_GROWATT_MODBUS
+#define ESPMQTT_GROWATT_MODBUS
 // #define ESPMQTT_SDM120
 // #define ESPMQTT_DDM18SD
 // #define ESPMQTT_WATERMETER
@@ -46,7 +46,6 @@
 // #define ESPMQTT_DDNS
 // #define ESPMQTT_GENERIC8266
 // #define ESPMQTT_GENERIC8266_NEO
-// #define ESPMQTT_MAINPOWERMETER
 // #define ESPMQTT_OBD2
 // #define ESPMQTT_NOISE
 // #define ESPMQTT_SOIL
@@ -107,7 +106,7 @@ static bool sonoffch_timeout_enabled[1] = {1};
 // Use RX pin for onewire
 #define ONEWIREPIN 3
 #undef SERIALLOG
-#define SONOFF_FLOORHEATING_TEMPMAX 45
+#define SONOFF_FLOORHEATING_TEMPMAX 450
 #endif
 
 #ifdef  ESPMQTT_DIMMER
@@ -517,17 +516,6 @@ const byte sonoff_buttons[1] = {0};
 static bool sonoff_oldbuttons[1] = {1};
 #endif
 
-#ifdef  ESPMQTT_MAINPOWERMETER
-#define FIRMWARE_TARGET "MAINPOWERMETER"
-#define FLASHBUTTON D3
-#define ESPLED D4
-#define ADS0_RDY_PIN    D0 //ADS1256 data ready
-#define ADS0_CS_PIN    D1 //ADS1256 chip select
-#define ADS1_RDY_PIN    D2 //ADS1256 data ready
-#define ADS1_CS_PIN    D8 //ADS1256 chip select
-#include "circuitspowermeter.h"
-#endif
-
 #ifdef  ESPMQTT_OPENTHERM
 #define FIRMWARE_TARGET "OPENTHERM"
 #define FLASHBUTTON D3
@@ -560,7 +548,6 @@ static bool sonoff_oldbuttons[1] = {1};
 #define NEOPIXELPIN D8
 #define WATERPULSEPIN D5
 #include "watermeter.h"
-#include "i2ceeprom_wearleveling.h"
 #define DATAMAPLENGTH_ADD 4
 #endif
 
@@ -2016,6 +2003,90 @@ void update_dht()
 }
 #endif
 
+#ifdef ONEWIREPIN
+void update_onewire()
+{
+  DEBUG_V("Requesting DS18B20 temperatures...\n");
+  oneWireSensors.requestTemperatures();
+  int temperature;
+#ifdef  ESPMQTT_SONOFFTH
+  temperature = (oneWireSensors.getTempC(onewire_address) * 10);
+  DEBUG_I("Temperature=%u.%01u\n", temperature / 10, temperature % 10);
+  if ((temperature == -1270) || (temperature == 850)) temperature = INT16_MAX;
+  if (sonoffth.temperature != temperature)
+  {
+    setDataMapSendStatus(DATAMAP_BASELENGTH, true);
+    sonoffth.temperature = temperature;
+  }
+#endif
+#ifdef  ESPMQTT_OPENTHERM
+  temperature = (oneWireSensors.getTempC(onewire_chReturnWaterThermometer) * 10);
+  DEBUG_I("ch return water Temperature=%u.%01u\n", temperature / 10, temperature % 10);
+  if ((temperature == -1270) || (temperature == 850)) temperature = INT16_MAX;
+  if (opentherm.onewire_ch_returnwatertemperature != temperature)
+  {
+    setDataMapSendStatus(DATAMAP_BASELENGTH, true);
+    opentherm.onewire_ch_returnwatertemperature = temperature;
+  }
+  temperature = (oneWireSensors.getTempC(onewire_dcwSupplyWaterThermometer) * 10);
+  DEBUG_I("dcw supply water Temperature=%u.%01u\n", temperature / 10, temperature % 10);
+  if ((temperature == -1270) || (temperature == 850)) temperature = INT16_MAX;
+  if (opentherm.onewire_dcw_returnwatertemperature != temperature)
+  {
+    setDataMapSendStatus(DATAMAP_BASELENGTH + 1, true);
+    opentherm.onewire_dcw_returnwatertemperature = temperature;
+  }
+#endif
+#ifdef  ESPMQTT_WEATHER
+  temperature = (oneWireSensors.getTempC(onewire_OutsideAddress) * 10);
+  DEBUG_I("Outside Temperature=%u.%01u\n", temperature / 10, temperature % 10);
+  if ((temperature == -1270) || (temperature == 850)) temperature = INT16_MAX;
+  if (weather.temperature != temperature)
+  {
+    setDataMapSendStatus(DATAMAP_BASELENGTH, true);
+    weather.temperature = temperature;
+  }
+#endif
+#ifdef  ESPMQTT_SONOFF_FLOORHEATING
+  temperature = (oneWireSensors.getTempC(onewire_OutsideAddress) * 10);
+  DEBUG_I("Floor Water Temperature=%u.%01u\n", temperature / 10, temperature % 10);
+  if ((temperature == -1270) || (temperature == 850)) temperature = INT16_MAX;
+  if (temperature != floorheating.temperature)
+  {
+    setDataMapSendStatus(DATAMAP_BASELENGTH, true);
+    floorheating.temperature = temperature;
+  }
+  bool floorheatingrelayon = false;
+  // When temperature exeeds maximum prevent pump from switching on
+  if (temperature != INT16_MAX)
+  {
+    if (temperature < SONOFF_FLOORHEATING_TEMPMAX)
+    {
+      // Every 24 hours run the pump for 1 minute to prevent locking
+      if ((int)(uptime / 60) % 1440 == 0)
+      {
+        floorheatingrelayon = true;
+      }
+      // Only if floorheating temperature as measured correctly put valve on if requested
+      else
+      {
+        floorheatingrelayon = floorheating_valveon;
+      }
+    }
+  }
+#ifdef SONOFFCHINVERSE
+  digitalWrite(sonoff_relays[0], floorheatingrelayon ? false : true); // Set floorheating
+#else
+  digitalWrite(sonoff_relays[0], floorheatingrelayon); // Set floorheating
+#endif
+#ifdef SONOFF_LEDS
+  digitalWrite(sonoff_leds[0], sonoff_ledinverse == floorheatingrelayon ? 0 : 1);
+#endif
+#endif
+  yield();
+}
+#endif
+
 void write_oled_display()
 {
 #ifdef OLED_ADDRESS
@@ -2602,7 +2673,7 @@ void espmqtt_handle_modules()
   rainmeter_handle();
 #endif
 
-#ifdef  ESPMQTT_WATERMETER
+#if defined(ESPMQTT_WATERMETER) || defined(ESPMQTT_WATERMETER2)
   espmqtt_watermeter_handle();
 #endif
 
@@ -2680,16 +2751,19 @@ void espmqtt_handle_modules_100ms()
 #endif
 }
 
-void espmqtt_handle_modules_1sec()
+#ifdef ESPMQTT_BBQTEMP
+void update_bbqtemp()
 {
-#ifdef  ESPMQTT_BBQTEMP
-  double temp = MAX6675_readCelsius(ESPMQTT_BBQTEMP_CS0);
-  putdatamap("temperature/0", temp == NAN ? "-" : String(temp, 1));
+  float temp = MAX6675_readCelsius(ESPMQTT_BBQTEMP_CS0);
+  bbqtemp.temperature_0 = isnan(temp) ? INT16_MAX : temp * 10;
   temp = MAX6675_readCelsius(ESPMQTT_BBQTEMP_CS1);
-  putdatamap("temperature/1", temp == NAN ? "-" : String(temp, 1));
+  bbqtemp.temperature_1 = isnan(temp) ? INT16_MAX : temp * 10;
+}
 #endif
 
 #ifdef  ESPMQTT_SONOFFPOWR2
+void update_sonoffpowr2()
+{
   static uint64_t deciwattsec = 0;
   deciwattsec += powerval >= 0 ? (powerval * 10) : 0;
   if ((uptime % 5) == 0) // Every 5 seconds send update about power usage
@@ -2709,22 +2783,17 @@ void espmqtt_handle_modules_1sec()
     String kwh = wh.substring(0, wh.length() - 3) + "." + wh.substring(wh.length() - 3); // Add decimal for wh to kwh conversion;
     putdatamap("energy/kwh", kwh);
   }
+}
 #endif
 
-#ifdef  ESPMQTT_MAINPOWERMETER
-  static uint8_t circuitnr = 0;
-  int32_t mW;
-  int32_t mVA;
-  int32_t mA;
-  int32_t mV;
-  uint8_t nrofsamples;
-  circuitspowermeter_read(circuitnr, mW, mVA, mA, mV, 10);
-  if (circuitnr == 0) putdatamap("mainsvoltage", String(mV / 1000));
-  //putdatamap("circuit/" + String((circuitnr + 1)) + "/mA", String(mA));
-  //putdatamap("circuit/" + String((circuitnr + 1)) + "/W", String(mW / 1000));
-  //putdatamap("circuit/" + String((circuitnr + 1)) + "/VA", String(mVA / 1000));
-  if (circuitnr < 14) circuitnr++;
-  else circuitnr = 0;
+void espmqtt_handle_modules_1sec()
+{
+#ifdef  ESPMQTT_BBQTEMP
+  update_bbqtemp();
+#endif
+
+#ifdef  ESPMQTT_SONOFFPOWR2
+  update_sonoffpowr2();
 #endif
 
 #ifdef DHTPIN
@@ -2732,73 +2801,7 @@ void espmqtt_handle_modules_1sec()
 #endif
 
 #ifdef ONEWIREPIN
-  if (uptime % 10 == 0)
-  {
-    DEBUG_V("Requesting DS18B20 temperatures...\n");
-    oneWireSensors.requestTemperatures();
-    int temperature;
-#ifdef  ESPMQTT_SONOFFTH
-    temperature = oneWireSensors.getTempC(onewire_address);
-    DEBUG_I("temperature=%f\n", temperature);
-    if ((temperature != -127) && (temperature != 85)) putdatamap("temperature", String(temperature, 1));
-    else putdatamap("temperature", "-");
-#endif
-#ifdef  ESPMQTT_OPENTHERM
-    temperature = oneWireSensors.getTempC(onewire_chReturnWaterThermometer);
-    DEBUG_I("chreturnwatertemp=%f\n", temperature);
-    if ((temperature != -127) && (temperature != 85)) putdatamap("ow/ch/returnwatertemperature", String(temperature, 1));
-    else putdatamap("ow/ch/returnwatertemperature", "-");
-    temperature = oneWireSensors.getTempC(onewire_dcwSupplyWaterThermometer);
-    DEBUG_I("dcwsupplywatertemp=%f\n", temperature);
-    if ((temperature != -127) && (temperature != 85)) putdatamap("ow/dcw/temperature", String(temperature, 1));
-    else putdatamap("ow/dcw/temperature", "-");
-    yield();
-#endif
-#ifdef  ESPMQTT_WEATHER
-    temperature = (oneWireSensors.getTempC(onewire_OutsideAddress) * 10);
-    DEBUG_I("Outside Temperature=%u.%01u\n", weather.temperature / 10, weather.temperature % 10);
-    if ((temperature == -1270) || (temperature == 850)) temperature = INT16_MAX;
-    if (weather.temperature != temperature)
-    {
-      if (!(isnan(weather.temperature) && isnan(temperature))) setDataMapSendStatus(DATAMAP_BASELENGTH, true);
-      weather.temperature = temperature;
-    }
-    yield();
-#endif
-#ifdef  ESPMQTT_SONOFF_FLOORHEATING
-    temperature = oneWireSensors.getTempC(onewire_floorWaterAddress);
-    DEBUG_I("Floor Water Temperature=%f\n", temperature);
-    bool floorheatingrelayon = false;
-    // When temperature exeeds maximum prevent pump from switching on
-    if ((temperature != -127) && (temperature != 85))
-    {
-      putdatamap("temperature", String(temperature, 1));
-      if (temperature < SONOFF_FLOORHEATING_TEMPMAX)
-      {
-        // Every 24 hours run the pump for 1 minute to prevent locking
-        if ((int)(uptime / 60) % 1440 == 0)
-        {
-          floorheatingrelayon = true;
-        }
-        // Only if floorheating temperature as measured correctly put valve on if requested
-        else
-        {
-          floorheatingrelayon = floorheating_valveon;
-        }
-      }
-    }
-    else putdatamap("temperature", "-");
-#ifdef SONOFFCHINVERSE
-    digitalWrite(sonoff_relays[0], floorheatingrelayon ? false : true); // Set floorheating
-#else
-    digitalWrite(sonoff_relays[0], floorheatingrelayon); // Set floorheating
-#endif
-#ifdef SONOFF_LEDS
-    digitalWrite(sonoff_leds[0], sonoff_ledinverse == floorheatingrelayon ? 0 : 1);
-#endif
-    yield();
-#endif
-  }
+  if (uptime % 10 == 0) update_onewire();
 #endif
 
   write_oled_display();
@@ -4554,6 +4557,7 @@ void setup() {
 
 #ifdef ESPMQTT_WATERMETER2
   DataMap.status = DataMapStatus::online;
+  watermeter_init(WATERPULSEPIN, NODEMCULEDPIN, 0);
 #endif
 
 #ifdef  ESPMQTT_WATERMETER
@@ -4561,10 +4565,6 @@ void setup() {
   i2cEeprom_init(I2C_SDA, I2C_SCL, I2C_EEPROM_ADDRESS, EE24LC512MAXBYTES);
   uint32_t watermeter_liters = i2cEeprom_read();
   watermeter_init(WATERPULSEPIN, NODEMCULEDPIN, watermeter_liters);
-#endif
-
-#ifdef  ESPMQTT_MAINPOWERMETER
-  circuitspowermeter_init(ADS0_CS_PIN, ADS0_RDY_PIN, ADS1_CS_PIN, ADS1_RDY_PIN);
 #endif
 
 #ifdef  ESPMQTT_SONOFF_FLOORHEATING
