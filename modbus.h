@@ -1,8 +1,9 @@
 void modbus_clear_buffer(); // Clears the buffer, get function will not return data anymore
 
 uint8_t modbus_get_byte(uint8_t bytenr);
-double modbus_get_two_register_double(uint8_t registerstartid, double devide = 1);
+double modbus_get_two_register_double(uint8_t registerstartid);
 uint16_t modbus_get_two_register_uint(uint8_t registerstartid);
+int16_t modbus_get_two_register_int(uint8_t registerstartid);
 uint16_t modbus_get_register(uint8_t registerid);
 
 void modbus_handle(); // Has to be called continously to handle incomming serial data

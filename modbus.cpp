@@ -182,16 +182,16 @@ void modbus_clear_buffer()
 // This function creates a double from 2 16 bit values
 double glue(unsigned int d1, unsigned int d0) {
   double t;
-  t = d1 << 16;
-  t += d0;
+  t = d0 >> 16;
+  t += d1;
   return t;
 }
 
-double modbus_get_two_register_double(uint8_t registerstartid, double devide)
+double modbus_get_two_register_double(uint8_t registerstartid)
 {
-  if (registerstartid * 2 < modbus_RxBufferPointer)
+  if (registerstartid + 2 < modbus_RxBufferPointer)
   {
-    return glue(modbus_get_register(registerstartid), modbus_get_register(registerstartid+1)) / devide;
+    return glue(modbus_get_register(registerstartid), modbus_get_register(registerstartid+1));
   }
   else
   {
@@ -201,9 +201,21 @@ double modbus_get_two_register_double(uint8_t registerstartid, double devide)
 
 uint16_t modbus_get_two_register_uint(uint8_t registerstartid)
 {
-  if (registerstartid * 2 < modbus_RxBufferPointer)
+  if (registerstartid + 2 < modbus_RxBufferPointer)
   {
-    return glue(modbus_get_register(registerstartid), modbus_get_register(registerstartid+1));
+    return (modbus_get_register(registerstartid) << 8) + modbus_get_register(registerstartid+1);
+  }
+  else
+  {
+    return 0xFFFF;
+  }
+}
+
+int16_t modbus_get_two_register_int(uint8_t registerstartid)
+{
+  if (registerstartid + 2 < modbus_RxBufferPointer)
+  {
+    return (modbus_get_register(registerstartid) << 8) + modbus_get_register(registerstartid+1);
   }
   else
   {
