@@ -37,8 +37,8 @@
 // #define ESPMQTT_BEDROOM2
 // #define ESPMQTT_OPENTHERM
 // #define ESPMQTT_SMARTMETER
-// #define ESPMQTT_GROWATT
-#define ESPMQTT_GROWATT_MODBUS
+#define ESPMQTT_GROWATT
+// #define ESPMQTT_GROWATT_MODBUS
 // #define ESPMQTT_SDM120
 // #define ESPMQTT_DDM18SD
 // #define ESPMQTT_WATERMETER
@@ -3967,10 +3967,13 @@ void growattcallback ()
 
   for (uint8_t bitpointer = 0;  bitpointer < 16; bitpointer++)
   {
-    if (*(uint16_t*)&growatt_DataMap.changed & (1 << bitpointer))
+    for (unint8_t bytepointer = 0; bytepointer < 2; bytepointer++)
     {
-      *(uint16_t*)&growatt_DataMap.changed &=  ~(1 << bitpointer);
-      setDataMapSendStatus(DATAMAP_BASELENGTH + bitpointer, true);
+    if (*(uint8_t*)&growatt_DataMap.changed[bytepointer] & (1 << bitpointer))
+    {
+      *(uint8_t*)&growatt_DataMap.changed[bytepointer] &=  ~(1 << bitpointer);
+      setDataMapSendStatus(DATAMAP_BASELENGTH + (bitpointer + (bytepointer * 8)), true);
+    }
     }
   }
 }
