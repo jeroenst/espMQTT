@@ -37,7 +37,7 @@
 // #define ESPMQTT_BEDROOM2
 // #define ESPMQTT_OPENTHERM
 // #define ESPMQTT_SMARTMETER
-#define ESPMQTT_GROWATT
+// #define ESPMQTT_GROWATT
 // #define ESPMQTT_GROWATT_MODBUS
 // #define ESPMQTT_SDM120
 // #define ESPMQTT_DDM18SD
@@ -57,7 +57,7 @@
 
 /* ESP8285 */
 // #define ESPMQTT_ZMAI90
-// #define ESPMQTT_DUCOBOX
+#define ESPMQTT_DUCOBOX
 // #define ESPMQTT_SONOFFS20 // coffeelamp & sonoffs20_00X
 // #define ESPMQTT_SONOFFBULB
 // #define ESPMQTT_GARDEN //ESP8285 TUIN & MARIANNE & LUIFEL
@@ -1224,6 +1224,11 @@ int16_t getDataMap(char *key, char *value, int8_t id = -1)
   if (getdatamap_checkandfill(key, value, id, idCounter++, "rain/lastminute/mm", valuestring)) return --idCounter;
 #endif
 
+#ifdef ESPMQTT_DUCOBOX
+  if (ducobox.node_4_temperature != INT16_MAX) snprintf (valuestring, 30, cF("%u.%01u"), ducobox.node_4_temperature / 10, ducobox.node_4_temperature % 10);
+  else snprintf (valuestring, 30, "-");
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "4_temperature", valuestring)) return --idCounter;
+#endif
   return -1;
   yield();
 }
@@ -1612,7 +1617,7 @@ void mqttdosubscriptions(int32_t packetId = -1)
 
   static int32_t nextpacketid = 1;
   static uint16_t nextsubscribe = 0;
-  char subscribetopic[20];
+  const char *subscribetopic = "";
   DEBUG_V("mqttdosubscriptions (packetId=%d, nextpacketId=%d, nextsubscribe=%d)\n", packetId, nextpacketid, nextsubscribe);
 
   if (packetId == -1)
@@ -1627,7 +1632,6 @@ void mqttdosubscriptions(int32_t packetId = -1)
   }
   else return;
 
-  subscribetopic[0] = 0;
   while ((0 == subscribetopic[0]) && (nextsubscribe <= nr_of_subsribe_topics))
   {
     //DEBUG("mqttdosubscriptions while nextsubscribe=%d\n", nextsubscribe);
@@ -1675,15 +1679,15 @@ void mqttdosubscriptions(int32_t packetId = -1)
       case 22:  subscribetopic = "setdimstate/1"; break;
 #endif
 #ifdef ESPMQTT_BHT002
-      case 23: strcpy(subscribetopic, "setsetpoint"); break;
+      case 23: subscribetopic = "setsetpoint"; break;
 #endif
-      case 24:  strcpy(subscribetopic, "startfirmwareupgrade"); break;
+      case 24: subscribetopic = "startfirmwareupgrade"; break;
 #ifdef ESPMQTT_QSWIFISWITCH1C
-      case 25:  subscribetopic = "setrelay"; break;
+      case 25: subscribetopic = "setrelay"; break;
 #endif
 #ifdef ESPMQTT_QSWIFISWITCH2C
-      case 26:  subscribetopic = "setrelay/0"; break;
-      case 27:  subscribetopic = "setrelay/1"; break;
+      case 26: subscribetopic = "setrelay/0"; break;
+      case 27: subscribetopic = "setrelay/1"; break;
 #endif
       default: break;
     }
@@ -1732,7 +1736,7 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties,
 #ifdef SONOFFCH
   for (byte i = 0; i < SONOFFCH; i++)
   {
-    if (String(topic) == String(mqtt_topicprefix + "setrelay/" + i))
+    if (String(topic) == String(mqtt_topicprefix) + "setrelay/" + i)
     {
       bool inverse = false;
 #ifdef SONOFFCHINVERSE
@@ -1792,12 +1796,12 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties,
 #endif
 
 #ifdef  ESPMQTT_SONOFF_FLOORHEATING
-  if (String(topic) == String(mqtt_topicprefix + "setvalve")) floorheating_valveon = payloadstring == "1" ? true : false;
+  if (String(topic) == String(mqtt_topicprefix) + "setvalve") floorheating_valveon = payloadstring == "1" ? true : false;
 #endif
 
 
 #ifdef  ESPMQTT_DUCOBOX
-  if (String(topic) == String(mqtt_topicprefix + "setfan")) ducobox_setfan(payloadstring.toInt());
+  if (String(topic) == String(mqtt_topicprefix) + "setfan") ducobox_setfan(payloadstring.toInt());
 #endif
 
 #ifdef  ESPMQTT_DIMMER
@@ -3341,10 +3345,10 @@ void sonoff_handle()
     inverse = true;
 #endif
     String relaystate = digitalRead(sonoff_relays[i]) != inverse ? "1" : "0";
-    if (i == 0) putdatamap ("relay/0", relaystate);
-    if (i == 1) putdatamap ("relay/1", relaystate);
-    if (i == 2) putdatamap ("relay/2", relaystate);
-    if (i == 3) putdatamap ("relay/3", relaystate);
+    if (i == 0) sonoff.relay_0 = relaystate;
+    if (i == 1) sonoff.relay_1 = relaystate;
+    if (i == 2) sonoff.relay_2 = relaystate;
+    if (i == 3) sonoff.relay_3 = relaystate;
   }
 
 #ifdef HLW8012_CF_PIN
