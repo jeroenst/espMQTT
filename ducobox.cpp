@@ -189,10 +189,10 @@ void _ducobox_handleserial(String ducomessage)
         ducobox_writeserial("fanparaget");             // Get fan parameters
         break;
       case 2:
-        ducobox_writeserial("nodeparaget 3 73");       // Request TEMPERATURE of node 3
+        ducobox_writeserial("nodeparaget 4 73");       // Request TEMPERATURE of node 3
         break;
       case 3:
-        ducobox_writeserial("nodeparaget 3 74");       // Request CO2 of sensor 3
+        ducobox_writeserial("nodeparaget 4 74");       // Request CO2 of sensor 3
         break;
       case 4:
         ducobox_writeserial("sensorinfo");       // Request internal sensors
