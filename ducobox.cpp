@@ -2,21 +2,19 @@
 #include "ducobox.h"
 #define ducobox_setfan_internal_count 2
 
+Ducobox_DataMap_Struct ducobox_DataMap;
+
 WiFiServer ducoserver(2233);
 static uint8_t _ducobox_fanspeedoverride = 255;
 static uint8_t _ducobox_relay0 = 0;
 static uint8_t _ducobox_relay1 = 0;
-static uint8_t _ducobox_refreshdelay = 5;
-static uint8_t _ducobox_refreshtimeout = 30;
-static uint16_t _ducobox_co2 = 0;
-static uint8_t _ducobox_rh = 0;
-static float _ducobox_temp = 0;
+static uint16_t _ducobox_co2 = UINT16_MAX;
 
 static String _serialsendqueue = "";
-static unsigned long _nextupdatetime = 0;
+static unsigned long _nextupdatetime = 5000;
 static bool recvok = 1;
 
-void(*_ducobox_callback)(const char *, String);
+void(*_ducobox_callback)();
 
 void _ducobox_writeserialqueue()
 // The ducobox can't handle serial data at full speed, so send char followed by a pause before next char
@@ -79,14 +77,13 @@ void _ducobox_handleserial(String ducomessage)
     int stringpos = ducomessage.indexOf("  FanSpeed:");
     if (stringpos == 0)
     {
-      _ducobox_callback("status", "querying");
+      ducobox_DataMap.status = Ducobox_status::querying;
+      _ducobox_callback();
       recvok = 1;
 
       // Read fanspeed
       ducovalue = ducomessage.substring(19);
-      ducovalue = ducovalue.substring(0, ducovalue.indexOf(' '));
-
-      _ducobox_callback("1/fanspeed", ducovalue);
+      ducobox_DataMap.fanspeed = ducovalue.substring(0, ducovalue.indexOf(' ')).toInt();
       //ducocmd = 1;
     }
   }
@@ -97,8 +94,7 @@ void _ducobox_handleserial(String ducomessage)
     if (stringpos == 0)
     {
       ducovalue = ducomessage.substring(ducomessage.indexOf(":") + 2);
-      ducovalue = ducovalue.substring(0, ducovalue.indexOf(" ["));
-      _ducobox_callback("1/minfanspeed", ducovalue);
+      ducobox_DataMap.minfanspeed = ducovalue.substring(0, ducovalue.indexOf(" [")).toInt();
       //ducocmd = 2;
     }
   }
@@ -116,8 +112,7 @@ void _ducobox_handleserial(String ducomessage)
         static uint8_t tempretry = 0;
         if (ducomessage != "")
         {
-          ducovalue = String(float(ducomessage.substring(6).toInt()) / 10, 1);
-          _ducobox_callback("2/temperature", ducovalue);
+          ducobox_DataMap.node_4_temperature = ducomessage.substring(6).toInt();
           tempretry = 0;
         }
         else
@@ -125,9 +120,8 @@ void _ducobox_handleserial(String ducomessage)
           tempretry++;
           if (tempretry == 0) tempretry--;
         }
-        if (tempretry == 30) _ducobox_callback("2/temperature", "-");
-        _ducobox_callback("2/temperature/retries", String(tempretry));
-
+        if (tempretry == 30) ducobox_DataMap.node_4_temperature = INT16_MAX;
+        ducobox_DataMap.node_4_temperature_retries = tempretry;
         //      ducocmd = 3;
         break;
       case 3:
@@ -139,7 +133,7 @@ void _ducobox_handleserial(String ducomessage)
           _ducobox_co2 = ducovalue.toInt();
           if (_ducobox_co2 > 400)
           {
-            _ducobox_callback("2/co2", ducovalue);
+            ducobox_DataMap.node_4_co2 = _ducobox_co2;
             co2retry = 0;
           }
           else
@@ -153,11 +147,10 @@ void _ducobox_handleserial(String ducomessage)
         }
         if (co2retry == 30)
         {
-          _ducobox_callback("2/co2", "-");
+           ducobox_DataMap.node_4_co2 = UINT16_MAX;
           _ducobox_co2 = 0;
         }
-        _ducobox_callback("2/co2/retries", String(co2retry));
-
+        ducobox_DataMap.node_4_co2_retries = co2retry;
         //        ducocmd = 4;
         break;
     }
@@ -168,15 +161,13 @@ void _ducobox_handleserial(String ducomessage)
     int stringpos = ducomessage.indexOf("RH : ");
     if (stringpos > 0)
     {
-      _ducobox_rh = ducomessage.substring(stringpos + 5, stringpos + 5 + 4).toInt() / 100;
-      _ducobox_callback ("26/humidity", String(_ducobox_rh));
+      ducobox_DataMap.node_26_humidity = ducomessage.substring(stringpos + 5, stringpos + 5 + 4).toInt() / 100;
     }
 
     stringpos = ducomessage.indexOf("TEMP : ");
     if (stringpos > 0)
     {
-      _ducobox_temp = float(ducomessage.substring(stringpos + 8, stringpos + 8 + 3).toInt()) / 10;
-      _ducobox_callback ("26/temperature", String(_ducobox_temp, 1));
+      ducobox_DataMap.node_26_temperature = ducomessage.substring(stringpos + 8, stringpos + 8 + 3).toInt();
     }
   }
 
@@ -189,10 +180,10 @@ void _ducobox_handleserial(String ducomessage)
         ducobox_writeserial("fanparaget");             // Get fan parameters
         break;
       case 2:
-        ducobox_writeserial("nodeparaget 3 73");       // Request TEMPERATURE of node 3
+        ducobox_writeserial("nodeparaget 4 73");       // Request TEMPERATURE of node 4
         break;
       case 3:
-        ducobox_writeserial("nodeparaget 3 74");       // Request CO2 of sensor 3
+        ducobox_writeserial("nodeparaget 4 74");       // Request CO2 of sensor 4
         break;
       case 4:
         ducobox_writeserial("sensorinfo");       // Request internal sensors
@@ -214,13 +205,16 @@ void _ducobox_handleserial(String ducomessage)
         }
         else
         {
-          _ducobox_callback("status", "ready");
+          ducobox_DataMap.status = Ducobox_status::ready;
+          _ducobox_callback();
           ducocmd = 0;
-          _nextupdatetime = millis() + (_ducobox_refreshdelay * 1000); // Next update over _duco_refreshtime seconds
+          _nextupdatetime = millis() + 30000; // Next update over 30 seconds
+//          _nextupdatetime = millis() + (_ducobox_refreshdelay * 1000); // Next update over _duco_refreshtime seconds
         }
         break;
       case 6:
-        _ducobox_callback("status", "ready");
+        ducobox_DataMap.status = Ducobox_status::ready;
+        _ducobox_callback();
         ducocmd = 0;
         break;
     }
@@ -273,8 +267,13 @@ void ducobox_handle()
 
     if (millis() > _nextupdatetime)
     {
-      if (recvok == 0)   _ducobox_callback("status", "commerror");
-      _nextupdatetime = millis() + (_ducobox_refreshtimeout * 1000); // Next update over _duco_refreshtime seconds
+      if (recvok == 0) 
+      {
+         ducobox_DataMap.status = Ducobox_status::commerror;
+         
+         _ducobox_callback();
+      }
+      _nextupdatetime = millis() + 120000; // Next update over 120 seconds
       ducobox_writeserial("fanspeed");                // Request fanspeed
       recvok = 0;
     }
@@ -282,23 +281,14 @@ void ducobox_handle()
   }
 }
 
-void ducobox_init(uint8_t ducobox_relay0, uint8_t ducobox_relay1, uint8_t ducobox_refreshtimeout, void(*callback)(const char *, String))
+void ducobox_init(uint8_t ducobox_relay0, uint8_t ducobox_relay1, void(*callback)())
 {
   _ducobox_callback = callback;
   _ducobox_relay0 = ducobox_relay0;
   _ducobox_relay1 = ducobox_relay1;
-  _ducobox_refreshtimeout = ducobox_refreshtimeout;
   Serial.setRxBufferSize(1000);
   Serial.setDebugOutput(false);
   Serial.begin(115200); //Init serial 115200 baud
   ducoserver.begin();
   ducobox_writeserial(""); // Clear bogus
-  _ducobox_callback("1/fanspeed", "-");
-  _ducobox_callback("1/minfanspeed", "-");
-  _ducobox_callback("26/humidity", "-");
-  _ducobox_callback("26/temperature", "-");
-  _ducobox_callback("2/co2", "-");
-  _ducobox_callback("2/co2/retries", "-");
-  _ducobox_callback("2/temperature", "-");
-  _ducobox_callback("2/temperature/retries", "-");
 }

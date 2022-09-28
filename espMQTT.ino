@@ -36,7 +36,7 @@
 // #define ESPMQTT_BATHROOM
 // #define ESPMQTT_BEDROOM2
 // #define ESPMQTT_OPENTHERM
-// #define ESPMQTT_SMARTMETER
+#define ESPMQTT_SMARTMETER
 // #define ESPMQTT_GROWATT
 // #define ESPMQTT_GROWATT_MODBUS
 // #define ESPMQTT_SDM120
@@ -57,7 +57,7 @@
 
 /* ESP8285 */
 // #define ESPMQTT_ZMAI90
-#define ESPMQTT_DUCOBOX
+// #define ESPMQTT_DUCOBOX
 // #define ESPMQTT_SONOFFS20 // coffeelamp & sonoffs20_00X
 // #define ESPMQTT_SONOFFBULB
 // #define ESPMQTT_GARDEN //ESP8285 TUIN & MARIANNE & LUIFEL
@@ -318,6 +318,7 @@ struct
 #define  ESPMQTT_SONOFFDUAL
 #define FLASHBUTTON 10
 #define ESPLED 13
+#define DATAMAPLENGTH_ADD 6
 #include "ducobox.h"
 #undef SERIALLOG
 #endif
@@ -626,6 +627,10 @@ static bool sonoff_oldbuttons[1] = {1};
 #define NODEMCULEDPIN D0
 #define FLASHBUTTON D3
 #define ESPLED D4
+#endif
+
+#ifdef SONOFFCH
+static bool sonoff_relaystate[SONOFFCH];
 #endif
 
 #ifdef NEOPIXELPIN
@@ -1225,9 +1230,39 @@ int16_t getDataMap(char *key, char *value, int8_t id = -1)
 #endif
 
 #ifdef ESPMQTT_DUCOBOX
-  if (ducobox.node_4_temperature != INT16_MAX) snprintf (valuestring, 30, cF("%u.%01u"), ducobox.node_4_temperature / 10, ducobox.node_4_temperature % 10);
+  if (ducobox_DataMap.fanspeed != UINT16_MAX) snprintf (valuestring, 30, cF("%d"), ducobox_DataMap.fanspeed);
   else snprintf (valuestring, 30, "-");
-  if (getdatamap_checkandfill(key, value, id, idCounter++, "4_temperature", valuestring)) return --idCounter;
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "1/fanspeed", valuestring)) return --idCounter;
+
+  if (ducobox_DataMap.minfanspeed != UINT16_MAX) snprintf (valuestring, 30, cF("%d"), ducobox_DataMap.minfanspeed);
+  else snprintf (valuestring, 30, "-");
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "1/minfanspeed", valuestring)) return --idCounter;
+
+  if (ducobox_DataMap.node_4_temperature != INT16_MAX) snprintf (valuestring, 30, cF("%u.%01u"), ducobox_DataMap.node_4_temperature / 10, ducobox_DataMap.node_4_temperature % 10);
+  else snprintf (valuestring, 30, "-");
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "4/temperature", valuestring)) return --idCounter;
+
+  if (ducobox_DataMap.node_4_co2 != UINT16_MAX) snprintf (valuestring, 30, cF("%d"), ducobox_DataMap.node_4_co2);
+  else snprintf (valuestring, 30, "-");
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "4/co2", valuestring)) return --idCounter;
+
+  if (ducobox_DataMap.node_26_temperature != INT16_MAX) snprintf (valuestring, 30, cF("%u.%01u"), ducobox_DataMap.node_26_temperature / 10, ducobox_DataMap.node_26_temperature % 10);
+  else snprintf (valuestring, 30, "-");
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "26/temperature", valuestring)) return --idCounter;
+
+  if (ducobox_DataMap.node_26_humidity != UINT16_MAX) snprintf (valuestring, 30, cF("%d"), ducobox_DataMap.node_26_humidity);
+  else snprintf (valuestring, 30, "-");
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "26/humidity", valuestring)) return --idCounter;
+#endif
+
+#ifdef SONOFFCH
+  for (uint8_t i = 0; i < SONOFFCH; i++)
+  {
+    char topicstring [10];
+    snprintf (valuestring, 30, cF("%d"), sonoff_relaystate[i]);
+    snprintf(topicstring, 10, "relay/%u", i);
+    if (getdatamap_checkandfill(key, value, id, idCounter++, topicstring, valuestring)) return --idCounter;
+  }
 #endif
   return -1;
   yield();
@@ -3237,8 +3272,10 @@ void sonoff_init()
 #ifdef SONOFFCHINVERSE
   inverse = true;
 #endif
-  for (byte i = 0; i < SONOFFCH; i++)
+  for (uint8_t i = 0; i < SONOFFCH; i++)
   {
+    sonoff_relaystate[i] = false;
+
     digitalWrite(sonoff_relays[i], inverse ? true : false);
     pinMode(sonoff_relays[i], OUTPUT);
 #ifdef SONOFF_LEDS
@@ -3344,11 +3381,12 @@ void sonoff_handle()
 #ifdef SONOFFCHINVERSE
     inverse = true;
 #endif
-    String relaystate = digitalRead(sonoff_relays[i]) != inverse ? "1" : "0";
-    if (i == 0) sonoff.relay_0 = relaystate;
-    if (i == 1) sonoff.relay_1 = relaystate;
-    if (i == 2) sonoff.relay_2 = relaystate;
-    if (i == 3) sonoff.relay_3 = relaystate;
+    bool relaystate = digitalRead(sonoff_relays[i]) != inverse ? 1 : 0;
+    if ((i == 0) && (i <= SONOFFCH)) sonoff_relaystate[0] = relaystate;
+    if ((i == 1) && (i <= SONOFFCH)) sonoff_relaystate[1] = relaystate;
+    if ((i == 2) && (i <= SONOFFCH)) sonoff_relaystate[2] = relaystate;
+    if ((i == 3) && (i <= SONOFFCH)) sonoff_relaystate[3] = relaystate;
+    // TODO: Set send bit
   }
 
 #ifdef HLW8012_CF_PIN
@@ -3912,10 +3950,37 @@ void qswifiswitch_switchcallback(uint8_t channel, bool switchstate)
 }
 #endif
 
-void ducoboxcallback (const char *topic, String payload)
+#ifdef ESPMQTT_DUCOBOX
+void ducoboxcallback ()
 {
-  //  putdatamap(topic, payload);
+  if (ducobox_DataMap.status == Ducobox_status::ready)
+  {
+    if (DataMap.status != DataMapStatus::ready)
+    {
+      DataMap.status = DataMapStatus::ready;
+      DataMap.sendStatusAfterPublishCompleted = true;
+    }
+  }
+
+  if ((ducobox_DataMap.status == Ducobox_status::commerror))
+  {
+    if (DataMap.status != DataMapStatus::commerror)
+    {
+      DataMap.status = DataMapStatus::commerror;
+      setDataMapSendStatus("status", true);
+    }
+  }
+
+  for (uint8_t bitpointer = 0;  bitpointer < 6; bitpointer++)
+  {
+    //if (*(uint32_t*)&growattModbus_DataMap.changed & (1 << bitpointer))
+    //{
+      //*(uint32_t*)&growattModbus_DataMap.changed &=  ~(1 << bitpointer);
+      setDataMapSendStatus(DATAMAP_BASELENGTH + bitpointer, true);
+    //}
+  }
 }
+#endif
 
 void amgpelletstovecallback (const char *topic, String payload)
 {
@@ -3944,27 +4009,27 @@ void growattcallback ()
 {
   if (growatt_DataMap.status == Growatt_status::ready)
   {
-    if (DataMap.status != ready)
+    if (DataMap.status != DataMapStatus::ready)
     {
-      DataMap.status = ready;
+      DataMap.status = DataMapStatus::ready;
       DataMap.sendStatusAfterPublishCompleted = true;
     }
   }
 
-  if ((DataMap.status != querying) && (DataMap.status != commerror))
+  if ((DataMap.status != DataMapStatus::querying) && (DataMap.status != DataMapStatus::commerror))
   {
-    if (DataMap.status != querying)
+    if (DataMap.status != DataMapStatus::querying)
     {
-      DataMap.status = querying;
+      DataMap.status = DataMapStatus::querying;
       setDataMapSendStatus("status", true);
     }
   }
 
   if (growatt_DataMap.status == Growatt_status::offline)
   {
-    if (DataMap.status != commerror)
+    if (DataMap.status != DataMapStatus::commerror)
     {
-      DataMap.status = commerror;
+      DataMap.status = DataMapStatus::commerror;
       setDataMapSendStatus("status", true);
     }
   }
@@ -4040,8 +4105,8 @@ void growattModbuscallback ()
 #ifdef  ESPMQTT_SMARTMETER
 void smartmetercallback ()
 {
-  if (smartmeter_DataMap.status == Smartmeter_status::ready) DataMap.status = ready;
-  if (smartmeter_DataMap.status == Smartmeter_status::disconnected) DataMap.status = commerror;
+  if (smartmeter_DataMap.status == Smartmeter_status::ready) DataMap.status = DataMapStatus::ready;
+  if (smartmeter_DataMap.status == Smartmeter_status::disconnected) DataMap.status = DataMapStatus::commerror;
   for (uint8_t bitpointer = 0;  bitpointer < 8; bitpointer++)
   {
     if (*(uint8_t*)&smartmeter_DataMap.electricity.changed & (1 << bitpointer))
@@ -4562,6 +4627,10 @@ void setup() {
   DataMap.length += DATAMAPLENGTH_ADD;
 #endif
 
+#ifdef SONOFFCH
+  DataMap.length += SONOFFCH;
+#endif
+
 #ifdef ESPMQTT_WATERMETER2
   DataMap.status = DataMapStatus::online;
   watermeter_init(WATERPULSEPIN, NODEMCULEDPIN, 0);
@@ -4686,7 +4755,7 @@ void setup() {
 #endif
 
 #ifdef  ESPMQTT_DUCOBOX
-  ducobox_init(sonoff_relays[0], sonoff_relays[1], 10, ducoboxcallback);
+  ducobox_init(sonoff_relays[0], sonoff_relays[1], ducoboxcallback);
 #endif
 
 #ifdef  ESPMQTT_SONOFFBULB
