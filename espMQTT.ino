@@ -34,9 +34,9 @@
 // #define ESPMQTT_WEATHER
 // #define ESPMQTT_AMGPELLETSTOVE
 // #define ESPMQTT_BATHROOM
-// #define ESPMQTT_BEDROOM2
+#define ESPMQTT_BEDROOM2
 // #define ESPMQTT_OPENTHERM
-#define ESPMQTT_SMARTMETER
+// #define ESPMQTT_SMARTMETER
 // #define ESPMQTT_GROWATT
 // #define ESPMQTT_GROWATT_MODBUS
 // #define ESPMQTT_SDM120
@@ -638,6 +638,18 @@ static bool sonoff_relaystate[SONOFFCH];
 Adafruit_NeoPixel neopixelleds = Adafruit_NeoPixel(2, NEOPIXELPIN, NEO_RGB + NEO_KHZ400);
 #endif
 
+#ifdef MH_Z19
+struct
+{
+  int8_t temperature = INT8_MAX; //In 1 degree celcius
+  uint16_t co2 = UINT16_MAX; //In 1 ppm
+  struct 
+  {
+      uint8_t temperature : 1;
+      uint8_t co2 : 1;
+  } changed;
+} mhz19;
+#endif
 
 // ################################################################################################################# END OF DEFINES ####################################################################################################################
 
@@ -727,7 +739,19 @@ extern "C" {
 
 #ifdef DHTPIN
 #include "DHT.h"
-DHT dht(DHTPIN, DHTTYPE);
+DHT dhtdevice(DHTPIN, DHTTYPE);
+struct
+{
+  int16_t temperature = INT16_MAX; //In 0.1 degree celcius
+  uint16_t humidity = UINT16_MAX; //In 0.1 percent
+  int16_t heatindex = INT16_MAX; //In 0.1 degree celcius
+  struct 
+  {
+      uint8_t temperature : 1;
+      uint8_t humidity : 1;
+      uint8_t heatindex : 1;
+  } changed;
+} dht;
 #endif
 
 #ifdef OLED_ADDRESS
@@ -1264,7 +1288,57 @@ int16_t getDataMap(char *key, char *value, int8_t id = -1)
     if (getdatamap_checkandfill(key, value, id, idCounter++, topicstring, valuestring)) return --idCounter;
   }
 #endif
-  return -1;
+
+#ifdef MH_Z19
+  if (mhz19.temperature != INT8_MAX) snprintf (valuestring, 30, cF("%d"), mhz19.temperature);
+  else snprintf (valuestring, 30, "-");
+  if (mhz19.changed.temperature) 
+  {
+    mhz19.changed.temperature = false;
+    setDataMapSendStatus(idCounter, true);
+  }
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "mhz19/temperature", valuestring)) return --idCounter;
+
+  if (mhz19.co2 != UINT16_MAX) snprintf (valuestring, 30, cF("%d"), mhz19.co2);
+  else snprintf (valuestring, 30, "-");
+  if (mhz19.changed.co2) 
+  {
+    mhz19.changed.co2 = false;
+    setDataMapSendStatus(idCounter, true);
+  }
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "mhz19/co2", valuestring)) return --idCounter;
+#endif
+
+#ifdef DHTPIN
+  if (dht.temperature != INT16_MAX) snprintf (valuestring, 30, cF("%.1f"), (float)dht.temperature/10);
+  else snprintf (valuestring, 30, "-");
+  if (dht.changed.temperature) 
+  {
+    dht.changed.temperature = false;
+    setDataMapSendStatus(idCounter, true);
+  }
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "dht/temperature", valuestring)) return --idCounter;
+
+  if (dht.humidity != INT16_MAX) snprintf (valuestring, 30, cF("%.1f"), (float)dht.humidity/10);
+  else snprintf (valuestring, 30, "-");
+  if (dht.changed.humidity) 
+  {
+    dht.changed.humidity = false;
+    setDataMapSendStatus(idCounter, true);
+  }
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "dht/humidity", valuestring)) return --idCounter;
+
+  if (dht.heatindex != INT16_MAX) snprintf (valuestring, 30, cF("%.1f"), (float)dht.heatindex/10);
+  else snprintf (valuestring, 30, "-");
+  if (dht.changed.heatindex) 
+  {
+    dht.changed.heatindex = false;
+    setDataMapSendStatus(idCounter, true);
+  }
+  if (getdatamap_checkandfill(key, value, id, idCounter++, "dht/heatindex", valuestring)) return --idCounter;
+#endif
+
+return -1;
   yield();
 }
 
@@ -1999,14 +2073,14 @@ void initSerial()
 void update_dht()
 {
   static uint8 errors = 4;
-  float rh = dht.readHumidity();
+  float rh = dhtdevice.readHumidity();
   // Read temperature as Celsius (the default)
-  float temp = dht.readTemperature();
+  float temp = dhtdevice.readTemperature();
 #ifdef DHTTEMPOFFSET
   temp += DHTTEMPOFFSET;
 #endif
 
-  float hi = dht.computeHeatIndex(temp, rh, false);
+  float hi = dhtdevice.computeHeatIndex(temp, rh, false);
 
   // Check if any reads failed and exit early (to try again).
   if (isnan(temp) || isnan(rh))
@@ -2020,16 +2094,21 @@ void update_dht()
 
   if (errors == 0)
   {
-    putdatamap("dht22/temperature", String(temp, 1));
-    putdatamap("dht22/humidity", String(rh, 1));
-    putdatamap("dht22/heatindex", String(hi, 1));
+    dht.changed.temperature = dht.temperature != (int)(temp * 10);
+    dht.temperature = temp * 10;
+
+    dht.changed.humidity = dht.humidity != (int)(rh * 10);
+    dht.humidity = rh * 10;
+
+    dht.changed.heatindex = dht.heatindex != (int)(hi * 10);
+    dht.heatindex = hi * 10;
   }
 
   if (errors == 5)
   {
-    putdatamap("dht22/temperature", "-");
-    putdatamap("dht22/humidity", "-");
-    putdatamap("dht22/heatindex", "-");
+    dht.temperature = INT16_MAX;
+    dht.humidity = UINT16_MAX;
+    dht.heatindex = INT16_MAX;
   }
 
 #ifdef NEOPIXELPIN
@@ -2160,24 +2239,24 @@ void write_oled_display()
 
 #if defined(DHTPIN) || defined(SHT21)
 #ifndef OLEDSMALL
-  display.drawString(OLEDX, lcdline += 9, "TEMP: " + getdatamap("dht22/temperature") + " °C");
-  display.drawString(OLEDX, lcdline += 9, "RH: " + getdatamap("dht22/humidity") + " %");
-  display.drawString(OLEDX, lcdline += 9, "HI: " + getdatamap("dht22/heatindex") + " °C");
+  display.drawString(OLEDX, lcdline += 9, "TEMP: " + String(float(dht.temperature) / 10 ,1) + " °C");
+  display.drawString(OLEDX, lcdline += 9, "RH: " + String(float(dht.humidity) / 10 ,1) + " %");
+  display.drawString(OLEDX, lcdline += 9, "HI: " + String(float(dht.heatindex) / 10 ,1) + " °C");
 #else
-  display.drawString(OLEDX, lcdline += 9, "T:" + getdatamap("dht22/temperature") + " °C");
-  display.drawString(OLEDX, lcdline += 9, "RH:" + getdatamap("dht22/humidity") + " %");
-  display.drawString(OLEDX, lcdline += 9, "HI:" + getdatamap("dht22/heatindex") + " °C");
+  display.drawString(OLEDX, lcdline += 9, "T: " + String(float(dht.temperature) / 10 ,1) + " °C");
+  display.drawString(OLEDX, lcdline += 9, "RH: " + String(float(dht.humidity) / 10 ,1) + " %");
+  display.drawString(OLEDX, lcdline += 9, "HI: " + String(float(dht.heatindex) / 10 ,1) + " °C");
 #endif
 #endif
 
 
 #if defined(MH_Z19)
 #ifndef OLEDSMALL
-  display.drawString(OLEDX, lcdline += 9, "CO2: " + getdatamap("mhz19/co2") + " ppm");
-  display.drawString(OLEDX, lcdline += 9, "MHZ_TEMP: " + getdatamap("mhz19/temperature") + " °C");
+  display.drawString(OLEDX, lcdline += 9, "CO2: " + String(mhz19.co2) + " ppm");
+  display.drawString(OLEDX, lcdline += 9, "MHZ_TEMP: " + String(mhz19.temperature) + " °C");
 #else
-  display.drawString(OLEDX, lcdline += 9, "CO2:" + getdatamap("mhz19/co2"));
-  display.drawString(OLEDX, lcdline += 9, "MT:" + getdatamap("mhz19/temperature") + "°C");
+  display.drawString(OLEDX, lcdline += 9, "CO2: " + String(mhz19.co2) + " ppm");
+  display.drawString(OLEDX, lcdline += 9, "MT: " + String(mhz19.temperature) + " °C");
 #endif
 #endif
 
@@ -2758,21 +2837,7 @@ void espmqtt_handle_modules()
 #endif
 
 #ifdef MH_Z19
-  static int mhz19ppm = 0;
-  static int mhz19temp = 0;
-  switch (MHZ19_handle(&mhz19ppm, &mhz19temp))
-  {
-    case 0:
-      putdatamap ("mhz19/co2", String(mhz19ppm));
-      putdatamap ("mhz19/temperature", String(mhz19temp));
-      break;
-    case 2:
-      putdatamap ("mhz19/co2", "-");
-      putdatamap ("mhz19/temperature", "-");
-      break;
-    default:
-      break;
-  }
+  MHZ19_handle();
 #endif
 }
 
@@ -3490,10 +3555,9 @@ void publishdatamap(int32_t packetId, bool publishall, bool init, bool publishre
       nextpacketId = -1;
       while ((datamappointer < getDataMapLength()) && (nextpacketId == -1))
       {
-        //        DEBUG ("datamappointer=%d datamaplength=%d send=%d\n", datamappointer, getDataMapLength(), getDataMapSendStatus(datamappointer));
+        String sendtopic = String(mqtt_topicprefix + getDataMapKey(datamappointer)); // we have to do this before getdatamapsendstatus
         if (getDataMapSendStatus(datamappointer))
         {
-          String sendtopic = String(mqtt_topicprefix + getDataMapKey(datamappointer));
           nextpacketId = mqttClient.publish(sendtopic.c_str(), 1, true, getDataMapValue(datamappointer).c_str());
           if (nextpacketId > 0)
           {
@@ -3580,10 +3644,12 @@ void systemTimerCallback()
 }
 
 #ifdef MH_Z19
-uint8_t MHZ19_handle(int *ppm, int *temp)
+uint8_t MHZ19_handle()
 {
   static unsigned long requesttime = 5000;
   static unsigned long readtime = 0;
+  uint16_t newppm = UINT8_MAX;
+  int8_t newtemp = INT_MAX;
   if (requesttime < millis())
   {
     MHZ19_send_request_cmd();
@@ -3593,15 +3659,28 @@ uint8_t MHZ19_handle(int *ppm, int *temp)
   if ((readtime > 0) && (readtime < millis()))
   {
     readtime = 0;
-    if (MHZ19_read(ppm, temp))
+    if (MHZ19_read(&newppm, &newtemp) == false)
     {
-      DEBUG_I("MHZ19 ppm=%d temp=%d\n", *ppm, *temp);
-      if (ppm == 0) return 1;
-      else return 0;
+      DEBUG_I("MHZ19 ppm=%d temp=%d\n", newppm, newtemp);
+      if (newppm == 0) return 1;
+      else
+      {
+        mhz19.changed.temperature = mhz19.temperature != newtemp;
+        mhz19.changed.co2 = mhz19.co2 != newppm;
+        mhz19.temperature = newtemp;
+        mhz19.co2 = newppm;
+        return 0;
+      }
     }
-    else
+    else  
     {
       DEBUG_E("MHZ19 read error!\n");
+      newppm = (uint16_t)UINT8_MAX;
+      newtemp = (int8_t)INT8_MAX;
+      mhz19.changed.temperature = mhz19.temperature != newtemp;
+      mhz19.changed.co2 = mhz19.co2 != newppm;
+      mhz19.temperature = newtemp;
+      mhz19.co2 = newppm;
       return 2;
     }
   }
@@ -3611,9 +3690,8 @@ uint8_t MHZ19_handle(int *ppm, int *temp)
 
 void MHZ19_init()
 {
-  putdatamap ("mhz19/co2", "-");
-  putdatamap ("mhz19/temperature", "-");
   MHZ19_setabs(true);
+  DataMap.length += 2;
 }
 
 uint8_t MHZ19_checksum(uint8_t cmd[], uint8_t length)
@@ -3661,9 +3739,9 @@ void MHZ19_send_request_cmd()
   MHZ19_write(cmd, 8);
 }
 
-bool MHZ19_read(int *ppm, int *temp)
+bool MHZ19_read(uint16_t *ppm, int8_t *temp)
 {
-  static uint8_t errorcounter = 0;
+  static uint8_t errorcounter = 255;
   uint8_t response[9]; // for answer
 
   DEBUG_D("Receiving MHZ19 data...\n");
@@ -3692,8 +3770,8 @@ bool MHZ19_read(int *ppm, int *temp)
 
     if (response[8] == crc)
     {
-      int responseHigh = (int) response[2];
-      int responseLow = (int) response[3];
+      uint16_t responseHigh = (int) response[2];
+      uint16_t responseLow = (int) response[3];
       *ppm = (256 * responseHigh) + responseLow;
       *temp = response[4] - 40;
       errorcounter = 0;
@@ -3702,13 +3780,10 @@ bool MHZ19_read(int *ppm, int *temp)
   else
   {
     DEBUG_E("Invalid response from MHZ_19 CO2 sensor!\n");
-    if (errorcounter < 255) errorcounter++;
-    if (errorcounter == 5)
-    {
-      return false;
-    }
+    if (errorcounter < 5) errorcounter++;
+    else return true;
   }
-  return true;
+  return false;
 }
 
 
@@ -4774,7 +4849,8 @@ void setup() {
 #endif
 
 #ifdef DHTPIN
-  dht.begin();
+  dhtdevice.begin();
+  DataMap.length += 3;
 #endif
 
 #ifdef QSWIFIDIMMERCHANNELS
