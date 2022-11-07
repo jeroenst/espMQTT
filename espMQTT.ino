@@ -34,9 +34,9 @@
 // #define ESPMQTT_WEATHER
 // #define ESPMQTT_AMGPELLETSTOVE
 // #define ESPMQTT_BATHROOM
-#define ESPMQTT_BEDROOM2
+// #define ESPMQTT_BEDROOM2
 // #define ESPMQTT_OPENTHERM
-// #define ESPMQTT_SMARTMETER
+#define ESPMQTT_SMARTMETER
 // #define ESPMQTT_GROWATT
 // #define ESPMQTT_GROWATT_MODBUS
 // #define ESPMQTT_SDM120
@@ -619,6 +619,7 @@ static bool sonoff_oldbuttons[1] = {1};
 #define NODEMCULEDPIN D0
 #include "smartmeter.h"
 #undef SERIALLOG
+#undef CPUSLEEP
 #endif
 
 #ifdef  ESPMQTT_DDNS
@@ -1040,6 +1041,7 @@ int16_t getDataMap(char *key, char *value, int8_t id = -1)
                               (DataMap.status == DataMapStatus::rebooting) ? cF("rebooting") :
                               (DataMap.status == DataMapStatus::upgrading) ? cF("upgrading") :
                               "")) return --idCounter;
+  
   if (getdatamap_checkandfill(key, value, id, idCounter++, "status/upgrade",
                               (DataMap.status_upgrade == DataMapStatusUpgrade::notchecked) ? cF("not checked") :
                               (DataMap.status_upgrade == DataMapStatusUpgrade::uptodate) ? cF("up to date") :
@@ -1310,8 +1312,18 @@ int16_t getDataMap(char *key, char *value, int8_t id = -1)
 #endif
 
 #ifdef DHTPIN
-  if (dht.temperature != INT16_MAX) snprintf (valuestring, 30, cF("%.1f"), (float)dht.temperature/10);
-  else snprintf (valuestring, 30, "-");
+  if (dht.temperature != INT16_MAX)
+  {
+    snprintf (valuestring, 30, cF("%.1f"), (float)dht.temperature/10);
+    DataMap.status = DataMapStatus::online;
+    setDataMapSendStatus(0);
+  }
+  else 
+  {
+    snprintf (valuestring, 30, "-");
+    DataMap.status = DataMapStatus::commerror;
+    setDataMapSendStatus(0);
+  }
   if (dht.changed.temperature) 
   {
     dht.changed.temperature = false;
@@ -1805,14 +1817,14 @@ void mqttdosubscriptions(int32_t packetId = -1)
 
   if (0 == subscribetopic[0])
   {
-    DEBUG_V("Subscribing to mqtt topics finished successfull\n");
+    DEBUG_I("Subscribing to mqtt topics finished successfull\n");
     mainstate.mqttsubscribed = true;
     triggers.mqttsubscribed = true; // When subscription has finished start publishing of datamap
   }
   else
   {
-    static char subscribetopicarray[30];  // We need this static variable because mqttclient.subscribe uses a pointer
-    snprintf (subscribetopicarray, 30, "%s%s", mqtt_topicprefix, subscribetopic);
+    static char subscribetopicarray[100];  // We need this static variable because mqttclient.subscribe uses a pointer
+    snprintf (subscribetopicarray, 50, "%s%s", mqtt_topicprefix, subscribetopic);
     DEBUG_D("MQTT Subscribing to: %s\n", subscribetopicarray);
     nextpacketid = mqttClient.subscribe(subscribetopicarray , 1);
   }
@@ -2953,6 +2965,8 @@ void loop()
   my_sleep = millis();
 #endif
 
+  espmqtt_handle_modules();
+
   switch (DataMap.status)
   {
     case DataMapStatus::online:
@@ -3242,8 +3256,6 @@ void loop()
   yield();
   ESP.wdtFeed(); // Prevent watchdog to kick in...
 
-  espmqtt_handle_modules();
-  yield();
   dotasks();
 
   if (timertick == 1) // Every 0.1 second read next SDM120 register
@@ -4181,7 +4193,12 @@ void growattModbuscallback ()
 void smartmetercallback ()
 {
   if (smartmeter_DataMap.status == Smartmeter_status::ready) DataMap.status = DataMapStatus::ready;
+  if (smartmeter_DataMap.status == Smartmeter_status::receiving) DataMap.status = DataMapStatus::receiving;
   if (smartmeter_DataMap.status == Smartmeter_status::disconnected) DataMap.status = DataMapStatus::commerror;
+  setDataMapSendStatus(1);
+
+  if (smartmeter_DataMap.status != Smartmeter_status::ready) return;
+  
   for (uint8_t bitpointer = 0;  bitpointer < 8; bitpointer++)
   {
     if (*(uint8_t*)&smartmeter_DataMap.electricity.changed & (1 << bitpointer))
