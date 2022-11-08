@@ -619,7 +619,6 @@ static bool sonoff_oldbuttons[1] = {1};
 #define NODEMCULEDPIN D0
 #include "smartmeter.h"
 #undef SERIALLOG
-#undef CPUSLEEP
 #endif
 
 #ifdef  ESPMQTT_DDNS
@@ -1091,7 +1090,7 @@ int16_t getDataMap(char *key, char *value, int8_t id = -1)
   if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/watt_using", String(smartmeter_DataMap.electricity.watt_using).c_str())) return --idCounter;
   if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/watt_providing", String(smartmeter_DataMap.electricity.watt_providing).c_str())) return --idCounter;
 
-  snprintf (valuestring, 30, cF("%u.%03u"), smartmeter_DataMap.electricity.wh / 1000, smartmeter_DataMap.electricity.wh % 1000);
+  snprintf (valuestring, 30, cF("%d.%03u"), smartmeter_DataMap.electricity.wh / 1000, abs(smartmeter_DataMap.electricity.wh % 1000));
   if (getdatamap_checkandfill(key, value, id, idCounter++, "electricity/kwh_total", valuestring))return --idCounter;
 
   snprintf (valuestring, 30, cF("%u.%03u"), smartmeter_DataMap.electricity.wh_used1 / 1000, smartmeter_DataMap.electricity.wh_used1 % 1000);
@@ -2965,7 +2964,7 @@ void loop()
   my_sleep = millis();
 #endif
 
-  espmqtt_handle_modules();
+  dotasks();
 
   switch (DataMap.status)
   {
@@ -3256,6 +3255,8 @@ void loop()
   yield();
   ESP.wdtFeed(); // Prevent watchdog to kick in...
 
+  espmqtt_handle_modules();
+  yield();
   dotasks();
 
   if (timertick == 1) // Every 0.1 second read next SDM120 register
