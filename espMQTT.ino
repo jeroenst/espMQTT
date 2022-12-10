@@ -31,12 +31,12 @@
 #define DEBUGLEVEL Debug.VERBOSE
 
 /* ESP8266 */
-// #define ESPMQTT_WEATHER
+#define ESPMQTT_WEATHER
 // #define ESPMQTT_AMGPELLETSTOVE
 // #define ESPMQTT_BATHROOM
 // #define ESPMQTT_BEDROOM2
 // #define ESPMQTT_OPENTHERM
-#define ESPMQTT_SMARTMETER
+// #define ESPMQTT_SMARTMETER
 // #define ESPMQTT_GROWATT
 // #define ESPMQTT_GROWATT_MODBUS
 // #define ESPMQTT_SDM120
@@ -146,6 +146,23 @@ SDM sdm(serSDM, 2400);
 HardwareSerial serSDM(0);
 #include <SDM.h>
 SDM sdm(serSDM, 2400);
+struct
+{
+  float voltage = nan;
+  float current = nan;
+  struct
+  {
+    float active = nan;
+    float reactive = nan;
+  } power;
+  float frequency = nan;
+  float powerfactor = nan;
+  struct
+  {
+    float active;
+    float reactive;
+  } energy;
+} ddm18sd;
 #endif
 
 #ifdef  ESPMQTT_QSWIFIDIMMERD01
@@ -1219,7 +1236,7 @@ int16_t getDataMap(char *key, char *value, int8_t id = -1)
 #endif
 
 #ifdef ESPMQTT_WEATHER
-  if (weather.temperature != INT16_MAX) snprintf (valuestring, 30, cF("%u.%01u"), weather.temperature / 10, weather.temperature % 10);
+  if (weather.temperature != INT16_MAX) snprintf (valuestring, 30, cF("%.1f"), float(weather.temperature) / 10);
   else snprintf (valuestring, 30, "-");
   if (getdatamap_checkandfill(key, value, id, idCounter++, "temperature", valuestring)) return --idCounter;
 
@@ -1313,7 +1330,7 @@ int16_t getDataMap(char *key, char *value, int8_t id = -1)
 #ifdef DHTPIN
   if (dht.temperature != INT16_MAX)
   {
-    snprintf (valuestring, 30, cF("%.1f"), (float)dht.temperature/10);
+    snprintf (valuestring, 30, cF("%.1f"), float(dht.temperature/10));
     DataMap.status = DataMapStatus::online;
     setDataMapSendStatus(0);
   }
@@ -1330,7 +1347,7 @@ int16_t getDataMap(char *key, char *value, int8_t id = -1)
   }
   if (getdatamap_checkandfill(key, value, id, idCounter++, "dht/temperature", valuestring)) return --idCounter;
 
-  if (dht.humidity != INT16_MAX) snprintf (valuestring, 30, cF("%.1f"), (float)dht.humidity/10);
+  if (dht.humidity != INT16_MAX) snprintf (valuestring, 30, cF("%.1f"), float(dht.humidity)/10);
   else snprintf (valuestring, 30, "-");
   if (dht.changed.humidity) 
   {
@@ -1339,7 +1356,7 @@ int16_t getDataMap(char *key, char *value, int8_t id = -1)
   }
   if (getdatamap_checkandfill(key, value, id, idCounter++, "dht/humidity", valuestring)) return --idCounter;
 
-  if (dht.heatindex != INT16_MAX) snprintf (valuestring, 30, cF("%.1f"), (float)dht.heatindex/10);
+  if (dht.heatindex != INT16_MAX) snprintf (valuestring, 30, cF("%.1f"), float(dht.heatindex)/10);
   else snprintf (valuestring, 30, "-");
   if (dht.changed.heatindex) 
   {
@@ -1680,7 +1697,7 @@ void connectToWifi()
   ArduinoOTA.setPassword(esp_password);
   Debug.setPassword(esp_password);
 
-  // If no ssid was configured start accesspoint
+  // If an ssid was configured connect, otherwise start accesspoint
   if (0 != wifissid[0])
   {
     if (!mainstate.wificonnected && !mainstate.accesspoint)
@@ -2140,7 +2157,7 @@ void update_onewire()
   int temperature;
 #ifdef  ESPMQTT_SONOFFTH
   temperature = (oneWireSensors.getTempC(onewire_address) * 10);
-  DEBUG_I("Temperature=%u.%01u\n", temperature / 10, temperature % 10);
+  DEBUG_I("Temperature=%.1f\n", float(temperature) / 10);
   if ((temperature == -1270) || (temperature == 850)) temperature = INT16_MAX;
   if (sonoffth.temperature != temperature)
   {
@@ -2150,7 +2167,7 @@ void update_onewire()
 #endif
 #ifdef  ESPMQTT_OPENTHERM
   temperature = (oneWireSensors.getTempC(onewire_chReturnWaterThermometer) * 10);
-  DEBUG_I("ch return water Temperature=%u.%01u\n", temperature / 10, temperature % 10);
+  DEBUG_I("ch return water Temperature=%.1f\n", float(temperature) / 10);
   if ((temperature == -1270) || (temperature == 850)) temperature = INT16_MAX;
   if (opentherm.onewire_ch_returnwatertemperature != temperature)
   {
@@ -2158,7 +2175,7 @@ void update_onewire()
     opentherm.onewire_ch_returnwatertemperature = temperature;
   }
   temperature = (oneWireSensors.getTempC(onewire_dcwSupplyWaterThermometer) * 10);
-  DEBUG_I("dcw supply water Temperature=%u.%01u\n", temperature / 10, temperature % 10);
+  DEBUG_I("dcw supply water Temperature=%.1f\n", float(temperature) / 10);
   if ((temperature == -1270) || (temperature == 850)) temperature = INT16_MAX;
   if (opentherm.onewire_dcw_returnwatertemperature != temperature)
   {
@@ -2178,7 +2195,7 @@ void update_onewire()
 #endif
 #ifdef  ESPMQTT_SONOFF_FLOORHEATING
   temperature = (oneWireSensors.getTempC(onewire_OutsideAddress) * 10);
-  DEBUG_I("Floor Water Temperature=%u.%01u\n", temperature / 10, temperature % 10);
+  DEBUG_I("Floor Water Temperature=%.1f\n", float(temperature) / 10);
   if ((temperature == -1270) || (temperature == 850)) temperature = INT16_MAX;
   if (temperature != floorheating.temperature)
   {
@@ -2719,31 +2736,32 @@ void ddm18sd_readnextregister()
   switch (sdmreadcounter)
   {
     case 1:
-      putdatamap("status", "querying");
-      putdatamap("voltage", String(sdm.readVal(DDM18SD_VOLTAGE), 2));
+      DataMap.status = DataMapStatus::querying;
+      ddm18sd.voltage = sdm.readVal(DDM18SD_VOLTAGE);
       break;
     case 2:
-      putdatamap("current", String(sdm.readVal(DDM18SD_CURRENT), 2));
+      ddm18sd.current = sdm.readVal(DDM18SD_CURRENT);
       break;
     case 3:
-      putdatamap("power", String(sdm.readVal(DDM18SD_POWER), 2));
+      ddm18sd.power.active = sdm.readVal(DDM18SD_POWER);
       break;
     case 4:
-      putdatamap("power/reactive", String(sdm.readVal(DDM18SD_REACTIVE_POWER), 2));
+      ddm18sd.power_reactive = sdm.readVal(DDM18SD_REACTIVE_POWER);
       break;
     case 5:
-      putdatamap("frequency", String(sdm.readVal(DDM18SD_FREQUENCY), 2));
+      ddm18sd.power_frequency = sdm.readVal(DDM18SD_FREQUENCY);
       break;
     case 6:
-      putdatamap("powerfactor", String(sdm.readVal(DDM18SD_POWER_FACTOR), 2));
+      ddm18sd.powerfactor = sdm.readVal(DDM18SD_POWER_FACTOR);
       break;
     case 7:
-      putdatamap("energy/active", String(sdm.readVal(DDM18SD_IMPORT_ACTIVE_ENERGY), 3));
+      ddm18sd.energy.active = sdm.readVal(DDM18SD_IMPORT_ACTIVE_ENERGY);
       break;
     case 8:
+      ddm18sd.energy.reactive = sdm.readVal(DDM18SD_IMPORT_REACTIVE_ENERGY);
       putdatamap("energy/reactive", String(sdm.readVal(DDM18SD_IMPORT_REACTIVE_ENERGY), 3));
-      if (isnan(value)) putdatamap("status", "commerror");
-      else putdatamap("status", "ready");
+      if (isnan(ddm18sd.energy.reactive)) DataMap.status = DataMapStatus::commerror;
+      else DataMap.status = DataMapStatus::ready;
       break;
     case 9:
       if (uptime % 10) sdmreadcounter = 0;
@@ -3271,7 +3289,7 @@ void loop()
     timersectick = 0;
     updatemqtt = 1;
 
-    // scan for stronger wifi network: every 10 minutes, directly when wifi is not connected or every 30 seconds if signal is bad
+    // scan for stronger wifi network: every 10 minutes, directly when wifi is not connected
     // try to do this as less as posisble because during scan the esp is unreachable for about a second.
     if ((!mainstate.accesspoint))
     {
@@ -3291,8 +3309,8 @@ void loop()
     yield();
     ESP.wdtFeed(); // Prevent watchdog to kick in...
 
-    // Every 1 minutes publish all regular mqtt data
-    if ((uptime % 60) == 0)
+    // Every 10 minutes publish all regular mqtt data
+    if ((uptime % 600) == 0)
     {
       DEBUG_I ("Regular publishing datamap...\n");
       publishdatamap(-1, false, false, true);
