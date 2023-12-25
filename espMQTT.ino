@@ -53,10 +53,11 @@
 // #define ESPMQTT_LIVINGROOM
 // #define ESPMQTT_BBQTEMP
 // #define ESPMQTT_GOODWE
+#define ESPMQTT_WHR930
 
 /* ESP8285 */
 // #define ESPMQTT_ZMAI90
-#define ESPMQTT_DUCOBOX
+// #define ESPMQTT_DUCOBOX
 // #define ESPMQTT_SONOFFS20 // coffeelamp & sonoffs20_00X
 // #define ESPMQTT_SONOFFBULB
 // #define ESPMQTT_GARDEN //ESP8285 TUIN & MARIANNE & LUIFEL
@@ -363,6 +364,16 @@ const byte sonoff_relays[2] = {12, 5};
 const byte sonoff_buttons[2] = {0, 9};
 static bool sonoff_oldbuttons[2] = {1, 1};
 #endif
+
+#ifdef  ESPMQTT_WHR930
+#define FIRMWARE_TARGET "WHR930"
+#define ESPLED D4
+#define APONBOOT
+#undef SERIALLOG
+#include "whr930.h"
+#endif
+
+
 
 #ifdef  ESPMQTT_BLITZWOLF
 #define FIRMWARE_TARGET "BLITZWOLF"
@@ -693,7 +704,7 @@ int wifichannel = 0;
 int wifinetworksfound = 0;
 
 
-
+char _gFmtBuf[100+1];
 
 
 SimpleMap<const char*, dataMapStruct> *dataMap = new SimpleMap<const char*, dataMapStruct>([](const char* &a, const char* &b) -> int {
@@ -934,7 +945,12 @@ void showdatamap()
   }
 }
 
-void putdatamap(const char *topic, String value, bool sendupdate = true, bool forceupdate = false, bool publishregular = true)
+void putdatamap(const char *topic, int value, bool sendupdate, bool forceupdate, bool publishregular)
+{
+  putdatamap(topic, String(value), sendupdate, forceupdate, publishregular);
+}
+
+void putdatamap(const char *topic, String value, bool sendupdate, bool forceupdate, bool publishregular)
 {
   dataMapStruct datamapstruct;
 
@@ -1395,6 +1411,9 @@ void mqttdosubscriptions(int32_t packetId = -1)
       case 26:  subscribetopic = mqtt_topicprefix + "setrelay/0"; break;
       case 27:  subscribetopic = mqtt_topicprefix + "setrelay/1"; break;
 #endif
+#ifdef ESPMQTT_WHR930
+      case 28:  subscribetopic = mqtt_topicprefix + "setfanlevel"; break;
+#endif
       default: break;
     }
     if (subscribetopic == "") nextsubscribe++;
@@ -1557,6 +1576,7 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties,
   {
     triggers.firmwareupgrade = payloadstring;
   }
+
 #ifdef ESPMQTT_BHT002
   if (topicstring == mqtt_topicprefix + "setsetpoint") bht002_setsetpoint(payloadstring.toInt());
 #endif
@@ -1568,6 +1588,10 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties,
   if (topicstring == mqtt_topicprefix + "setdimstate/1") tuya_2gangdimmerv2_setdimstate(payloadstring.toInt(), 1);
 #endif
 
+
+#ifdef ESPMQTT_WHR930
+  if (topicstring == mqtt_topicprefix + "setfanlevel") zehnder_whr930.setfanlevel(payloadstring.toInt());
+#endif
 }
 
 String uint64ToString(uint64_t input) {
@@ -2357,6 +2381,10 @@ void espmqtt_handle_modules()
       break;
   }
 #endif
+
+#ifdef ESPMQTT_WHR930
+  zehnder_whr930.loop();
+#endif
 }
 
 
@@ -2514,6 +2542,11 @@ void espmqtt_handle_modules_1sec()
       neopixelleds.show();
 #endif
     }
+
+#ifdef ESPMQTT_WHR930
+  zehnder_whr930.secondTick(uptime);
+#endif
+
     previouswifistatus = WiFi.status();
 }
 
@@ -4420,6 +4453,10 @@ void setup() {
   pinMode(ESPMQTT_BBQTEMP_CS1, OUTPUT);
   digitalWrite(ESPMQTT_BBQTEMP_CS0, HIGH);
   digitalWrite(ESPMQTT_BBQTEMP_CS1, HIGH);
+#endif
+
+#ifdef ESPMQTT_WHR930
+  zehnder_whr930.setup();
 #endif
 
   connectToWifi(); // After everything is set, connect to wifi.
