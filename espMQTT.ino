@@ -367,9 +367,11 @@ static bool sonoff_oldbuttons[2] = {1, 1};
 
 #ifdef  ESPMQTT_WHR930
 #define FIRMWARE_TARGET "WHR930"
-#define ESPLED D4
+#define ESPLED 2
 #define APONBOOT
 #undef SERIALLOG
+#define DHTPIN 4
+#define DHTTYPE DHT22   // there are multiple kinds of DHT sensors
 #include "whr930.h"
 #endif
 
@@ -1334,7 +1336,7 @@ void onMqttUnsubscribe(uint16_t packetId) {
 
 void mqttdosubscriptions(int32_t packetId = -1)
 {
-  const uint8_t nr_of_subsribe_topics = 30;
+  const uint8_t nr_of_subsribe_topics = 31;
 
   static int32_t nextpacketid = 1;
   static uint16_t nextsubscribe = 0;
@@ -1413,6 +1415,7 @@ void mqttdosubscriptions(int32_t packetId = -1)
 #endif
 #ifdef ESPMQTT_WHR930
       case 28:  subscribetopic = mqtt_topicprefix + "setfanlevel"; break;
+      case 29:  subscribetopic = mqtt_topicprefix + "setcomforttemperature"; break;
 #endif
       default: break;
     }
@@ -1591,6 +1594,7 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties,
 
 #ifdef ESPMQTT_WHR930
   if (topicstring == mqtt_topicprefix + "setfanlevel") zehnder_whr930.setfanlevel(payloadstring.toInt());
+  if (topicstring == mqtt_topicprefix + "setcomforttemperature") zehnder_whr930.setcomforttemperature(payloadstring.toInt());
 #endif
 }
 

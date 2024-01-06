@@ -32,7 +32,13 @@ void ZEHNDER_WHR930::requestData(bool startSequence)
       case 4: 
         sendPacket(0x00DF);
       break;
-      case 5:
+      case 5: 
+        sendPacket(0x00E1);
+      break;
+      case 6:
+        sendPacket(0x000B);
+      break;
+      case 7:
         if (fanlevel.send)
         {
           uint8_t sendData[1] = {fanlevel.level};
@@ -41,22 +47,15 @@ void ZEHNDER_WHR930::requestData(bool startSequence)
         }
         else sendCleared = true;
       break;        
-      case 6:
-        if (fanspeed.send)
+      case 8:
+        if (comfort.send)
         {
-          uint8_t sendData[9] = {fanspeed.exhaustabsent,
-                    fanspeed.exhaustlow,
-                    fanspeed.exhaustmedium,
-                    fanspeed.intakeabsent,
-                    fanspeed.intakelow,
-                    fanspeed.intakemedium,
-                    fanspeed.exhausthigh,
-                    fanspeed.intakehigh};
-          sendPacket(0x00CF, sendData, 9);
-          fanspeed.send = false;
+          uint8_t sendData[1] = {comfort.temperature};
+          if (comfort.temperature >= 15 && comfort.temperature <= 27) sendPacket(0x0099, sendData, 1);
+          comfort.send = false;
         }
         else sendCleared = true;
-      break;
+      break;        
       default: 
         sendCounter = 0;
       break;
@@ -127,6 +126,16 @@ void ZEHNDER_WHR930::setfanlevel(uint8_t level)
       }
 }
 
+void ZEHNDER_WHR930::setcomforttemperature(uint8_t temperature)
+{
+      if (temperature >= 15 && temperature <= 27)
+      {
+        DEBUG_D("setcomforttemperature(%d)\n", temperature);
+        zehnder_whr930.comfort.temperature = temperature;
+        zehnder_whr930.comfort.send = true;
+      }
+}
+
 void ZEHNDER_WHR930::setup()
 {
   Serial.begin(9600);
@@ -190,21 +199,21 @@ void ZEHNDER_WHR930::loop()
                 if (datalength >= 16+3)
               {
                 putdatamap(("fanlevel"), data[13]);
-                putdatamap(("exhaust/current"), data[11]);
-                putdatamap(("exhaust/absent"), data[5]);
-                putdatamap(("exhaust/low"), data[6]);
-                putdatamap(("exhaust/medium"), data[7]);
-                putdatamap(("exhaust/high"), data[15]);
-                putdatamap(("intake/fanactive"), data[14]);
-                putdatamap(("intake/current"), data[12]);
-                putdatamap(("intake/absent"), data[8]);
-                putdatamap(("intake/low"), data[9]);
-                putdatamap(("intake/medium"), data[10]);
-                putdatamap(("intake/high"), data[16]);
+                putdatamap(("exhaust/fan/current"), data[11]);
+                putdatamap(("exhaust/fan/absent"), data[5]);
+                putdatamap(("exhaust/fan/low"), data[6]);
+                putdatamap(("exhaust/fan/medium"), data[7]);
+                putdatamap(("exhaust/fan/high"), data[15]);
+                putdatamap(("intake/fan/active"), data[14]);
+                putdatamap(("intake/fan/current"), data[12]);
+                putdatamap(("intake/fan/absent"), data[8]);
+                putdatamap(("intake/fan/low"), data[9]);
+                putdatamap(("intake/fan/medium"), data[10]);
+                putdatamap(("intake/fan/high"), data[16]);
               }
             break;
             case 0x00D2:
-              if (datalength >= 8+3)
+              if (datalength >= 9+3)
               {
                 char floatvalue[5];
                 snprintf(floatvalue, 5, "%.1f", float(data[5])/ 2.0 - 20);
@@ -226,11 +235,29 @@ void ZEHNDER_WHR930::loop()
               }
             break;
             case 0x00E0:
-              if (datalength >= 9+3)
+              if (datalength >= 11+3)
               {
                 putdatamap("bypass/factor", data[7]);
                 putdatamap("bypass/level", data[8]);
                 putdatamap("bypass/correction", data[9]);
+                putdatamap("bypass/summermode", data[11]);
+              }
+            break;
+            case 0x00E2:
+              if (datalength >= 10+3)
+              {
+                putdatamap("bypass/status", data[5]);
+                putdatamap("intake/heater", data[7]);
+                putdatamap("frostprotection/status", data[6]);
+                putdatamap("frostprotection/minutes", (data[8] << 8) + data[9]);
+                putdatamap("frostprotection/level", data[10]);
+              }
+            break;
+            case 0x000C:
+              if (datalength >= 10+3)
+              {
+                putdatamap("intake/fan/rpm",  1875000 / ((data[7] << 8) + data[8]));
+                putdatamap("exhaust/fan/rpm", 1875000 / ((data[9] << 8) + data[10]));
               }
             break;
           }

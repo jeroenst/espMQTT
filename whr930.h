@@ -27,6 +27,12 @@ class ZEHNDER_WHR930
       bool send = 0;
     } fanlevel;
 
+    struct
+    {
+      uint8_t temperature;
+      bool send = 0;
+    } comfort;
+
     void sendPacket(uint16_t command, uint8_t *data = nullptr, uint8_t length = 0);
     void requestData(bool startSequence = false);
     static void mqttClientCallback(char* topic, byte* payload, unsigned int length);
@@ -35,6 +41,7 @@ class ZEHNDER_WHR930
     void setup();
     static void secondTick(uint16_t uptime);
     void setfanlevel(uint8_t level);
+    void setcomforttemperature(uint8_t temperature);
 };
 
 extern ZEHNDER_WHR930 zehnder_whr930;
