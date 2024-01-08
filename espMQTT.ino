@@ -2903,9 +2903,9 @@ void loop()
     yield();
     ESP.wdtFeed(); // Prevent watchdog to kick in...
 
-    // Every 10 minutes (+/- 60 seconds) publish all mqtt data
+    // Every 1 minutes (+/- 60 seconds) publish all mqtt data
     static int8_t dividefactor = random(-60, 60);
-    if ((uptime > 60) && (((uptime + dividefactor) % 600) == 0))
+    if ((uptime > 60) && (((uptime + dividefactor) % 60) == 0))
     {
       DEBUG_I ("Regular publishing datamap...\n");
       publishdatamap(-1, false, false, true);
