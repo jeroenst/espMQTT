@@ -24,19 +24,19 @@ void ZEHNDER_WHR930::requestData(bool startSequence)
         sendPacket(0x00CD);
       break;
       case 2:
-        sendPacket(0x00D1);
+        sendPacket(0x000B);
       break;
       case 3:
+        sendPacket(0x00D1);
+      break;
+      case 4:
         sendPacket(0x00D9);
       break;
-      case 4: 
+      case 5: 
         sendPacket(0x00DF);
       break;
-      case 5: 
+      case 6: 
         sendPacket(0x00E1);
-      break;
-      case 6:
-        sendPacket(0x000B);
       break;
       case 7:
         if (fanlevel.send)
@@ -212,6 +212,13 @@ void ZEHNDER_WHR930::loop()
                 putdatamap(("intake/fan/high"), data[16]);
               }
             break;
+            case 0x000C:
+              if (datalength >= 10+3)
+              {
+                putdatamap("intake/fan/rpm",  1875000 / ((data[7] << 8) + data[8]));
+                putdatamap("exhaust/fan/rpm", 1875000 / ((data[9] << 8) + data[10]));
+              }
+            break;
             case 0x00D2:
               if (datalength >= 9+3)
               {
@@ -247,17 +254,10 @@ void ZEHNDER_WHR930::loop()
               if (datalength >= 10+3)
               {
                 putdatamap("bypass/status", data[5]);
-                putdatamap("intake/heater", data[7]);
+                putdatamap("frostprotection/heater", data[7]);
                 putdatamap("frostprotection/status", data[6]);
                 putdatamap("frostprotection/minutes", (data[8] << 8) + data[9]);
                 putdatamap("frostprotection/level", data[10]);
-              }
-            break;
-            case 0x000C:
-              if (datalength >= 10+3)
-              {
-                putdatamap("intake/fan/rpm",  1875000 / ((data[7] << 8) + data[8]));
-                putdatamap("exhaust/fan/rpm", 1875000 / ((data[9] << 8) + data[10]));
               }
             break;
           }
