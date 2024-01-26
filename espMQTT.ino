@@ -43,7 +43,7 @@
 // #define ESPMQTT_DDM18SD
 // #define ESPMQTT_WATERMETER
 // #define ESPMQTT_DDNS
-#define ESPMQTT_GENERIC8266
+// #define ESPMQTT_GENERIC8266
 // #define ESPMQTT_MAINPOWERMETER
 // #define ESPMQTT_OBD2
 // #define ESPMQTT_NOISE
@@ -709,9 +709,7 @@ int wifinetworksfound = 0;
 char _gFmtBuf[_gFmtBufSize];
 
 SimpleMap<const char*, dataMapStruct> *dataMap = new SimpleMap<const char*, dataMapStruct>([](const char* &a, const char* &b) -> int {
-  if (a == b) return 0;      // a and b are equal
-  else if (a > b) return 1;  // a is bigger than b
-  else return -1;            // a is smaller than b
+  return strcmp(a,b);      // a and b are equal
 });
 
 SimpleMap<int, char *> *eepromMap = new SimpleMap<int, char *>([](int &a, int &b) -> int {
@@ -719,102 +717,6 @@ SimpleMap<int, char *> *eepromMap = new SimpleMap<int, char *>([](int &a, int &b
   else if (a > b) return 1;  // a is bigger than b
   else return -1;            // a is smaller than b
 });
-
-
-static const char *dataNames[] PROGMEM =
-{ "hostname",
-  "firmware/name",
-  "firmware/target",
-  "firmware/sourcefile",
-  "firmware/version",
-  "firmware/compiletime",
-  "status",
-  "status/upgrade",
-  "flash/id",
-  "flash/size/real",
-  "flash/size/ide",
-  "flash/mode",
-  "flash/speed",
-  "system/chipid",
-  "system/uptime",
-  "system/freeram",
-  "wifi/mac",
-  "wifi/state",
-  "wifi/localip",
-  "wifi/ssid",
-  "wifi/bssid",
-  "wifi/rssi",
-  "wifi/externalip",
-  "mqtt/server",
-  "mqtt/port",
-  "mqtt/sll",
-  "mqtt/state",
-  "mqtt/user",
-  "mqtt/clientid",
-  "mqtt/user"
-};
-
-
-struct {
-  char status[10] = "online";
-  char status_upgrade[10] = "online";
-} dataValues;
-
-const char* getDataValue(const char *dataName)
-{
-  static bool initialized = false;
-  static char compiletime[20] = "";
-  static char flash_id[10] = "";
-  static char flash_size_real[10] = "";
-  static char flash_size_ide[10] = "";
-  static char flash_speed[10] = "";
-  static char flash_mode[10] = "";
-
-  static struct {
-    const char *value = "";
-    bool sendupdate = false;
-    bool forceupdate = false;
-    bool publishregular = false;
-
-  } status[20];
-
-  if (!initialized)
-  {
-    initialized = true;
-
-    status[0].value = WiFi.hostname().c_str();
-    status[1].value = "espMQTT";
-    status[2].value = FIRMWARE_TARGET;
-    status[3].value = __FILE__;
-    status[4].value = compiletime;
-    status[5].value = ESPMQTT_VERSION;
-    status[6].value = dataValues.status;
-    status[7].value = dataValues.status_upgrade;
-    status[8].value = flash_id;
-    status[9].value = flash_size_real;
-    status[10].value = flash_size_ide;
-    status[11].value = flash_mode;
-
-
-    strcat(compiletime, __DATE__);
-    strcat(compiletime, " ");
-    strcat(compiletime, __TIME__);
-
-    itoa(ESP.getFlashChipId(), flash_id, 10);
-    itoa(ESP.getFlashChipRealSize(), flash_size_real, 10);
-    itoa(ESP.getFlashChipSize(), flash_size_ide, 10);
-    itoa(ESP.getFlashChipSpeed(), flash_speed, 10);
-    FlashMode_t ideMode = ESP.getFlashChipMode();
-    strcpy (flash_mode, (ideMode == FM_QIO ? "QIO" : ideMode == FM_QOUT ? "QOUT" : ideMode == FM_DIO ? "DIO" : ideMode == FM_DOUT ? "DOUT" : "UNKNOWN"));
-
-  }
-
-  for (int i = 0; i < 20; i++)
-  {
-    if (strcmp(dataName, dataNames[i])) return status[i].value;
-  }
-  return "";
-}
 
 bool updatemqtt = 0;
 
@@ -980,18 +882,17 @@ void putdatamap(const char *topic, String value, bool sendupdate, bool forceupda
   int n = value.length() + 1;
 
   // Remove old payload from memory
-  if (dataMap->has(topic))
+  if (!dataMap->has(topic))
   {
-    free(datamapstruct.payload);
+    datamapstruct.payload = (char*) malloc(n * sizeof(char));
+  }
+  else
+  {
+    datamapstruct.payload = (char*) realloc (datamapstruct.payload, n * sizeof(char));
   }
 
-  // Reserve memory for new payload
-  char *char_array;
-  char_array = (char*) malloc(n * sizeof(char));
-
   // Copy value to memory
-  strcpy(char_array, value.c_str());
-  datamapstruct.payload = char_array;
+  strcpy(datamapstruct.payload, value.c_str());
 
   dataMap->put(topic, datamapstruct);
 }
@@ -1214,11 +1115,11 @@ void update_systeminfo(bool writestaticvalues = false)
     firmwarename = firmwarename.substring(firmwarename.lastIndexOf("/") + 1);
     firmwarename = firmwarename.substring(firmwarename.lastIndexOf("\\") + 1);
     firmwarename = firmwarename.substring(0, firmwarename.lastIndexOf("."));
-    //putdatamap("firmware/name", firmwarename, sendupdate, false, false);
+    putdatamap("firmware/name", firmwarename, sendupdate, false, false);
     putdatamap("firmware/target", FIRMWARE_TARGET, sendupdate, false, false);
     //putdatamap("firmware/sourcefile", String(__FILE__).substring(String(__FILE__).lastIndexOf('/') + 1), sendupdate, false, false);
     putdatamap("firmware/version", ESPMQTT_VERSION, sendupdate, false, false);
-    //putdatamap("firmware/compiletime", String(__DATE__) + " " + __TIME__, sendupdate, false, false);
+    putdatamap("firmware/compiletime", String(__DATE__) + " " + __TIME__, sendupdate, false, false);
     putdatamap("firmware/upgradekey", getRandomString(10), sendupdate, false, false);
     putdatamap("status", "online", sendupdate, false, false);
     putdatamap("status/upgrade", "not checked", sendupdate, false, false);
@@ -3191,6 +3092,7 @@ void publishdatamap(int32_t packetId, bool publishall, bool init, bool publishre
         if (data.send)
         {
           String sendtopic = String(mqtt_topicprefix + topic);
+          
           nextpacketId = mqttClient.publish(sendtopic.c_str(), 1, true, data.payload);
           if (nextpacketId > 0)
           {

@@ -111,16 +111,17 @@ void ZEHNDER_WHR930::sendPacket(uint16_t command, uint8_t *data, uint8_t length)
 
   String debugstring = "";
   for (uint8_t i = 0; i < packetpointer; i++) debugstring += " 0x" + String(packet[i], HEX);
-  DEBUG_D("Writing to serial:%s\n", debugstring.c_str());
+  if (Debug.isActive(Debug.DEBUG)) Debug.printf(cF("Writing to serial:%s\n"), debugstring.c_str());
 
   Serial.write(packet, packetpointer);
+  free(packet);
 }
 
 void ZEHNDER_WHR930::setfanlevel(uint8_t level)
 {
       if (level <= 4)
       {
-        DEBUG_D("setfanlevel(%d)\n", level);
+        if (Debug.isActive(Debug.DEBUG)) Debug.printf(cF("setfanlevel(%d)\n"), level);
         zehnder_whr930.fanlevel.level = level;
         zehnder_whr930.fanlevel.send = true;
       }
@@ -130,7 +131,7 @@ void ZEHNDER_WHR930::setcomforttemperature(uint8_t temperature)
 {
       if (temperature >= 15 && temperature <= 27)
       {
-        DEBUG_D("setcomforttemperature(%d)\n", temperature);
+        if (Debug.isActive(Debug.DEBUG)) Debug.printf(cF("setcomforttemperature(%d)\n"), temperature);
         zehnder_whr930.comfort.temperature = temperature;
         zehnder_whr930.comfort.send = true;
       }
@@ -157,7 +158,7 @@ void ZEHNDER_WHR930::loop()
     
     String debugstring = "";
     for (uint8_t i = 0; i < datalength; i++) debugstring += " 0x" + String(data[i], HEX);
-    DEBUG_D("Received from serial:%s\n", debugstring.c_str());
+    if (Debug.isActive(Debug.DEBUG)) Debug.printf(cF("Received from serial:%s\n"), debugstring.c_str());
 
     if ((datalength == 2) && (data[0] == 0x07) && (data[1] == 0xF3))
     {
@@ -192,7 +193,7 @@ void ZEHNDER_WHR930::loop()
         if (datalength == messagelength)
         {
           uint16_t command = (data[2] << 8) + data[3];
-          DEBUG_D("Command received:0x%x\n", command);
+          if (Debug.isActive(Debug.DEBUG)) Debug.printf(cF("Command received:0x%x\n"), command);
           switch (command)
           {
             case 0x00CE:
@@ -276,7 +277,7 @@ void ZEHNDER_WHR930::secondTick(uint16_t uptime)
 {
   if ((uptime % 10 == 0) && (uptime > 0))
   {
-    DEBUG_D("Requesting data from WHR-930\n");
+    if (Debug.isActive(Debug.DEBUG)) Debug.printf(cF("Requesting data from WHR-930\n"));
     zehnder_whr930.requestData(true);
   }
 }
