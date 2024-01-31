@@ -36,8 +36,8 @@
 // #define ESPMQTT_BATHROOM
 // #define ESPMQTT_BEDROOM2
 // #define ESPMQTT_OPENTHERM
-// #define ESPMQTT_SMARTMETER
-#define ESPMQTT_GROWATT
+#define ESPMQTT_SMARTMETER
+// #define ESPMQTT_GROWATT
 // #define ESPMQTT_GROWATT_MODBUS
 // #define ESPMQTT_SDM120
 // #define ESPMQTT_DDM18SD
@@ -697,7 +697,7 @@ struct Mainstate {
 uint8_t wifichannel = 0;
 uint16_t wifinetworksfound = 0;
 
-#define STATICDATAMAPSIZE 23
+#define STATICDATAMAPSIZE 24
 uint64_t staticdatamapsend = 0;
 uint64_t staticdatamaponair = 0;
 uint64_t staticdatamappublishregular = 0;
@@ -839,8 +839,8 @@ String getdatamapbyindex(uint8_t index)
         firmwarename = firmwarename.substring(0, firmwarename.lastIndexOf("."));
         return firmwarename;
       }
-    case 2: return cF(FIRMWARE_TARGET);
-    case 3: return cF(ESPMQTT_VERSION);
+    case 2: return sF(FIRMWARE_TARGET);
+    case 3: return sF(ESPMQTT_VERSION);
     case 4: return String(__DATE__) + " " + __TIME__;
     case 5: return upgraderandomstr;
     case 6: 
@@ -850,22 +850,22 @@ String getdatamapbyindex(uint8_t index)
       return uptimestr;
     }
     case 7: return String(system_get_free_heap_size());
-    case 8: return chipid;
-    case 9: return WiFi.SSID();
-    case 10: return String(WiFi.RSSI());
-    case 11: return WiFi.macAddress();
-    case 12: return WiFi.status() == WL_CONNECTED ? cF("connected") : cF("disconnected");
-    case 13: return WiFi.localIP().toString();
-    case 14: return WiFi.SSID();
-    case 15: return WiFi.BSSIDstr();
-    case 16: return String(wifichannel);
-    case 17: return mqtt_server;
-    case 18: return String(mqtt_port);
-    case 19: return String(mqtt_ssl);
-    case 20: return mqttClient.connected() ? sF("connected") : sF("disconnected");
-    case 21: return String(mqttClient.getClientId());
-    case 22: return  mqtt_username;
-  
+    case 8: return String(100 - ESP.getMaxFreeBlockSize() * 100.0 / ESP.getFreeHeap(), 0);
+    case 9: return chipid;
+    case 10: return WiFi.SSID();
+    case 11: return String(WiFi.RSSI());
+    case 12: return WiFi.macAddress();
+    case 13: return WiFi.status() == WL_CONNECTED ? cF("connected") : cF("disconnected");
+    case 14: return WiFi.localIP().toString();
+    case 15: return WiFi.SSID();
+    case 16: return WiFi.BSSIDstr();
+    case 17: return String(wifichannel);
+    case 18: return mqtt_server;
+    case 19: return String(mqtt_port);
+    case 20: return String(mqtt_ssl);
+    case 21: return mqttClient.connected() ? sF("connected") : sF("disconnected");
+    case 22: return String(mqttClient.getClientId());
+    case 23: return mqtt_username;
   }
   return dataMap->getData(index - STATICDATAMAPSIZE);
 }
@@ -893,21 +893,22 @@ String getdatamapkey(uint8_t index)
     case 5: return sF("firmware/upgradekey");
     case 6: return sF("system/uptime");
     case 7: return sF("system/freeram");
-    case 8: return sF("system/chipid");
-    case 9: return sF("wifi/ssid");
-    case 10: return sF("wifi/rssi");
-    case 11: return sF("wifi/mac");
-    case 12: return sF("wifi/state");
-    case 13: return sF("wifi/localip");
-    case 14: return sF("wifi/ssid");
-    case 15: return sF("wifi/bssid");
-    case 16: return sF("wifi/channel");
-    case 17: return sF("mqtt/server");
-    case 18: return sF("mqtt/port");
-    case 19: return sF("mqtt/ssl");
-    case 20: return sF("mqtt/state");
-    case 21: return sF("mqtt/clientid");
-    case 22: return sF("mqtt/user");
+    case 8: return sF("system/ramfrag");
+    case 9: return sF("system/chipid");
+    case 10: return sF("wifi/ssid");
+    case 11: return sF("wifi/rssi");
+    case 12: return sF("wifi/mac");
+    case 13: return sF("wifi/state");
+    case 14: return sF("wifi/localip");
+    case 15: return sF("wifi/ssid");
+    case 16: return sF("wifi/bssid");
+    case 17: return sF("wifi/channel");
+    case 18: return sF("mqtt/server");
+    case 19: return sF("mqtt/port");
+    case 20: return sF("mqtt/ssl");
+    case 21: return sF("mqtt/state");
+    case 22: return sF("mqtt/clientid");
+    case 23: return sF("mqtt/user");
   }
   if (index - STATICDATAMAPSIZE < dataMap->size()) return dataMap->getKey(index - STATICDATAMAPSIZE);
   else return "";
@@ -996,7 +997,7 @@ void showdatamap()
 {
   for (uint8_t i = 0; i < getdatamapsize(); i++)
   {
-    Debug.printf(sF("%s=%s (send=%d, onair=%d)\n").c_str(), getdatamapkey(i).c_str(), getdatamapbyindex(i).c_str(), getdatamapsend(i), getdatamaponair(i));
+    Debug.printf(cF("%s=%s (send=%d, onair=%d)\n"), getdatamapkey(i).c_str(), getdatamapbyindex(i).c_str(), getdatamapsend(i), getdatamaponair(i));
     yield();
   }
 }
@@ -1016,13 +1017,13 @@ void putdatamap(const char *topic, String value, bool sendupdate, bool forceupda
     datamapPayload = dataMap->get(topic);
     if ((strcmp (topic , value.c_str()) == 0) && !forceupdate) return;
 
-    if (strcmp(topic, "status") == 0)
+    if (strcmp(topic, cF("status")) == 0)
     {
-      if (strcmp (datamapPayload, "upgrading") == 0)
+      if (strcmp (datamapPayload, cF("upgrading")) == 0)
       {
         // When upgrading only accept upgradefailed or upgradedone as value
-        if ((value != "upgrade_exit") && (value != "rebooting")) return;
-        if (value == "upgrade_exit") value = "online";
+        if ((value != sF("upgrade_exit")) && (value != cF("rebooting"))) return;
+        if (value == sF("upgrade_exit")) value = sF("online");
       }
     }
     datamapPayload = (char*) realloc (datamapPayload, n * sizeof(char));
@@ -1046,7 +1047,7 @@ void putdatamap(const char *topic, String value, bool sendupdate, bool forceupda
   setdatamappublishregular(index, publishregular);
 
   // Do not output debug for uptime
-  if (strcmp(topic, "system/uptime") != 0) if (Debug.isActive(Debug.INFO)) Debug.printf(sF("DATAMAP %s=%s (sendupdate=%d, oldval=%s oldsend=%d forceupdate=%d)\n").c_str(), topic, value.c_str(), sendupdate, datamapPayload, getdatamapsend(index), forceupdate);
+  if (strcmp(topic, cF("system/uptime")) != 0) if (Debug.isActive(Debug.INFO)) Debug.printf(sF("DATAMAP %s=%s (sendupdate=%d, oldval=%s oldsend=%d forceupdate=%d)\n").c_str(), topic, value.c_str(), sendupdate, datamapPayload, getdatamapsend(index), forceupdate);
 }
 
 #ifdef  ESPMQTT_BBQTEMP
@@ -3505,37 +3506,29 @@ void handleWWWSettings()
     String wifiselectoptions = sF("<option value=\"") + WiFi.SSID() + sF("\" selected>") + WiFi.SSID() + sF("</option>");
     uint8_t n = WiFi.scanNetworks();
     for (int i = 0; i < n; ++i) {
-      if (WiFi.SSID(i) != WiFi.SSID()) wifiselectoptions += "<option value=\"" + WiFi.SSID(i) + "\">" + WiFi.SSID(i) + "</option>";
+      if (WiFi.SSID(i) != WiFi.SSID()) wifiselectoptions += sF("<option value=\"") + WiFi.SSID(i) + "\">" + WiFi.SSID(i) + sF("</option>");
     }
 
-
     webserver.setContentLength(CONTENT_LENGTH_UNKNOWN);
-    webserver.send (200, "text/html", F("<HTML><HEAD><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"></HEAD><BODY><CENTER><div align=\"left\" style=\"width:400px; margin:auto\">"));
-    webserver.sendContent (F("<CENTER><H1>"));
-    webserver.sendContent (WiFi.hostname() + "</H1>");
-    webserver.sendContent (F("</CENTER><form action=\"/settings\" method=\"post\" autocomplete=\"off\"><TABLE style=\"width:400px; margin:auto\">"));
-    webserver.sendContent (F("<TR><TD>Hostname</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"40\" name=\"hostname\" value=\""));
-    webserver.sendContent (WiFi.hostname() + "\">");
-    webserver.sendContent (F("</TD></TR>"));
-    webserver.sendContent (F("<TR><TD>Wifi SSID</TD><TD><select style=\"width:200\" name=\"wifissid\">"));
-    webserver.sendContent (wifiselectoptions + "</select>");
-    webserver.sendContent (F("</TD></TR>"));
-    webserver.sendContent (F("<TR><TD>wifi Key</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"64\" name=\"wifipsk\" value=\""));
-    webserver.sendContent (String(WiFi.psk()) + "\">");
-    webserver.sendContent (F("</TD></TR>"));
-    webserver.sendContent (F("<TR><TD>MQTT Server</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttserver\" value=\""));
-    webserver.sendContent (mqtt_server + "\">");
-    webserver.sendContent (F("</TD></TR>"));
-    webserver.sendContent (F("<TR><TD>MQTT Port</TD><TD><input style=\"width:200\" type=\"number\" maxlength=\"5\" name=\"mqttport\" value=\""));
-    webserver.sendContent (String(mqtt_port) + "\"></TD></TR>");
-    webserver.sendContent (F("<TR><TD>MQTT Ssl</TD><TD ALIGN=\"left\"><input type=\"checkbox\" name=\"mqttssl\" "));
-    webserver.sendContent (String(mqtt_ssl ? "checked" : "") + ("></TD></TR>"));
-    webserver.sendContent (F("<TR><TD>MQTT Username</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttusername\" value=\""));
-    webserver.sendContent (mqtt_username + "\">");
-    webserver.sendContent (F("</TD></TR>"));
-    webserver.sendContent (F("<TR><TD>MQTT Password</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttpassword\" value=\""));
-    webserver.sendContent (mqtt_password + "\">");
-    webserver.sendContent (sF("</TD></TR><TR><TD>MQTT Topic Prefix</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"50\" name=\"mqtttopicprefix\" value=\""));
+    webserver.send (200, "text/html", F("<HTML><HEAD><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"></HEAD><BODY><CENTER><div align=\"left\" style=\"width:400px; margin:auto\"><CENTER><H1>"));
+    webserver.sendContent (WiFi.hostname());
+    webserver.sendContent (F("</H1></CENTER><form action=\"/settings\" method=\"post\" autocomplete=\"off\"><TABLE style=\"width:400px; margin:auto\"><TR><TD>Hostname</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"40\" name=\"hostname\" value=\""));
+    webserver.sendContent (WiFi.hostname());
+    webserver.sendContent (F("\"></TD></TR><TR><TD>Wifi SSID</TD><TD><select style=\"width:200\" name=\"wifissid\">"));
+    webserver.sendContent (wifiselectoptions);
+    webserver.sendContent (F("</select></TD></TR><TR><TD>wifi Key</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"64\" name=\"wifipsk\" value=\""));
+    webserver.sendContent (String(WiFi.psk()));
+    webserver.sendContent (F("\"></TD></TR><TR><TD>MQTT Server</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttserver\" value=\""));
+    webserver.sendContent (mqtt_server);
+    webserver.sendContent (F("\"></TD></TR><TR><TD>MQTT Port</TD><TD><input style=\"width:200\" type=\"number\" maxlength=\"5\" name=\"mqttport\" value=\""));
+    webserver.sendContent (String(mqtt_port));
+    webserver.sendContent (F("\"></TD></TR><TR><TD>MQTT Ssl</TD><TD ALIGN=\"left\"><input type=\"checkbox\" name=\"mqttssl\" "));
+    webserver.sendContent (String(mqtt_ssl ? "checked>" : ">"));
+    webserver.sendContent (F("</TD></TR><TR><TD>MQTT Username</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttusername\" value=\""));
+    webserver.sendContent (mqtt_username);
+    webserver.sendContent (F("\"></TD></TR><TR><TD>MQTT Password</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttpassword\" value=\""));
+    webserver.sendContent (mqtt_password);
+    webserver.sendContent (sF("\"></TD></TR><TR><TD>MQTT Topic Prefix</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"50\" name=\"mqtttopicprefix\" value=\""));
     webserver.sendContent (mqtt_topicprefix);
     webserver.sendContent (sF("\"></TD></TR><TR><TD>ESP Password</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"webpassword\" value=\""));
     webserver.sendContent (esp_password);
@@ -3553,8 +3546,7 @@ void handleWWWSettings()
 #ifdef  ESPMQTT_QSWIFIDIMMERD02
     webserver.sendContent (sF("<TR><TD>Dimmer Offset 0</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"3\" name=\"qswifidimoffset0\" value=\""));
     webserver.sendContent (getdatamap("dimoffset/0"));
-    webserver.sendContent (sF("\"></TD></TR>"));
-    webserver.sendContent (sF("<TR><TD>Dimmer Offset 1</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"3\" name=\"qswifidimoffset1\" value=\""));
+    webserver.sendContent (sF("\"></TD></TR><TR><TD>Dimmer Offset 1</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"3\" name=\"qswifidimoffset1\" value=\""));
     webserver.sendContent (getdatamap("dimoffset/1"));
     webserver.sendContent (sF("\"></TD></TR>"));
 #endif
@@ -3568,10 +3560,8 @@ void handleJsonData() {
   webserver.send(200, "text/json", "{");
   for (int i = 0; i < getdatamapsize(); i++)
   {
-    webserver.sendContent ("\"" + getdatamapkey(i) + "\":\"" + getdatamapbyindex(i));
-    if (i < getdatamapsize() - 1) webserver.sendContent("\",");
+    webserver.sendContent ("\"" + getdatamapkey(i) + "\":\"" + getdatamapbyindex(i) + "\"" + ((i < getdatamapsize() - 1) ? "," : "}"));
   }
-  webserver.sendContent("\"}");
   webserver.sendContent("");
 }
 
@@ -4415,7 +4405,7 @@ static void handleDataExternalIpServer(void*, AsyncClient * client, void *data, 
 }
 
 void onConnectExternalIpServer(void*, AsyncClient * client) {
-  client->add("GET /\r\n", 16);
+  client->add(cF("GET /\r\n"), 16);
   client->send();
 }
 
@@ -4425,5 +4415,5 @@ void updateexternalip()
   client->close();
   client->onData(&handleDataExternalIpServer, client);
   client->onConnect(&onConnectExternalIpServer, client);
-  client->connect("extip.jst-it.nl", 80);
+  client->connect(cF("extip.jst-it.nl"), 80);
 }

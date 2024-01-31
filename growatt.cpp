@@ -81,7 +81,7 @@ void growatt_handle()
 
     if (!RxPowerDataOk)
     {
-      _growatt_callback(cF("inverter/status"), cF("offline"));
+      _growatt_callback(cF("inverter/status"), sF("offline"));
       _growatt_callback(cF("inverter/status/value"), "-");
       _growatt_callback(cF("pv/1/volt"), "-");
       _growatt_callback(cF("pv/2/volt"), "-");
@@ -136,7 +136,7 @@ void growatt_handle()
           if (Debug.isActive(Debug.DEBUG)) Debug.printf(cF("Received power data from Growatt Inverter...\n"));
           intvalue = RxBuffer[6];
           _growatt_callback(cF("inverter/status/value"), String(intvalue));
-          _growatt_callback(cF("inverter/status"), intvalue == 0 ? cF("waiting") : intvalue == 1 ? cF("ready") : intvalue == 3 ? cF("fault") : cF("unknown"));
+          _growatt_callback(cF("inverter/status"), intvalue == 0 ? sF("waiting") : intvalue == 1 ? sF("ready") : intvalue == 3 ? sF("fault") : sF("unknown"));
           value = double((uint16_t(RxBuffer[7]) << 8) + RxBuffer[8]) / 10;
           _growatt_callback(cF("pv/1/volt"), String(value, 1));
           value = double((uint16_t(RxBuffer[9]) << 8) + RxBuffer[10]) / 10;
@@ -185,12 +185,12 @@ void growatt_handle()
         {
           if (Debug.isActive(Debug.DEBUG)) Debug.printf(cF("Received energy data from Growatt Inverter...\n"));
           value = double((uint16_t(RxBuffer[13]) << 8) + RxBuffer[14]) / 10;
-          if (pvwatt > 1) _growatt_callback("grid/today/kwh", String(value, 1)); // Only reset today value when pvwatt above 1 watt otherwise this gets resets during shutdown
+          if (pvwatt > 1) _growatt_callback(cF("grid/today/kwh"), String(value, 1)); // Only reset today value when pvwatt above 1 watt otherwise this gets resets during shutdown
           value = double((uint32_t(RxBuffer[15]) << 24) + (uint32_t(RxBuffer[16]) << 16) + (uint16_t(RxBuffer[17]) << 8) + RxBuffer[18]) / 10;
-          _growatt_callback("grid/total/kwh", String(value, 1));
+          _growatt_callback(cF("grid/total/kwh"), String(value, 1));
           intvalue = ((uint32_t(RxBuffer[19]) << 24) + (uint32_t(RxBuffer[20]) << 16) + (uint16_t(RxBuffer[21]) << 8) + RxBuffer[22]);
           _growatt_callback(cF("inverter/hours"), String(intvalue));
-          _growatt_callback(cF("status"), "ready");
+          _growatt_callback(cF("status"), sF("ready"));
         }
         RxBufferPointer = 0;
       }
