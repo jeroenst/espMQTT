@@ -1,9 +1,9 @@
 #include "espMQTT.h"
 #include "smartmeter.h"
 
-void(*_smartmeter_callback)(const char*,String);
+void(*_smartmeter_callback)(const char*,const String&);
 
-void smartmeter_init(void(*callback)(const char *,String))
+void smartmeter_init(void(*callback)(const char *, const String&))
 {
   _smartmeter_callback = callback;
   
@@ -78,7 +78,7 @@ int8_t smartmeter_handle()
       if (sscanf(buffer, cF("1-0:2.8.1(%f") , &value) == 1)
       {
         kwh -= value;
-        _smartmeter_callback("electricity/kwh_provided1", String(value, 3));
+        _smartmeter_callback(cF("electricity/kwh_provided1"), String(value, 3));
         returnvalue++;
       }
 

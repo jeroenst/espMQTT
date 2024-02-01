@@ -707,7 +707,7 @@ uint64_t datamaponair = 0;
 uint64_t datamappublishregular = 0;
 
 
-char _gFmtBuf[_gFmtBufSize];
+//char _gFmtBuf[_gFmtBufSize];
 
 SimpleMap<const char*, char*> *dataMap = new SimpleMap<const char*, char*>([](const char* &a, const char* &b) -> int {
   return strcmp(a, b);     // a and b are equal
@@ -871,7 +871,7 @@ String getdatamapbyindex(uint8_t index)
 }
 
 
-int getdatamapindex(String name)
+int getdatamapindex(const String& name)
 {
   for (uint8_t index = 0; index < 255; index++)
   {
@@ -1007,7 +1007,7 @@ void putdatamap(const char *topic, int value, bool sendupdate, bool forceupdate,
   putdatamap(topic, String(value), sendupdate, forceupdate, publishregular);
 }
 
-void putdatamap(const char *topic, String value, bool sendupdate, bool forceupdate, bool publishregular)
+void putdatamap(const char *topic, const String& value, bool sendupdate, bool forceupdate, bool publishregular)
 {
   char *datamapTopic, *datamapPayload;
   int n = value.length() + 1;
@@ -1023,7 +1023,6 @@ void putdatamap(const char *topic, String value, bool sendupdate, bool forceupda
       {
         // When upgrading only accept upgradefailed or upgradedone as value
         if ((value != sF("upgrade_exit")) && (value != cF("rebooting"))) return;
-        if (value == sF("upgrade_exit")) value = sF("online");
       }
     }
     datamapPayload = (char*) realloc (datamapPayload, n * sizeof(char));
@@ -1037,7 +1036,8 @@ void putdatamap(const char *topic, String value, bool sendupdate, bool forceupda
   }
 
   // Copy value to memory
-  strcpy(datamapPayload, value.c_str());
+  if (value == sF("upgrade_exit")) strcpy(datamapPayload, cF("online"));
+  else strcpy(datamapPayload, value.c_str());
 
   dataMap->put(datamapTopic, datamapPayload);
 
@@ -3696,7 +3696,7 @@ void growattModbuscallback (const char *topic, String payload)
 #endif
 
 #ifdef  ESPMQTT_SMARTMETER
-void smartmetercallback (const char *topic, String payload)
+void smartmetercallback (const char *topic, const String& payload)
 {
   static uint32 nextupdatetime = 0;
   static bool sendupdate = 0;
@@ -4131,7 +4131,7 @@ void setup() {
 #endif
 
   Debug.begin("");
-  if (Debug.isActive(Debug.INFO)) Debug.printf(cF("\n\nInitializing ESP8266 %s %s...\n\n"), FIRMWARE_TARGET, ESPMQTT_VERSION);
+  if (Debug.isActive(Debug.INFO)) Debug.printf(cF("\n\nInitializing ESP8266 %s %s...\n\n"), cF(FIRMWARE_TARGET), cF(ESPMQTT_VERSION));
 
   EEPROM.begin(512);
 
@@ -4389,23 +4389,34 @@ void setup() {
 static void handleDataExternalIpServer(void*, AsyncClient * client, void *data, size_t len) {
   char *chardata = (char *)data;
   String datastring = "";
+  bool lineEndFound = false;
   for (unsigned int i = 0; i < len; i++)
   {
-    if ((chardata[i] == '\n') || (chardata[i] == '\r')) break;
-    if (((chardata[i] >= 48) && (chardata[i] <= 58)) || chardata[i] == 46) datastring += chardata[i]; // Only accept when character is a number a . or a :
+    if ((chardata[i] == '\n') || (chardata[i] == '\r')) 
+    {
+      lineEndFound = true;
+      continue;
+    }
+    if (lineEndFound) 
+    {
+      datastring = "";
+      lineEndFound = false;
+    }
+    if (((chardata[i] >= '0') && (chardata[i] <= '9')) || chardata[i] == '.') datastring += chardata[i]; // Only accept when character is a number a .
     else
     {
       datastring = "";
-      break;
     }
-
   }
+  if (datastring == "") datastring = "-";
   putdatamap(cF("wifi/externalip"), datastring, true, true, false);
   client->close();
 }
 
 void onConnectExternalIpServer(void*, AsyncClient * client) {
-  client->add(cF("GET /\r\n"), 16);
+  client->add(cF("GET / HTTP/1.0\r\n"), 16);
+  client->add(cF("Host: extip.jst-it.nl\r\n"),23);
+  client->add(cF("\r\n"), 2);
   client->send();
 }
 
