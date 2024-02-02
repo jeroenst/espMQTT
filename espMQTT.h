@@ -21,6 +21,7 @@ extern RemoteDebug Debug;
 #define cF(x)  String( F(x) ).c_str()
 // Used with printf() for the char format string
 
+void putdatamap(const String& topic, const String& value, bool sendupdate = true, bool forceupdate = false, bool publishregular = true);
 void putdatamap(const char *topic, const String& value, bool sendupdate = true, bool forceupdate = false, bool publishregular = true);
 void putdatamap(const char *topic, int value, bool sendupdate = true, bool forceupdate = false, bool publishregular = true);
 

@@ -36,7 +36,7 @@
 // #define ESPMQTT_BATHROOM
 // #define ESPMQTT_BEDROOM2
 // #define ESPMQTT_OPENTHERM
-#define ESPMQTT_SMARTMETER
+// #define ESPMQTT_SMARTMETER
 // #define ESPMQTT_GROWATT
 // #define ESPMQTT_GROWATT_MODBUS
 // #define ESPMQTT_SDM120
@@ -57,7 +57,7 @@
 /* ESP8285 */
 // #define ESPMQTT_ZMAI90
 // #define ESPMQTT_DUCOBOX
-// #define ESPMQTT_SONOFFS20 // coffeelamp & sonoffs20_00X
+#define ESPMQTT_SONOFFS20 // coffeelamp & sonoffs20_00X
 // #define ESPMQTT_SONOFFBULB
 // #define ESPMQTT_GARDEN //ESP8285 TUIN & MARIANNE & LUIFEL
 // #define ESPMQTT_SONOFF_FLOORHEATING
@@ -77,7 +77,7 @@
 // #define ESPMQTT_QSWIFISWITCH1C
 // #define ESPMQTT_QSWIFISWITCH2C
 
-#define ESPMQTT_VERSION "TEST"
+#define ESPMQTT_VERSION __DATE__
 #endif
 
 #define APONBOOT
@@ -644,27 +644,9 @@ Adafruit_NeoPixel neopixelleds = Adafruit_NeoPixel(2, NEOPIXELPIN, NEO_RGB + NEO
 #include <AsyncMqttClient.h>
 AsyncMqttClient mqttClient;
 #include <ArduinoOTA.h>
-//#include <user_interface.h>
 #include "SimpleMap.h"
-//#include <//syslog.h>
-//#define //syslogD(fmt, ...) if (WiFi.status() == WL_CONNECTED) //syslog.logf(LOG_DEBUG,"(%s) " fmt, __func__, ##__VA_ARGS__)
-//#define //syslogI(fmt, ...) if (WiFi.status() == WL_CONNECTED) //syslog.logf(LOG_INFO,"(%s) " fmt, __func__, ##__VA_ARGS__)
-//#define //syslogN(fmt, ...) if (WiFi.status() == WL_CONNECTED) //syslog.logf(LOG_NOTICE,"(%s) " fmt, __func__, ##__VA_ARGS__)
-//#define //syslogW(fmt, ...) if (WiFi.status() == WL_CONNECTED) //syslog.logf(LOG_WARNING,"(%s) " fmt, __func__, ##__VA_ARGS__)
-//#define //syslogE(fmt, ...) if (WiFi.status() == WL_CONNECTED) //syslog.logf(LOG_ERR,"(%s) " fmt, __func__, ##__VA_ARGS__)
-//#define //syslogC(fmt, ...) if (WiFi.status() == WL_CONNECTED) //syslog.logf(LOG_CRIT,"(%s) " fmt, __func__, ##__VA_ARGS__)
-//#define //syslogA(fmt, ...) if (WiFi.status() == WL_CONNECTED) //syslog.logf(LOG_ALERT,"(%s) " fmt, __func__, ##__VA_ARGS__)
-//#define //syslogEM(fmt, ...) if (WiFi.status() == WL_CONNECTED) //syslog.logf(LOG_EMERG,"(%s) " fmt, __func__, ##__VA_ARGS__)
 
 #include <ESP8266Ping.h>
-
-// A UDP instance to let us send and receive packets over UDP
-//WiFiUDP udpClient//syslog;
-//WiFiUDP udpClient;
-
-// Create a new empty //syslog instance
-////syslog //syslog(udpClient//syslog, //syslog_PROTO_IETF);
-
 
 #ifdef HLW8012_CF_PIN
 #include <HLW8012.h>
@@ -706,13 +688,9 @@ uint64_t datamapsend = 0;
 uint64_t datamaponair = 0;
 uint64_t datamappublishregular = 0;
 
-
-//char _gFmtBuf[_gFmtBufSize];
-
 SimpleMap<const char*, char*> *dataMap = new SimpleMap<const char*, char*>([](const char* &a, const char* &b) -> int {
   return strcmp(a, b);     // a and b are equal
 });
-
 
 bool updatemqtt = 0;
 
@@ -764,8 +742,6 @@ bool floorheating_valveon = 0;
 #endif
 #endif
 
-//WiFiClientSecure wifiClientSecure;
-//WiFiClient wifiClient;
 ESP8266WebServer webserver(80);
 #include <WiFiUdp.h>
 
@@ -1002,6 +978,11 @@ void showdatamap()
   }
 }
 
+void putdatamap(const String& topic, const String& value, bool sendupdate, bool forceupdate, bool publishregular)
+{
+  putdatamap(topic.c_str(), String(value), sendupdate, forceupdate, publishregular);
+}
+
 void putdatamap(const char *topic, int value, bool sendupdate, bool forceupdate, bool publishregular)
 {
   putdatamap(topic, String(value), sendupdate, forceupdate, publishregular);
@@ -1047,7 +1028,7 @@ void putdatamap(const char *topic, const String& value, bool sendupdate, bool fo
   setdatamappublishregular(index, publishregular);
 
   // Do not output debug for uptime
-  if (strcmp(topic, cF("system/uptime")) != 0) if (Debug.isActive(Debug.INFO)) Debug.printf(sF("DATAMAP %s=%s (sendupdate=%d, oldval=%s oldsend=%d forceupdate=%d)\n").c_str(), topic, value.c_str(), sendupdate, datamapPayload, getdatamapsend(index), forceupdate);
+  if (strcmp(topic, cF("system/uptime")) != 0) if (Debug.isActive(Debug.INFO)) Debug.printf(cF("DATAMAP %s=%s (sendupdate=%d, oldval=%s oldsend=%d forceupdate=%d)\n"), topic, value.c_str(), sendupdate, datamapPayload, getdatamapsend(index), forceupdate);
 }
 
 #ifdef  ESPMQTT_BBQTEMP
@@ -2450,7 +2431,7 @@ void espmqtt_handle_modules_1sec()
   int32_t mV;
   uint8_t nrofsamples;
   circuitspowermeter_read(circuitnr, mW, mVA, mA, mV, 10);
-  if (circuitnr == 0) putdatamap(cF("mainsvoltage", String(mV / 1000));
+  if (circuitnr == 0) putdatamap(cF("mainsvoltage"), String(mV / 1000));
                                    //putdatamap(cF("circuit/" + String((circuitnr + 1)) + "/mA", String(mA));
                                    //putdatamap(cF("circuit/" + String((circuitnr + 1)) + "/W", String(mW / 1000));
                                    //putdatamap(cF("circuit/" + String((circuitnr + 1)) + "/VA", String(mVA / 1000));
@@ -3131,7 +3112,7 @@ void publishdatamap(int32_t packetId, bool publishall, bool init, bool publishre
     nextpacketId = -1;
   }
 
-  if ((packetId != -1) || publishall) if (Debug.isActive(Debug.VERBOSE)) Debug.printf(sF("Publishdatamap packetId=%d publishall=%d datamappointer=%d datamapsize=%d nextpacketid=%d waitingforack=%d\n").c_str(), packetId, publishall, datamappointer, dataMap->size(), nextpacketId, waitingforack);
+  if ((packetId != -1) || publishall) if (Debug.isActive(Debug.VERBOSE)) Debug.printf(cF("Publishdatamap packetId=%d publishall=%d datamappointer=%d datamapsize=%d nextpacketid=%d waitingforack=%d\n"), packetId, publishall, datamappointer, dataMap->size(), nextpacketId, waitingforack);
 
   yield();
 
@@ -3637,11 +3618,6 @@ void ducoboxcallback (const char *topic, String payload)
   putdatamap(topic, payload);
 }
 
-void amgpelletstovecallback (const char *topic, String payload)
-{
-  putdatamap(topic, payload);
-}
-
 void bht002callback (const char *topic, String payload)
 {
   putdatamap(topic, payload);
@@ -3653,23 +3629,6 @@ void tuyacallback (const char *topic, String payload)
   putdatamap(topic, payload);
   yield();
 }
-
-void openthermcallback (const char *topic, String payload)
-{
-  putdatamap(topic, payload);
-}
-
-#ifdef  ESPMQTT_GROWATT
-void growattcallback (const char *topic, String payload)
-{
-  if (strcmp(topic, "status") == 0)
-  {
-    if (payload == sF("ready")) digitalWrite(NODEMCULEDPIN, 0);
-    else digitalWrite(NODEMCULEDPIN, 1);
-  }
-  putdatamap(topic, payload, getdatamap(topic) != payload);
-}
-#endif
 
 #ifdef  ESPMQTT_GOODWE
 void goodwecallback (const char *topic, String payload)
@@ -3742,7 +3701,7 @@ void processCmdRemoteDebug()
     Debug.printf(cF("  showmainstate\n"));
     Debug.printf(cF("  factoryreset\n"));
     Debug.printf(cF("  showeeprommap\n"));
-    Debug.printf(cF("  scanwifinetworks (scan for stronger wifi network and connect to it)\n)"));
+    Debug.printf(cF("  scanwifinetworks (scan for stronger wifi network and connect to it)\n"));
     Debug.printf(cF("  showtime\n"));
     Debug.printf(cF("  getrestartreason\n"));
     Debug.printf(cF("  wifidisconnect\n"));
@@ -3850,8 +3809,8 @@ void processCmdRemoteDebug()
   }
 
 #ifdef  ESPMQTT_WATERMETER
-  if (lastCmd == sF("help")) Debug.printf(cF("  watermeterreadeeprom\n  watermeterwriteeeprom\n");
-                                            if (lastCmd == sF("watermeterreadeeprom"))
+  if (lastCmd == sF("help")) Debug.printf(cF("  watermeterreadeeprom\n  watermeterwriteeeprom\n"));
+  if (lastCmd == sF("watermeterreadeeprom"))
   {
     Debug.printf(cF("i2cEeprom read liters=%d\n"), i2cEeprom_read());
       watermeter_setliters(i2cEeprom_read());
@@ -4301,11 +4260,11 @@ void setup() {
 #endif
 
 #ifdef  ESPMQTT_OPENTHERM
-  opentherm_init(openthermcallback);
+  opentherm_init();
 #endif
 
 #ifdef  ESPMQTT_GROWATT
-  growatt_init(growattcallback, FANPIN);
+  growatt_init(FANPIN);
 #endif
 
 #ifdef  ESPMQTT_GOODWE
@@ -4313,11 +4272,11 @@ void setup() {
 #endif
 
 #ifdef  ESPMQTT_GROWATT_MODBUS
-  growattModbus_init(growattModbuscallback);
+  growattModbus_init();
 #endif
 
 #ifdef  ESPMQTT_AMGPELLETSTOVE
-  amgpelletstove_init(amgpelletstovecallback);
+  amgpelletstove_init();
 #endif
 
 #ifdef NEOPIXELPIN

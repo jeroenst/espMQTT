@@ -1,4 +1,4 @@
-void opentherm_init(void(*callback)(const char *,String));
+void opentherm_init();
 int opentherm_handle();
 void opentherm_setthermosttattemporary(double value);
 void opentherm_setthermosttatcontinue(double value);

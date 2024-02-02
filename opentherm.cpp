@@ -9,14 +9,6 @@ WiFiServer otserver(25238);
 uint32_t wdresettimeout = 0;
 uint8_t resetstate = 1;
 
-void(*_opentherm_callback)(const char *, String);
-
-void opentherm_callback(const char* topic, String payload)
-{
-  yield();
-  _opentherm_callback(topic, payload);
-  yield();
-}
 
 void opentherm_serialprint(String serialmessage)
 {
@@ -60,14 +52,13 @@ void opentherm_reset()
   resetstate = 1;
 }
 
-void opentherm_init(void(*callback)(const char *, String))
+void opentherm_init()
 {
   Serial.setDebugOutput(false);
   Serial.setRxBufferSize(100);
   Serial.begin(9600);  //Init serial 9600 baud
   Serial.print("\r\n");
 
-  _opentherm_callback = callback;
   otserver.begin();
 }
 
@@ -110,12 +101,12 @@ int opentherm_handle()
     DEBUG_V("%sSERIAL RX:%s %s\n", COLOR_GREEN, COLOR_RESET, otmessage.c_str());
     yield();
     String otvalue = "";
-    const char *topic = "";
+    String topic = "";
     uint16_t otintvalue = 0;
 
     if (otmessage.substring(0, 4) == "TC: ")
     {
-      topic = "thermostat/setpoint";
+      topic = sF("thermostat/setpoint");
       otvalue = otmessage.substring(4);
       wdresettimeout = 0;
       otgwcommstate = 2;
@@ -123,7 +114,7 @@ int opentherm_handle()
 
     else if (otmessage.substring(0, 4) == "TT: ")
     {
-      topic = "thermostat/setpoint";
+      topic = sF("thermostat/setpoint");
       otvalue = otmessage.substring(4);
       wdresettimeout = 0;
       otgwcommstate = 2;
@@ -131,7 +122,7 @@ int opentherm_handle()
 
     else if (otmessage.substring(0, 4) == "TO: ")
     {
-      topic = "outside/temperature";
+      topic = sF("outside/temperature");
       otvalue = otmessage.substring(4);
       wdresettimeout = 0;
       otgwcommstate = 2;
@@ -139,7 +130,7 @@ int opentherm_handle()
 
     else if (otmessage.substring(0, 4) == "CS: ")
     {
-      topic = "otgw/ch/water/setpoint";
+      topic = sF("otgw/ch/water/setpoint");
       otvalue = otmessage.substring(4);
       wdresettimeout = 0;
       otgwcommstate = 2;
@@ -147,7 +138,7 @@ int opentherm_handle()
 
     else if (otmessage.substring(0, 4) == "MM: ")
     {
-      topic = "otgw/maxmodulationlevel";
+      topic = sF("otgw/maxmodulationlevel");
       otvalue = otmessage.substring(4);
       wdresettimeout = 0;
       otgwcommstate = 2;
@@ -155,7 +146,7 @@ int opentherm_handle()
 
     else if (otmessage.substring(0, 4) == "OT: ")
     {
-      topic = "otgw/outsidetemperature";
+      topic = sF("otgw/outsidetemperature");
       otvalue = otmessage.substring(4);
       wdresettimeout = 0;
       otgwcommstate = 2;
@@ -173,81 +164,81 @@ int opentherm_handle()
         {
           case 0:
             otintvalue = opentherm_message_touint(otmessage);
-            opentherm_callback("ch/active", (otintvalue & 0x0002) ? "1" : "0");
-            opentherm_callback("dhw/active", (otintvalue & 0x0004) ? "1" : "0");
-            opentherm_callback("burner/active", (otintvalue & 0x0008) ? "1" : "0");
+            putdatamap(cF("ch/active"), (otintvalue & 0x0002) ? "1" : "0");
+            putdatamap(cF("dhw/active"), (otintvalue & 0x0004) ? "1" : "0");
+            putdatamap(cF("burner/active"), (otintvalue & 0x0008) ? "1" : "0");
             break;
           case 17:
             otvalue = String(opentherm_message_tofloat(otmessage), 1);
-            topic = "burner/modulation/level";
+            topic = sF("burner/modulation/level");
             break;
           case 116:
             otvalue = String(opentherm_message_touint(otmessage));
-            topic = "burner/starts";
+            topic = sF("burner/starts");
             break;
           case 120:
             otvalue = String(opentherm_message_touint(otmessage));
-            topic = "burner/hours";
+            topic = sF("burner/hours");
             break;
           case 19:
             otvalue = String(opentherm_message_tofloat(otmessage), 1);
-            topic = "dhw/flowrate";
+            topic = sF("dhw/flowrate");
             break;
           case 26:
             otvalue = String(opentherm_message_tofloat(otmessage), 1);
-            topic = "dhw/temperature";
+            topic = sF("dhw/temperature");
             break;
           case 118:
             otvalue = String(opentherm_message_touint(otmessage));
-            topic = "dhw/pump/starts";
+            topic = sF("dhw/pump/starts");
             break;
           case 122:
             otvalue = String(opentherm_message_touint(otmessage));
-            topic = "dhw/pump/hours";
+            topic = sF("dhw/pump/hours");
             break;
           case 119:
             otvalue = String(opentherm_message_touint(otmessage));
-            topic = "dhw/burner/starts";
+            topic = sF("dhw/burner/starts");
             break;
           case 123:
             otvalue = String(opentherm_message_touint(otmessage));
-            topic = "dhw/burner/hours";
+            topic = sF("dhw/burner/hours");
             break;
           case 25:
             otvalue = String(opentherm_message_tofloat(otmessage), 1);
-            topic = "boiler/temperature";
+            topic = sF("boiler/temperature");
             break;
           case 18:
             otvalue = String(opentherm_message_tofloat(otmessage), 1);
-            topic = "ch/water/pressure";
+            topic = sF("ch/water/pressure");
             break;
           case 117:
             otvalue = String(opentherm_message_touint(otmessage));
-            topic = "ch/pump/starts";
+            topic = sF("ch/pump/starts");
             break;
           case 121:
             otvalue = String(opentherm_message_touint(otmessage));
-            topic = "ch/pump/hours";
+            topic = sF("ch/pump/hours");
             break;
           case 56:
             otvalue = String(opentherm_message_tofloat(otmessage), 1);
-            topic = "dhw/setpoint";
+            topic = sF("dhw/setpoint");
             break;
           case 57:
             otvalue = String(opentherm_message_tofloat(otmessage), 1);
-            topic = "dhw/maxsetpoint";
+            topic = sF("dhw/maxsetpoint");
             break;
           case 28:
             otvalue = String(opentherm_message_tofloat(otmessage), 1);
-            topic = "ch/returnwatertemperature";
+            topic = sF("ch/returnwatertemperature");
             break;
           case 27:
             otvalue = String(opentherm_message_tofloat(otmessage), 1);
-            topic = "outside/temperature";
+            topic = sF("outside/temperature");
             break;
           case 33:
             otvalue = String(opentherm_message_toint(otmessage));
-            topic = "exhausttemperature";
+            topic = sF("exhausttemperature");
             break;
         }
       }
@@ -263,23 +254,23 @@ int opentherm_handle()
         {
           case 1:
             otvalue = String(opentherm_message_tofloat(otmessage), 1);
-            topic = "thermostat/ch/water/setpoint";
+            topic = sF("thermostat/ch/water/setpoint");
             break;
           case 16:
             otvalue = String(opentherm_message_tofloat(otmessage), 1);
-            topic = "thermostat/setpoint";
+            topic = sF("thermostat/setpoint");
             break;
           case 24:
             otvalue = String(opentherm_message_tofloat(otmessage), 1);
-            topic = "thermostat/temperature";
+            topic = sF("thermostat/temperature");
             break;
         }
       }
     }
 
-    if (strcmp(topic, ""))
+    if (topic != "")
     {
-      _opentherm_callback(topic, otvalue);
+      putdatamap(topic, otvalue);
       returnvalue++;
     }
   }
@@ -298,7 +289,7 @@ int opentherm_handle()
   if (otgwcommstate != oldotgwcommstate)
   {
     oldotgwcommstate = otgwcommstate;
-    _opentherm_callback("otgw/commstate", String(otgwcommstate));
+    putdatamap(cF("otgw/commstate"), String(otgwcommstate));
   }
 
   static uint32_t resettimer = 0;

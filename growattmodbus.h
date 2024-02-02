@@ -1,4 +1,4 @@
-void growattModbus_init(void(*callback)(const char *,String));
+void growattModbus_init();
 void growattModbus_handle();
 
 #define GROWATTMODBUS_TIMEOUT 10
