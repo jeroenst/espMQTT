@@ -11,7 +11,7 @@
     (Sonoff POW) https://github.com/jeroenst/hlw8012
     (RGB LED) https://github.com/jeroenst/my92xx
     (DS18B20) https://github.com/jeroenst/OneWire
-    (DS18B20) https://github.com/jeroenst/Arduino-Temperature-Control-Library
+    (DS18B20) https://github.com/pjeroenst/Arduino-Temperature-Control-Library
     (I2C OLED DISPLAY) https://github.com/jeroenst/esp8266-oled-ssd1306
 
    Libraries via Arduino Library Manager:
@@ -36,7 +36,7 @@
 // #define ESPMQTT_BATHROOM
 // #define ESPMQTT_BEDROOM2
 // #define ESPMQTT_OPENTHERM
-// #define ESPMQTT_SMARTMETER
+#define ESPMQTT_SMARTMETER
 // #define ESPMQTT_GROWATT
 // #define ESPMQTT_GROWATT_MODBUS
 // #define ESPMQTT_SDM120
@@ -57,7 +57,7 @@
 /* ESP8285 */
 // #define ESPMQTT_ZMAI90
 // #define ESPMQTT_DUCOBOX
-#define ESPMQTT_SONOFFS20 // coffeelamp & sonoffs20_00X
+// #define ESPMQTT_SONOFFS20 // coffeelamp & sonoffs20_00X
 // #define ESPMQTT_SONOFFBULB
 // #define ESPMQTT_GARDEN //ESP8285 TUIN & MARIANNE & LUIFEL
 // #define ESPMQTT_SONOFF_FLOORHEATING
@@ -644,6 +644,7 @@ Adafruit_NeoPixel neopixelleds = Adafruit_NeoPixel(2, NEOPIXELPIN, NEO_RGB + NEO
 #include <AsyncMqttClient.h>
 AsyncMqttClient mqttClient;
 #include <ArduinoOTA.h>
+#include <ESP8266HTTPUpdateServer.h>
 #include "SimpleMap.h"
 
 #include <ESP8266Ping.h>
@@ -743,6 +744,8 @@ bool floorheating_valveon = 0;
 #endif
 
 ESP8266WebServer webserver(80);
+ESP8266HTTPUpdateServer httpUpdater;
+
 #include <WiFiUdp.h>
 
 char chipid[10];
@@ -2891,9 +2894,9 @@ void loop()
     yield();
     ESP.wdtFeed(); // Prevent watchdog to kick in...
 
-    // Every 1 minutes (+/- 60 seconds) publish all mqtt data
+    // Every 10 minutes (+/- 600 seconds) publish all mqtt data
     static int8_t dividefactor = random(-60, 60);
-    if ((uptime > 60) && (((uptime + dividefactor) % 60) == 0))
+    if ((uptime > 60) && (((uptime + dividefactor) % 600) == 0))
     {
       if (Debug.isActive(Debug.INFO)) Debug.printf(cF("Regular publishing datamap...\n"));
       publishdatamap(-1, false, false, true);
@@ -3390,6 +3393,32 @@ bool MHZ19_read(int *ppm, int *temp)
 #endif
 
 
+void handleWWWReboot()
+{
+  if (!webserver.authenticate("admin", esp_password.c_str())) {
+    return webserver.requestAuthentication();
+  }
+  webserver.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  webserver.send (200, "text/html", F("<HTML><HEAD><meta http-equiv=\"refresh\" content=\"5;url=\\\" /></HEAD><BODY><CENTER><H1>"));
+  webserver.sendContent (WiFi.hostname());
+  webserver.sendContent(F("</H1><BR><BR><BR>Device Rebooting, Please Wait...</CENTER></BODY></HTML>"));
+  webserver.sendContent("");
+
+  reboottimeout = uptime + 4;
+}
+
+void handleWWWUpgrade()
+{
+  if (!webserver.authenticate("admin", esp_password.c_str())) {
+    return webserver.requestAuthentication();
+  }
+
+  webserver.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  webserver.send (200, "text/html", F("<HTML><BODY><CENTER><H1>"));
+  webserver.sendContent (WiFi.hostname());
+  webserver.sendContent(F("</H1><BR><form method='POST' action='/upgrade' enctype='multipart/form-data'><H2>Firmware Upgrade</H2><br><br><br><input type='file' accept='.bin,.bin.gz' name='firmware'><BR><BR><input type='submit' value='Update Firmware'></form></CENTER></BODY></HTML>"));
+  webserver.sendContent("");
+}
 
 void handleWWWSettings()
 {
@@ -3400,15 +3429,6 @@ void handleWWWSettings()
 
   if (webserver.method() == HTTP_POST)
   {
-    for (uint8_t i = 0; i < webserver.args(); i++)
-    {
-      if (webserver.argName(i) == sF("rebootdevice"))
-      {
-        webserver.send(200, cF("text/html"), sF("<HTML><HEAD><meta http-equiv=\"refresh\" content=\"5;url=\\\" /></HEAD><BODY>Device Rebooting, Please Wait...</BODY></HTML>"));
-        reboottimeout = uptime + 4;
-        return;
-      }
-    }
     mqtt_ssl = 0;
     for (uint8_t i = 0; i < webserver.args(); i++)
     {
@@ -3491,9 +3511,9 @@ void handleWWWSettings()
     }
 
     webserver.setContentLength(CONTENT_LENGTH_UNKNOWN);
-    webserver.send (200, "text/html", F("<HTML><HEAD><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"></HEAD><BODY><CENTER><div align=\"left\" style=\"width:400px; margin:auto\"><CENTER><H1>"));
+    webserver.send (200, "text/html", F("<HTML><HEAD><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"></HEAD><BODY><CENTER><div align=\"center\" style=\"width:400px; margin:auto\"><H1>"));
     webserver.sendContent (WiFi.hostname());
-    webserver.sendContent (F("</H1></CENTER><form action=\"/settings\" method=\"post\" autocomplete=\"off\"><TABLE style=\"width:400px; margin:auto\"><TR><TD>Hostname</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"40\" name=\"hostname\" value=\""));
+    webserver.sendContent (F("</H1><form action=\"/settings\" method=\"post\" autocomplete=\"off\"><TABLE style=\"width:400px; margin:auto\"><TR><TD style=\"width:160px;\">Hostname</TD><TD style=\"width:240px;\"><input style=\"width:200\" type=\"text\" maxlength=\"40\" name=\"hostname\" value=\""));
     webserver.sendContent (WiFi.hostname());
     webserver.sendContent (F("\"></TD></TR><TR><TD>Wifi SSID</TD><TD><select style=\"width:200\" name=\"wifissid\">"));
     webserver.sendContent (wifiselectoptions);
@@ -3509,29 +3529,30 @@ void handleWWWSettings()
     webserver.sendContent (mqtt_username);
     webserver.sendContent (F("\"></TD></TR><TR><TD>MQTT Password</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttpassword\" value=\""));
     webserver.sendContent (mqtt_password);
-    webserver.sendContent (sF("\"></TD></TR><TR><TD>MQTT Topic Prefix</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"50\" name=\"mqtttopicprefix\" value=\""));
+    webserver.sendContent (F("\"></TD></TR><TR><TD>MQTT Topic Prefix</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"50\" name=\"mqtttopicprefix\" value=\""));
     webserver.sendContent (mqtt_topicprefix);
-    webserver.sendContent (sF("\"></TD></TR><TR><TD>ESP Password</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"webpassword\" value=\""));
+    webserver.sendContent (F("\"></TD></TR><TR><TD>ESP Password</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"webpassword\" value=\""));
     webserver.sendContent (esp_password);
-    webserver.sendContent (sF("\"></TD></TR>"));
+    webserver.sendContent (F("\"></TD></TR>"));
 #ifdef  ESPMQTT_WATERMETER
-    webserver.sendContent (sF("<TR><TD>Watermeter Liter</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"64\" name=\"watermeterliter\" value=\""));
+    webserver.sendContent (F("<TR><TD>Watermeter Liter</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"64\" name=\"watermeterliter\" value=\""));
     webserver.sendContent (getdatamap("water/liter"));
-    webserver.sendContent (sF("\"></TD></TR>"));
+    webserver.sendContent (F("\"></TD></TR>"));
 #endif
 #ifdef  ESPMQTT_QSWIFIDIMMERD01
-    webserver.sendContent (sF("<TR><TD>Dimmer Offset</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"3\" name=\"qswifidimoffset\" value=\""));
+    webserver.sendContent (F("<TR><TD>Dimmer Offset</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"3\" name=\"qswifidimoffset\" value=\""));
     webserver.sendContent (getdatamap("dimoffset"));
-    webserver.sendContent (sF("\"></TD></TR>"));
+    webserver.sendContent (F("\"></TD></TR>"));
 #endif
 #ifdef  ESPMQTT_QSWIFIDIMMERD02
-    webserver.sendContent (sF("<TR><TD>Dimmer Offset 0</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"3\" name=\"qswifidimoffset0\" value=\""));
+    webserver.sendContent (F("<TR><TD>Dimmer Offset 0</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"3\" name=\"qswifidimoffset0\" value=\""));
     webserver.sendContent (getdatamap("dimoffset/0"));
-    webserver.sendContent (sF("\"></TD></TR><TR><TD>Dimmer Offset 1</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"3\" name=\"qswifidimoffset1\" value=\""));
+    webserver.sendContent (F("\"></TD></TR><TR><TD>Dimmer Offset 1</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"3\" name=\"qswifidimoffset1\" value=\""));
     webserver.sendContent (getdatamap("dimoffset/1"));
-    webserver.sendContent (sF("\"></TD></TR>"));
+    webserver.sendContent (F("\"></TD></TR>"));
 #endif
-    webserver.sendContent (sF("</TABLE><BR><CENTER><input type=\"submit\" value=\"Save Settings\"></form><BR><BR><form action=\"/settings\" method=\"post\" autocomplete=\"off\"><input type=\"hidden\" name=\"rebootdevice\" value=\"1\"><input type=\"submit\" value=\"Reboot Device\"></form><BR><BR><A HREF=\"/\">Return to main page</A></CENTER></div></BODY></HTML>"));
+    webserver.sendContent (F("</TABLE><BR><input type=\"submit\" value=\"Save Settings\"></form><BR>"));
+    webserver.sendContent (F("<form action=\"/reboot\"><input type=\"submit\" value=\"Reboot Device\"></form><BR><BR><A HREF=\"/\">Return to main page</A></div></CENTER></BODY></HTML>"));
     webserver.sendContent (""); // end chunked data
   }
 }
@@ -3547,7 +3568,7 @@ void handleJsonData() {
 }
 
 void handleWWWRoot() {
-  static const char webpage_P[] PROGMEM = "<!DOCTYPE html><html><meta charset=\"UTF-8\"><meta name=\"google\" content=\"notranslate\"><meta http-equiv=\"Content-Language\" content=\"en\"><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><style>table{width: 400px; margin: auto;}</style></head><body><CENTER><div align='center' style='width:400px; margin:auto'><CENTER><H1><p id='header'></p></H1></CENTER><p id='table'></p><A HREF='settings'>Settings</A></div></CENTER><script>function refreshsite(){var obj,dbParam,xmlhttp,myObj,x,txt ='';xmlhttp=new XMLHttpRequest();xmlhttp.onreadystatechange=function(){if(this.readyState==4&&this.status==200){myObj=JSON.parse(this.responseText);txt+='<TABLE>';for (x in myObj){if(x=='hostname')document.getElementById('header').innerHTML=myObj[x].toUpperCase();txt+='<tr><td>'+x.split('/').join(' ')+'</td><td>'+myObj[x]+'</td></tr>';}txt+='</table>';document.getElementById('table').innerHTML = txt;}};xmlhttp.open('GET','data.json',true);xmlhttp.setRequestHeader('Content-type','application/x-www-form-urlencoded');xmlhttp.send();}refreshsite();window.setInterval(refreshsite, 5000);</script></body></html>";
+  static const char webpage_P[] PROGMEM = "<!DOCTYPE html><html><meta charset=\"UTF-8\"><meta name=\"google\" content=\"notranslate\"><meta http-equiv=\"Content-Language\" content=\"en\"><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><style>table{width: 400px; margin: auto;}</style></head><body><CENTER><div align='center' style='width:400px; margin:auto'><CENTER><H1><p id='header'></p></H1></CENTER><p id='table'></p><A HREF='settings'>Settings</A><BR><A HREF='upgrade'>Upgrade</A></div></CENTER><script>function refreshsite(){var obj,dbParam,xmlhttp,myObj,x,txt ='';xmlhttp=new XMLHttpRequest();xmlhttp.onreadystatechange=function(){if(this.readyState==4&&this.status==200){myObj=JSON.parse(this.responseText);txt+='<TABLE>';for (x in myObj){if(x=='hostname')document.getElementById('header').innerHTML=myObj[x].toUpperCase();txt+='<tr><td>'+x.split('/').join(' ')+'</td><td>'+myObj[x]+'</td></tr>';}txt+='</table>';document.getElementById('table').innerHTML = txt;}};xmlhttp.open('GET','data.json',true);xmlhttp.setRequestHeader('Content-type','application/x-www-form-urlencoded');xmlhttp.send();}refreshsite();window.setInterval(refreshsite, 5000);</script></body></html>";
   if (Debug.isActive(Debug.INFO)) Debug.printf(cF("New webclient connected...\n"));
   webserver.send_P(200, "text/html", webpage_P);
 }
@@ -4224,8 +4245,11 @@ void setup() {
   webserver.on(cF("/"), handleWWWRoot);
   webserver.on(cF("/data.json"), handleJsonData);
   webserver.on(cF("/settings"), handleWWWSettings);
-  webserver.begin();
+  webserver.on(cF("/reboot"), handleWWWReboot);
+  webserver.on(cF("/upgrade"), HTTP_GET, handleWWWUpgrade);
 
+  httpUpdater.setup(&webserver, "/upgrade", "admin", esp_password);
+  webserver.begin();
 
 
   systemTimer.attach_ms(100, systemTimerCallback);
