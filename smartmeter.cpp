@@ -8,7 +8,7 @@ void smartmeter_init(void(*callback)(const char *, const String&))
   _smartmeter_callback = callback;
   
 
-  Serial.setRxBufferSize(100); 
+  Serial.setRxBufferSize(200); 
   Serial.begin(115200);  //Init serial 115200 baud
   Serial.setDebugOutput(false);
 
@@ -46,6 +46,7 @@ int8_t smartmeter_handle()
       if (buffer[0] == '/')
       {
         kwh = 0;
+        watt = 0;
         _smartmeter_callback(cF("status"), sF("receiving"));
       }
 
@@ -53,7 +54,6 @@ int8_t smartmeter_handle()
       {
         _smartmeter_callback(cF("electricity/watt"), String(watt));
         _smartmeter_callback(cF("electricity/kwh_total"), String(kwh,3));
-        watt = 0;
         _smartmeter_callback(cF("status"), sF("ready"));
       }
 
