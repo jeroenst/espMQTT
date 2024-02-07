@@ -2864,14 +2864,15 @@ void loop()
   yield();
   dotasks();
 
-  if (timertick == 1) // Every 0.1 second read next SDM120 register
+  if (timertick) // Every 0.1 second read next SDM120 register
   {
+    timertick = 0;
     espmqtt_handle_modules_100ms();
   }
   yield();
   ESP.wdtFeed(); // Prevent watchdog to kick in...
 
-  if (timersectick == 1) // Every 1 second check sensors and update display (it would be insane to do it more often right?)
+  if (timersectick) // Every 1 second check sensors and update display (it would be insane to do it more often right?)
   {
     timersectick = 0;
     updatemqtt = 1;
@@ -2889,7 +2890,7 @@ void loop()
     yield();
     ESP.wdtFeed(); // Prevent watchdog to kick in...
 
-    if ((uptime % 600) == 0)
+    if (0 == uptime % 600)
     {
       updateexternalip();
     }
@@ -2906,7 +2907,7 @@ void loop()
     yield();
     ESP.wdtFeed(); // Prevent watchdog to kick in...
 
-    if ((uptime % 60) == 0)
+    if (0 == uptime % 60)
     {
       char uptimestr[20];
       sprintf(uptimestr, cF("%d:%02d:%02d:%02d"), uptime / 86400, (uptime / 3600) % 24, (uptime / 60) % 60, uptime % 60);
@@ -2925,7 +2926,7 @@ void loop()
 
 
 #ifdef APONBOOT
-    if ((uptime == 60) && (!mainstate.wificonnectedonce))
+    if ((60 == uptime) && (!mainstate.wificonnectedonce))
     {
       if (Debug.isActive(Debug.WARNING)) Debug.printf(cF("Connection to wifi failed, starting accesspoint\n"));
       startWifiAP();
@@ -2937,9 +2938,9 @@ void loop()
 #endif
 
     // Every 10 seconds update system info
-    if ((uptime % 10) == 0) update_systeminfo();
+    if (0 == uptime % 10) update_systeminfo();
 
-    if ((uptime % 60) == 0) setdatamapsendall();
+    if (0 == uptime % 60) setdatamapsendall();
 
     espmqtt_handle_modules_1sec();
   }
