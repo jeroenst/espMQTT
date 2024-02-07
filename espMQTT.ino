@@ -36,10 +36,10 @@
 // #define ESPMQTT_BATHROOM
 // #define ESPMQTT_BEDROOM2
 // #define ESPMQTT_OPENTHERM
-#define ESPMQTT_SMARTMETER
+// #define ESPMQTT_SMARTMETER
 // #define ESPMQTT_GROWATT
 // #define ESPMQTT_GROWATT_MODBUS
-// #define ESPMQTT_SDM120
+#define ESPMQTT_SDM120
 // #define ESPMQTT_DDM18SD
 // #define ESPMQTT_WATERMETER
 // #define ESPMQTT_GENERIC8266
@@ -2164,6 +2164,7 @@ void sdm120_readnextregister()
 {
   static uint8_t sdmreadcounter = 1;
   double value = NAN;
+  static uint32_t nextQueryTime = 0;
 
   switch (sdmreadcounter)
   {
@@ -2205,13 +2206,14 @@ void sdm120_readnextregister()
       putdatamap(cF("energy/reactive/export"), doubletostring(sdm.readVal(SDM120CT_EXPORT_REACTIVE_ENERGY), 3));
       break;
     case 13:
+      nextQueryTime = uptime + 5;
       value = sdm.readVal(SDM120CT_TOTAL_REACTIVE_ENERGY);
       putdatamap(cF("energy/reactive"), doubletostring(value, 3));
       if (isnan(value)) putdatamap(cF("status"), sF("commerror"));
       else putdatamap(cF("status"), sF("ready"));
       break;
     case 14:
-      if (uptime % 5 == 0) sdmreadcounter = 0;
+      if (uptime > nextQueryTime) sdmreadcounter = 0;
       break;
   }
   if (sdmreadcounter < 14)
@@ -3552,7 +3554,7 @@ void handleWWWSettings()
     webserver.sendContent (F("\"></TD></TR>"));
 #endif
     webserver.sendContent (F("</TABLE><BR><input type=\"submit\" value=\"Save Settings\"></form><BR>"));
-    webserver.sendContent (F("<form action=\"/reboot\"><input type=\"submit\" value=\"Reboot Device\"></form><BR><BR><A HREF=\"/\">Return to main page</A></div></CENTER></BODY></HTML>"));
+    webserver.sendContent (F("<form action=\"/reboot\"><input type=\"submit\" value=\"Reboot Device\"></form><BR><A HREF=\"/\">Return to main page</A><BR><BR><A HREF='upgrade'>Upgrade</A></div></CENTER></BODY></HTML>"));
     webserver.sendContent (""); // end chunked data
   }
 }
@@ -3568,7 +3570,7 @@ void handleJsonData() {
 }
 
 void handleWWWRoot() {
-  static const char webpage_P[] PROGMEM = "<!DOCTYPE html><html><meta charset=\"UTF-8\"><meta name=\"google\" content=\"notranslate\"><meta http-equiv=\"Content-Language\" content=\"en\"><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><style>table{width: 400px; margin: auto;}</style></head><body><CENTER><div align='center' style='width:400px; margin:auto'><CENTER><H1><p id='header'></p></H1></CENTER><p id='table'></p><A HREF='settings'>Settings</A><BR><A HREF='upgrade'>Upgrade</A></div></CENTER><script>function refreshsite(){var obj,dbParam,xmlhttp,myObj,x,txt ='';xmlhttp=new XMLHttpRequest();xmlhttp.onreadystatechange=function(){if(this.readyState==4&&this.status==200){myObj=JSON.parse(this.responseText);txt+='<TABLE>';for (x in myObj){if(x=='hostname')document.getElementById('header').innerHTML=myObj[x].toUpperCase();txt+='<tr><td>'+x.split('/').join(' ')+'</td><td>'+myObj[x]+'</td></tr>';}txt+='</table>';document.getElementById('table').innerHTML = txt;}};xmlhttp.open('GET','data.json',true);xmlhttp.setRequestHeader('Content-type','application/x-www-form-urlencoded');xmlhttp.send();}refreshsite();window.setInterval(refreshsite, 5000);</script></body></html>";
+  static const char webpage_P[] PROGMEM = "<!DOCTYPE html><html><meta charset=\"UTF-8\"><meta name=\"google\" content=\"notranslate\"><meta http-equiv=\"Content-Language\" content=\"en\"><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><style>table{width: 400px; margin: auto;}</style></head><body><CENTER><div align='center' style='width:400px; margin:auto'><CENTER><H1><p id='header'></p></H1></CENTER><p id='table'></p><A HREF='settings'>Settings</A></div></CENTER><script>function refreshsite(){var obj,dbParam,xmlhttp,myObj,x,txt ='';xmlhttp=new XMLHttpRequest();xmlhttp.onreadystatechange=function(){if(this.readyState==4&&this.status==200){myObj=JSON.parse(this.responseText);txt+='<TABLE>';for (x in myObj){if(x=='hostname')document.getElementById('header').innerHTML=myObj[x].toUpperCase();txt+='<tr><td>'+x.split('/').join(' ')+'</td><td>'+myObj[x]+'</td></tr>';}txt+='</table>';document.getElementById('table').innerHTML = txt;}};xmlhttp.open('GET','data.json',true);xmlhttp.setRequestHeader('Content-type','application/x-www-form-urlencoded');xmlhttp.send();}refreshsite();window.setInterval(refreshsite, 5000);</script></body></html>";
   if (Debug.isActive(Debug.INFO)) Debug.printf(cF("New webclient connected...\n"));
   webserver.send_P(200, "text/html", webpage_P);
 }
