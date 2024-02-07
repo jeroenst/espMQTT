@@ -2386,8 +2386,6 @@ void espmqtt_handle_modules()
 
 void espmqtt_handle_modules_100ms()
 {
-  //    Serial.print(".");
-  timertick = 0;
 #ifdef  ESPMQTT_SDM120
   sdm120_readnextregister();
 #endif
