@@ -38,8 +38,8 @@
 // #define ESPMQTT_OPENTHERM
 // #define ESPMQTT_SMARTMETER
 // #define ESPMQTT_GROWATT
-// #define ESPMQTT_GROWATT_MODBUS
-#define ESPMQTT_SDM120
+#define ESPMQTT_GROWATT_MODBUS
+// #define ESPMQTT_SDM120
 // #define ESPMQTT_DDM18SD
 // #define ESPMQTT_WATERMETER
 // #define ESPMQTT_GENERIC8266
@@ -911,13 +911,13 @@ void setdatamapsend(uint8_t index, bool state)
 {
   if (state)
   {
-    if (index < STATICDATAMAPSIZE) staticdatamapsend |= (1 << index);
-    else datamapsend |= (1 << (index-STATICDATAMAPSIZE));
+    if (index < STATICDATAMAPSIZE) staticdatamapsend |= uint64_t(uint64_t(1) << index);
+    else datamapsend |= uint64_t(uint64_t(1) << (index-STATICDATAMAPSIZE));
   }
   else
   {
-    if (index < STATICDATAMAPSIZE) staticdatamapsend &= 0xFFFF - (1 << index);
-    else datamapsend &= 0xFFFF - (1 << (index-STATICDATAMAPSIZE));
+    if (index < STATICDATAMAPSIZE) staticdatamapsend &= 0xFFFF - uint64_t(uint64_t(1) << index);
+    else datamapsend &= 0xFFFF - uint64_t(uint64_t(1) << (index-STATICDATAMAPSIZE));
   }
 }
 
@@ -925,13 +925,13 @@ void setdatamaponair(uint8_t index, bool state)
 {
   if (state)
   {
-    if (index < STATICDATAMAPSIZE) staticdatamaponair |= (1 << index);
-    else datamaponair |= (1 << (index-STATICDATAMAPSIZE));
+    if (index < STATICDATAMAPSIZE) staticdatamaponair |= uint64_t(uint64_t(1) << index);
+    else datamaponair |= uint64_t(uint64_t(1) << (index-STATICDATAMAPSIZE));
   }
   else
   {
-    if (index < STATICDATAMAPSIZE) staticdatamaponair &= 0xFFFF - (1 << index);
-    else datamaponair &= 0xFFFF - (1 << (index-STATICDATAMAPSIZE));
+    if (index < STATICDATAMAPSIZE) staticdatamaponair &= 0xFFFF - uint64_t(uint64_t(1) << index);
+    else datamaponair &= 0xFFFF - uint64_t(uint64_t(1) << (index-STATICDATAMAPSIZE));
   }
 }
 
@@ -939,32 +939,32 @@ void setdatamappublishregular(uint8_t index, bool state)
 {
   if (state)
   {
-    if (index < STATICDATAMAPSIZE) staticdatamappublishregular |= (1 << index);
-    else datamappublishregular |= (1 << (index-STATICDATAMAPSIZE));
+    if (index < STATICDATAMAPSIZE) staticdatamappublishregular |= uint64_t(uint64_t(1) << index);
+    else datamappublishregular |= uint64_t(uint64_t(1) << (index-STATICDATAMAPSIZE));
   }
   else
   {
-    if (index < STATICDATAMAPSIZE) staticdatamappublishregular &= 0xFFFF - (1 << index);
-    else datamappublishregular &= 0xFFFF - (1 << (index-STATICDATAMAPSIZE));
+    if (index < STATICDATAMAPSIZE) staticdatamappublishregular &= 0xFFFF - uint64_t(uint64_t(1) << index);
+    else datamappublishregular &= 0xFFFF - uint64_t(uint64_t(1) << (index-STATICDATAMAPSIZE));
   }
 }
 
 bool getdatamapsend(uint8_t index)
 {
-  if (index < STATICDATAMAPSIZE) return staticdatamapsend & (1 << index);
-  else return datamapsend & (1 << (index-STATICDATAMAPSIZE));
+  if (index < STATICDATAMAPSIZE) return uint64_t(staticdatamapsend & uint64_t(uint64_t(1) << index)) > 0;
+  else return uint64_t(datamapsend & uint64_t(uint64_t(1) << (index-STATICDATAMAPSIZE))) > 0;
 }
 
 bool getdatamaponair(uint8_t index)
 {
-  if (index < STATICDATAMAPSIZE) return staticdatamaponair & (1 << index);
-  else return datamaponair & (1 << (index-STATICDATAMAPSIZE));
+  if (index < STATICDATAMAPSIZE) return uint64_t(staticdatamaponair & uint64_t(uint64_t(1) << index)) > 0;
+  else return uint64_t(datamaponair & uint64_t(uint64_t(1) << (index-STATICDATAMAPSIZE))) > 0;
 }
 
 bool getdatamappublishregular(uint8_t index)
 {
-  if (index < STATICDATAMAPSIZE) return staticdatamappublishregular & (1 << index);
-  else return datamappublishregular & (1 << (index-STATICDATAMAPSIZE));
+  if (index < STATICDATAMAPSIZE) return uint64_t(staticdatamappublishregular & uint64_t(uint64_t(1) << index)) > 0;
+  else return uint64_t(datamappublishregular & uint64_t(uint64_t(1) << (index-STATICDATAMAPSIZE))) > 0;
 }
 
 void setdatamapsendall(bool state = true)
@@ -1031,7 +1031,7 @@ void putdatamap(const char *topic, const String& value, bool sendupdate, bool fo
   setdatamappublishregular(index, publishregular);
 
   // Do not output debug for uptime
-  if (strcmp(topic, cF("system/uptime")) != 0) if (Debug.isActive(Debug.INFO)) Debug.printf(cF("DATAMAP %s=%s (sendupdate=%d, oldval=%s oldsend=%d forceupdate=%d)\n"), topic, value.c_str(), sendupdate, datamapPayload, getdatamapsend(index), forceupdate);
+  if (strcmp(topic, cF("system/uptime")) != 0) if (Debug.isActive(Debug.INFO)) Debug.printf(cF("PUTDATAMAP %s=%s (sendupdate=%d, oldval=%s oldsend=%d forceupdate=%d)\n"), topic, value.c_str(), sendupdate, datamapPayload, getdatamapsend(index), forceupdate);
 }
 
 #ifdef  ESPMQTT_BBQTEMP
