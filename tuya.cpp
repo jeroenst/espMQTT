@@ -193,14 +193,14 @@ void tuya_handle()
 
 void tuya_2gangdimmerv2_setdimstate(bool dimstate, uint8_t dimchannel)
 {
-  unsigned char tuyaCommand[] = { 0x55, 0xAA, 0x00, 0x06, 0x00, 0x05, ((dimchannel == 0) ? 0x01 : 0x07), 0x01, 0x00, 0x01, ((dimstate) ? 0x01 : 0x00)};
+  unsigned char tuyaCommand[] = { 0x55, 0xAA, 0x00, 0x06, 0x00, 0x05, (unsigned char)((dimchannel == 0) ? 0x01 : 0x07), 0x01, 0x00, 0x01, (unsigned char)((dimstate) ? 0x01 : 0x00)};
   tuya_commandCharsToSerial(11, tuyaCommand);
 }
 
 void tuya_2gangdimmerv2_setdimvalue(uint8_t dimvalue, uint8_t dimchannel)
 {
   uint16_t calculated_dimvalue = MIN((dimvalue * 10), 1000);
-  unsigned char tuyaCommand[] = { 0x55, 0xAA, 0x00, 0x06, 0x00, 0x08, ((dimchannel == 0) ? 0x02 : 0x08), 0x02, 0x00, 0x04, 0x00, 0x00, (calculated_dimvalue >> 8) & 0xFF, (calculated_dimvalue & 0xFF)};
+  unsigned char tuyaCommand[] = { 0x55, 0xAA, 0x00, 0x06, 0x00, 0x08, (unsigned char)((dimchannel == 0) ? 0x02 : 0x08), 0x02, 0x00, 0x04, 0x00, 0x00, (unsigned char)((calculated_dimvalue >> 8) & 0xFF), (unsigned char)(calculated_dimvalue & 0xFF)};
   tuya_commandCharsToSerial(14, tuyaCommand);
   tuya_2gangdimmerv2_setdimstate(dimvalue ? 1 : 0, dimchannel);
 }

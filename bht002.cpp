@@ -60,8 +60,8 @@ void bht002_sendtime()
   DEBUG ("Sending Datetime: %s\n", strftime_buf);
 
   unsigned char cancelConfigCommand[] = { 0x55, 0xaa, 0x00, 0x1c, 0x00, 0x08,
-                                          0x01, timeinfo.tm_year, timeinfo.tm_mon, timeinfo.tm_mday,
-                                          timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec, timeinfo.tm_wday
+                                          0x01, (unsigned char)timeinfo.tm_year, (unsigned char)timeinfo.tm_mon, (unsigned char)timeinfo.tm_mday,
+                                          (unsigned char)timeinfo.tm_hour, (unsigned char)timeinfo.tm_min, (unsigned char)timeinfo.tm_sec, (unsigned char)timeinfo.tm_wday
                                         };
   bht002_commandCharsToSerial(14, cancelConfigCommand);
 }
@@ -426,7 +426,7 @@ void bht002_handle()
       //length information now available
       commandLength = receivedCommand[4] * 0x100 + receivedCommand[5];
     }
-    else if ((commandLength > -1) && (receiveIndex == (6 + commandLength)))
+    else if ((commandLength > 0) && (receiveIndex == (6 + commandLength)))
     {
       //verify checksum
       int expChecksum = 0;

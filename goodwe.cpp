@@ -148,8 +148,6 @@ void goodwe_handle()
     {
       if (RxBufferPointer == RxBuffer[2] + 5) // full message received
       {
-        double value = 0;
-        uint32_t intvalue = 0;
         DEBUG_D("Received complete message from goodwe Inverter...\n");
 
         uint16_t inverterstatus = (RxBuffer[5] << 8) + RxBuffer[6];
