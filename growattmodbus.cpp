@@ -10,7 +10,7 @@
 
 bool growattModbus_RxReady = false;
 uint8_t growattModbus_itteration = 0;
-uint8_t growattModbus_errorCounter = 0;
+uint8_t growattModbus_errorCounter = 4; // After boot set topics asap
 
 
 void growattModbus_init()
