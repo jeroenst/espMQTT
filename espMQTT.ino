@@ -911,13 +911,13 @@ void setdatamapsend(uint8_t index, bool state)
 {
   if (state)
   {
-    if (index < STATICDATAMAPSIZE) staticdatamapsend |= uint64_t(uint64_t(1) << index);
-    else datamapsend |= uint64_t(uint64_t(1) << (index-STATICDATAMAPSIZE));
+    if (index < STATICDATAMAPSIZE) staticdatamapsend |= 1ULL << index;
+    else datamapsend |= 1ULL << (index-STATICDATAMAPSIZE);
   }
   else
   {
-    if (index < STATICDATAMAPSIZE) staticdatamapsend &= 0xFFFF - uint64_t(uint64_t(1) << index);
-    else datamapsend &= 0xFFFF - uint64_t(uint64_t(1) << (index-STATICDATAMAPSIZE));
+    if (index < STATICDATAMAPSIZE) staticdatamapsend &= 0xFFFFFFFF - (1ULL << index);
+    else datamapsend &= 0xFFFFFFFF - (1ULL << (index-STATICDATAMAPSIZE));
   }
 }
 
@@ -925,13 +925,13 @@ void setdatamaponair(uint8_t index, bool state)
 {
   if (state)
   {
-    if (index < STATICDATAMAPSIZE) staticdatamaponair |= uint64_t(uint64_t(1) << index);
-    else datamaponair |= uint64_t(uint64_t(1) << (index-STATICDATAMAPSIZE));
+    if (index < STATICDATAMAPSIZE) staticdatamaponair |= 1ULL << index;
+    else datamaponair |= 1ULL << (index-STATICDATAMAPSIZE);
   }
   else
   {
-    if (index < STATICDATAMAPSIZE) staticdatamaponair &= 0xFFFF - uint64_t(uint64_t(1) << index);
-    else datamaponair &= 0xFFFF - uint64_t(uint64_t(1) << (index-STATICDATAMAPSIZE));
+    if (index < STATICDATAMAPSIZE) staticdatamaponair &= 0xFFFFFFFF - (1ULL << index);
+    else datamaponair &= 0xFFFFFFFF - (1ULL << (index-STATICDATAMAPSIZE));
   }
 }
 
@@ -939,13 +939,13 @@ void setdatamappublishregular(uint8_t index, bool state)
 {
   if (state)
   {
-    if (index < STATICDATAMAPSIZE) staticdatamappublishregular |= uint64_t(uint64_t(1) << index);
-    else datamappublishregular |= uint64_t(uint64_t(1) << (index-STATICDATAMAPSIZE));
+    if (index < STATICDATAMAPSIZE) staticdatamappublishregular |= 1ULL << index;
+    else datamappublishregular |= 1ULL << (index-STATICDATAMAPSIZE);
   }
   else
   {
-    if (index < STATICDATAMAPSIZE) staticdatamappublishregular &= 0xFFFF - uint64_t(uint64_t(1) << index);
-    else datamappublishregular &= 0xFFFF - uint64_t(uint64_t(1) << (index-STATICDATAMAPSIZE));
+    if (index < STATICDATAMAPSIZE) staticdatamappublishregular &= 0xFFFFFFFF - (1ULL << index);
+    else datamappublishregular &= 0xFFFFFFFF - (1ULL << (index-STATICDATAMAPSIZE));
   }
 }
 
@@ -976,7 +976,7 @@ void showdatamap()
 {
   for (uint8_t i = 0; i < getdatamapsize(); i++)
   {
-    Debug.printf(cF("%s=%s (send=%d, onair=%d)\n"), getdatamapkey(i).c_str(), getdatamapbyindex(i).c_str(), getdatamapsend(i), getdatamaponair(i));
+    Debug.printf(cF("%s=%s (send=%d, onair=%d publishregular=%d)\n"), getdatamapkey(i).c_str(), getdatamapbyindex(i).c_str(), getdatamapsend(i), getdatamaponair(i), getdatamappublishregular(i));
     yield();
   }
 }
