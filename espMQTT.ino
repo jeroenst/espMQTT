@@ -909,62 +909,38 @@ uint8_t getdatamapsize()
 
 void setdatamapsend(uint8_t index, bool state)
 {
-  if (state)
-  {
-    if (index < STATICDATAMAPSIZE) staticdatamapsend |= 1ULL << index;
-    else datamapsend |= 1ULL << (index-STATICDATAMAPSIZE);
-  }
-  else
-  {
-    if (index < STATICDATAMAPSIZE) staticdatamapsend &= 0xFFFFFFFF - (1ULL << index);
-    else datamapsend &= 0xFFFFFFFF - (1ULL << (index-STATICDATAMAPSIZE));
-  }
+  if (index < STATICDATAMAPSIZE) bitWrite(staticdatamapsend, index, state);
+  else bitWrite(datamapsend, index-STATICDATAMAPSIZE, state);
 }
 
 void setdatamaponair(uint8_t index, bool state)
 {
-  if (state)
-  {
-    if (index < STATICDATAMAPSIZE) staticdatamaponair |= 1ULL << index;
-    else datamaponair |= 1ULL << (index-STATICDATAMAPSIZE);
-  }
-  else
-  {
-    if (index < STATICDATAMAPSIZE) staticdatamaponair &= 0xFFFFFFFF - (1ULL << index);
-    else datamaponair &= 0xFFFFFFFF - (1ULL << (index-STATICDATAMAPSIZE));
-  }
+  if (index < STATICDATAMAPSIZE) bitWrite(staticdatamaponair, index, state);
+  else bitWrite(datamaponair, index-STATICDATAMAPSIZE, state);
 }
 
 void setdatamappublishregular(uint8_t index, bool state)
 {
-  if (state)
-  {
-    if (index < STATICDATAMAPSIZE) staticdatamappublishregular |= 1ULL << index;
-    else datamappublishregular |= 1ULL << (index-STATICDATAMAPSIZE);
-  }
-  else
-  {
-    if (index < STATICDATAMAPSIZE) staticdatamappublishregular &= 0xFFFFFFFF - (1ULL << index);
-    else datamappublishregular &= 0xFFFFFFFF - (1ULL << (index-STATICDATAMAPSIZE));
-  }
+  if (index < STATICDATAMAPSIZE) bitWrite(staticdatamappublishregular, index, state);
+  else bitWrite(datamappublishregular, index-STATICDATAMAPSIZE, state);
 }
 
 bool getdatamapsend(uint8_t index)
 {
-  if (index < STATICDATAMAPSIZE) return uint64_t(staticdatamapsend & uint64_t(uint64_t(1) << index)) > 0;
-  else return uint64_t(datamapsend & uint64_t(uint64_t(1) << (index-STATICDATAMAPSIZE))) > 0;
+  if (index < STATICDATAMAPSIZE) return bitRead(staticdatamapsend, index);
+  else return bitRead(datamapsend, index-STATICDATAMAPSIZE);
 }
 
 bool getdatamaponair(uint8_t index)
 {
-  if (index < STATICDATAMAPSIZE) return uint64_t(staticdatamaponair & uint64_t(uint64_t(1) << index)) > 0;
-  else return uint64_t(datamaponair & uint64_t(uint64_t(1) << (index-STATICDATAMAPSIZE))) > 0;
+  if (index < STATICDATAMAPSIZE) return bitRead(staticdatamaponair, index);
+  else return bitRead(datamaponair, index-STATICDATAMAPSIZE);
 }
 
 bool getdatamappublishregular(uint8_t index)
 {
-  if (index < STATICDATAMAPSIZE) return uint64_t(staticdatamappublishregular & uint64_t(uint64_t(1) << index)) > 0;
-  else return uint64_t(datamappublishregular & uint64_t(uint64_t(1) << (index-STATICDATAMAPSIZE))) > 0;
+  if (index < STATICDATAMAPSIZE) return bitRead(staticdatamappublishregular, index);
+  else return bitRead(datamappublishregular, index-STATICDATAMAPSIZE);
 }
 
 void setdatamapsendall(bool state = true)
