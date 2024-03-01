@@ -1,6 +1,8 @@
 // Created with information from: https://github.com/klausahrenberg/WThermostatBeca/
 // https://github.com/fashberg/WThermostatBeca/blob/master/WThermostat/WBecaDevice.h
 
+#define receivedCommandLength 140
+
 
 #include "espMQTT.h"
 #include "bht002.h"
@@ -18,7 +20,7 @@ void(*_bht002_callback)(const char *, String);
 void bht002_commandCharsToSerial(unsigned int length, unsigned char* command)
 {
   int chkSum = 0;
-  int i;
+  unsigned int i;
   String commandStr = "";
 
   if (length > 2) {
@@ -42,7 +44,7 @@ void bht002_commandCharsToSerial(unsigned int length, unsigned char* command)
 void bht002_senddevicestate(bool state)
 {
   DEBUG ("Sending On\n");
-  unsigned char bht002Command[] = { 0x55, 0xAA, 0x00, 0x06, 0x00, 0x05, 0x01, 0x01, 0x00, 0x01, state ? 1 : 0 };
+  unsigned char bht002Command[] = { 0x55, 0xAA, 0x00, 0x06, 0x00, 0x05, 0x01, 0x01, 0x00, 0x01, state ? (unsigned char)0x01 : (unsigned char)0x00 };
   bht002_commandCharsToSerial(11, bht002Command);
 }
 
@@ -401,9 +403,8 @@ void bht002_handle()
   static uint8_t bht002_initialize_counter = 0;
 
   const unsigned char BHT002_COMMAND_START[] = {0x55, 0xAA};
-#define receivedCommandLength 140
 
-  static int8_t receiveIndex = -1;
+  static int16_t receiveIndex = -1;
   static uint8_t receivedCommand[receivedCommandLength];
   static uint8_t commandLength = 0;
 
