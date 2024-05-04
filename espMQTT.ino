@@ -38,7 +38,7 @@
 // #define ESPMQTT_OPENTHERM
 // #define ESPMQTT_SMARTMETER
 // #define ESPMQTT_GROWATT
-#define ESPMQTT_GROWATT_MODBUS
+// #define ESPMQTT_GROWATT_MODBUS
 // #define ESPMQTT_SDM120
 // #define ESPMQTT_DDM18SD
 // #define ESPMQTT_WATERMETER
@@ -52,7 +52,7 @@
 // #define ESPMQTT_LIVINGROOM
 // #define ESPMQTT_BBQTEMP
 // #define ESPMQTT_GOODWE
-// #define ESPMQTT_WHR930
+#define ESPMQTT_WHR930
 
 /* ESP8285 */
 // #define ESPMQTT_ZMAI90
@@ -1570,7 +1570,7 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties,
 
 #ifdef ESPMQTT_WHR930
   if (topicstring == mqtt_topicprefix + sF("setfanlevel")) zehnder_whr930.setfanlevel(payloadstring.toInt());
-  if (topicstring == mqtt_topicprefix + sF("setcomforttemperature")) zehnder_whr930.setcomforttemperature(payloadstring.toInt());
+  if (topicstring == mqtt_topicprefix + sF("setcomforttemperature")) zehnder_whr930.setcomforttemperature(payloadstring.toFloat());
 #endif
 }
 

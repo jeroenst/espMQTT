@@ -29,7 +29,7 @@ class ZEHNDER_WHR930
 
     struct
     {
-      uint8_t temperature;
+      uint8_t calculated_temperature;
       bool send = 0;
     } comfort;
 
@@ -41,7 +41,7 @@ class ZEHNDER_WHR930
     void setup();
     static void secondTick(uint16_t uptime);
     void setfanlevel(uint8_t level);
-    void setcomforttemperature(uint8_t temperature);
+    void setcomforttemperature(float temperature); // In 0,5 degrees celcius
 };
 
 extern ZEHNDER_WHR930 zehnder_whr930;

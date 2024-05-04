@@ -50,8 +50,8 @@ void ZEHNDER_WHR930::requestData(bool startSequence)
       case 8:
         if (comfort.send)
         {
-          uint8_t sendData[1] = {comfort.temperature};
-          if (comfort.temperature >= 15 && comfort.temperature <= 27) sendPacket(0x0099, sendData, 1);
+          uint8_t sendData[1] = {comfort.calculated_temperature};
+          sendPacket(0x00D3, sendData, 1);
           comfort.send = false;
         }
         else sendCleared = true;
@@ -122,18 +122,18 @@ void ZEHNDER_WHR930::setfanlevel(uint8_t level)
       if (level <= 4)
       {
         if (Debug.isActive(Debug.DEBUG)) Debug.printf(cF("setfanlevel(%d)\n"), level);
-        zehnder_whr930.fanlevel.level = level;
-        zehnder_whr930.fanlevel.send = true;
+        fanlevel.level = level;
+        fanlevel.send = true;
       }
 }
 
-void ZEHNDER_WHR930::setcomforttemperature(uint8_t temperature)
+void ZEHNDER_WHR930::setcomforttemperature(float temperature)
 {
       if (temperature >= 15 && temperature <= 27)
       {
-        if (Debug.isActive(Debug.DEBUG)) Debug.printf(cF("setcomforttemperature(%d)\n"), temperature);
-        zehnder_whr930.comfort.temperature = temperature;
-        zehnder_whr930.comfort.send = true;
+        if (Debug.isActive(Debug.DEBUG)) Debug.printf(cF("setcomforttemperature(%f)\n"), temperature);
+        comfort.calculated_temperature = (float)((temperature + 20) * 2);
+        comfort.send = true;
       }
 }
 
