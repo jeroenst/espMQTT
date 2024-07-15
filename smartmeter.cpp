@@ -63,7 +63,7 @@ int8_t smartmeter_handle()
       else if (buffer[0] == '!')
       {
         _smartmeter_callback(cF("electricity/watt"), String(watt));
-        _smartmeter_callback(cF("electricity/kwh_total"), String(kwh,3));
+        _smartmeter_callback(cF("electricity/kwh/total"), String(kwh,3));
         _smartmeter_callback(cF("status"), sF("ready"));
       }
       
@@ -76,7 +76,7 @@ int8_t smartmeter_handle()
       else if (sscanf(buffer, "1-0:1.8.1(%f" , &value) == 1)
       {
         kwh += value;
-        _smartmeter_callback(cF("electricity/kwh_used1"), String(value, 3));
+        _smartmeter_callback(cF("electricity/kwh/used/t1"), String(value, 3));
         returnvalue++;
       }
 
@@ -84,7 +84,7 @@ int8_t smartmeter_handle()
       else if (sscanf(buffer, "1-0:1.8.2(%f" , &value) == 1)
       {
         kwh += value;
-        _smartmeter_callback(cF("electricity/kwh_used2"), String(value, 3));
+        _smartmeter_callback(cF("electricity/kwh/used/t2"), String(value, 3));
         returnvalue++;
       }
 
@@ -92,7 +92,7 @@ int8_t smartmeter_handle()
       else if (sscanf(buffer, "1-0:2.8.1(%f" , &value) == 1)
       {
         kwh -= value;
-        _smartmeter_callback(cF("electricity/kwh_provided1"), String(value, 3));
+        _smartmeter_callback(cF("electricity/kwh/provided/t1"), String(value, 3));
         returnvalue++;
       }
 
@@ -100,14 +100,14 @@ int8_t smartmeter_handle()
       else if (sscanf(buffer, "1-0:2.8.2(%f" , &value) == 1)
       {
         kwh -= value;
-        _smartmeter_callback(cF("electricity/kwh_provided2"), String(value, 3));
+        _smartmeter_callback(cF("electricity/kwh/provided/t2"), String(value, 3));
         returnvalue++;
       }
 
       // 1-0:1.7.0 = Electricity actual usage (DSMR v4.0)
       else if (sscanf(buffer, "1-0:1.7.0(%f" , &value) == 1)
       {
-        _smartmeter_callback(cF("electricity/kw_using"), String(value, 3));
+        _smartmeter_callback(cF("electricity/kw/using"), String(value, 3));
         watt += value * 1000;
         returnvalue++;
       }
@@ -115,7 +115,7 @@ int8_t smartmeter_handle()
       // 1-0:2.7.0 = Electricity actual providing (DSMR v4.0)
       else if (sscanf(buffer, "1-0:2.7.0(%f" , &value) == 1)
       {
-        _smartmeter_callback(cF("electricity/kw_providing"), String(value, 3));
+        _smartmeter_callback(cF("electricity/kw/providing"), String(value, 3));
         watt -= value * 1000;
         returnvalue++;
       }
@@ -123,21 +123,21 @@ int8_t smartmeter_handle()
       // 1-0:32.7.0 = Electricity voltage l1 (DSMR v5.0)
       else if (sscanf(buffer, "1-0:32.7.0(%f" , &value) == 1)
       {
-        _smartmeter_callback(cF("electricity/voltage/l1"), String(value, 1));
+        _smartmeter_callback(cF("electricity/voltage/l1"), String(value, 0));
         returnvalue++;
       }
 
       // 1-0:52.7.0 = Electricity voltage l2 (DSMR v5.0)
       else if (sscanf(buffer, "1-0:52.7.0(%f" , &value) == 1)
       {
-        _smartmeter_callback(cF("electricity/voltage/l2"), String(value, 1));
+        _smartmeter_callback(cF("electricity/voltage/l2"), String(value, 0));
         returnvalue++;
       }
 
       // 1-0:72.7.0 = Electricity voltage l3 (DSMR v5.0)
       else if (sscanf(buffer, "1-0:72.7.0(%f" , &value) == 1)
       {
-        _smartmeter_callback(cF("electricity/voltage/l3"), String(value, 1));
+        _smartmeter_callback(cF("electricity/voltage/l3"), String(value, 0));
         returnvalue++;
       }
 
@@ -145,21 +145,21 @@ int8_t smartmeter_handle()
       // 1-0:31.7.0 = Electricity current l1 (DSMR v5.0)
       else if (sscanf(buffer, "1-0:31.7.0(%f" , &value) == 1)
       {
-        _smartmeter_callback(cF("electricity/current/l1"), String(value, 1));
+        _smartmeter_callback(cF("electricity/current/l1"), String(value, 0));
         returnvalue++;
       }
 
       // 1-0:51.7.0 = Electricity current l2 (DSMR v5.0)
       else if (sscanf(buffer, "1-0:51.7.0(%f" , &value) == 1)
       {
-        _smartmeter_callback(cF("electricity/current/l2"), String(value, 1));
+        _smartmeter_callback(cF("electricity/current/l2"), String(value, 0));
         returnvalue++;
       }
 
       // 1-0:71.7.0 = Electricity current l3 (DSMR v5.0)
       else if (sscanf(buffer, "1-0:71.7.0(%f" , &value) == 1)
       {
-        _smartmeter_callback(cF("electricity/current/l3"), String(value, 1));
+        _smartmeter_callback(cF("electricity/current/l3"), String(value, 0));
         returnvalue++;
       }
 
