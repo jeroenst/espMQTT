@@ -120,13 +120,49 @@ int8_t smartmeter_handle()
         returnvalue++;
       }
 
-      // 1-0:32.7.0 = Electricity voltage (DSMR v4.0)
+      // 1-0:32.7.0 = Electricity voltage l1 (DSMR v5.0)
       else if (sscanf(buffer, "1-0:32.7.0(%f" , &value) == 1)
       {
-        _smartmeter_callback(cF("electricity/voltage"), String(value, 1));
+        _smartmeter_callback(cF("electricity/voltage/l1"), String(value, 1));
         returnvalue++;
       }
-      
+
+      // 1-0:52.7.0 = Electricity voltage l2 (DSMR v5.0)
+      else if (sscanf(buffer, "1-0:52.7.0(%f" , &value) == 1)
+      {
+        _smartmeter_callback(cF("electricity/voltage/l2"), String(value, 1));
+        returnvalue++;
+      }
+
+      // 1-0:72.7.0 = Electricity voltage l3 (DSMR v5.0)
+      else if (sscanf(buffer, "1-0:72.7.0(%f" , &value) == 1)
+      {
+        _smartmeter_callback(cF("electricity/voltage/l3"), String(value, 1));
+        returnvalue++;
+      }
+
+
+      // 1-0:31.7.0 = Electricity current l1 (DSMR v5.0)
+      else if (sscanf(buffer, "1-0:31.7.0(%f" , &value) == 1)
+      {
+        _smartmeter_callback(cF("electricity/current/l1"), String(value, 1));
+        returnvalue++;
+      }
+
+      // 1-0:51.7.0 = Electricity current l2 (DSMR v5.0)
+      else if (sscanf(buffer, "1-0:51.7.0(%f" , &value) == 1)
+      {
+        _smartmeter_callback(cF("electricity/current/l2"), String(value, 1));
+        returnvalue++;
+      }
+
+      // 1-0:71.7.0 = Electricity current l3 (DSMR v5.0)
+      else if (sscanf(buffer, "1-0:71.7.0(%f" , &value) == 1)
+      {
+        _smartmeter_callback(cF("electricity/current/l3"), String(value, 1));
+        returnvalue++;
+      }
+
       // 0-1:24.2.1 = Gas (DSMR v4.0)
       else if (sscanf(buffer, "0-1:24.2.1(%2d%2d%2d%2d%2d%2d%c)(%f", &day, &month, &year, &hour, &minute, &second, &summerwinter, &value) == 8)
       {
