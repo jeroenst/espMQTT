@@ -1,7 +1,7 @@
 #include "espMQTT.h"
 #include "smartmeter.h"
 
-#define SMARTMETER_BUFFER_SIZE 100
+#define SMARTMETER_BUFFER_SIZE 500
 
 void(*_smartmeter_callback)(const char*,const String&);
 
@@ -10,11 +10,11 @@ void smartmeter_init(void(*callback)(const char *, const String&))
   _smartmeter_callback = callback;
   
 
-  Serial.setRxBufferSize(1000);
-  Serial.begin(115200);  //Init serial 115200 baud
+  Serial.setRxBufferSize(2000);
+  Serial.begin(115200, SERIAL_8N1, SERIAL_FULL, 1, true);   //Init serial 115200 baud 8N1 inverted
   Serial.setDebugOutput(false);
 
-  U0C0 = BIT(UCRXI) | BIT(UCBN) | BIT(UCBN + 1) | BIT(UCSBN); // Inverse RX
+  //U0C0 = BIT(UCRXI) | BIT(UCBN) | BIT(UCBN + 1) | BIT(UCSBN); // Inverse RX
 
 }
 
@@ -26,7 +26,7 @@ int8_t smartmeter_handle()
   int day, month, year, hour, minute, second;
   char summerwinter;
   static char buffer[SMARTMETER_BUFFER_SIZE];
-  static uint8_t bufpos = 0;
+  static uint16_t bufpos = 0;
   static int watt = 0;
 
   while (Serial.available()) {
