@@ -975,7 +975,7 @@ void putdatamap(const char *topic, const String& value, bool sendupdate, bool fo
   if (dataMap->has(topic))
   {
     datamapPayload = dataMap->get(topic);
-    if ((strcmp (topic , value.c_str()) == 0) && !forceupdate) return;
+    if ((strcmp (datamapPayload , value.c_str()) == 0) && !forceupdate) return;
 
     if (strcmp(topic, cF("status")) == 0)
     {
