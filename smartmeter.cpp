@@ -112,11 +112,60 @@ int8_t smartmeter_handle()
         returnvalue++;
       }
 
+      // 1-0:21.7.0 = Electricity actual usage l1(DSMR v4.0)
+      else if (sscanf(buffer, "1-0:21.7.0(%f" , &value) == 1)
+      {
+        _smartmeter_callback(cF("electricity/kw/using/l1"), String(value, 3));
+        returnvalue++;
+      }
+
+      // 1-0:41.7.0 = Electricity actual usage l2(DSMR v4.0)
+      else if (sscanf(buffer, "1-0:41.7.0(%f" , &value) == 1)
+      {
+        _smartmeter_callback(cF("electricity/kw/using/l2"), String(value, 3));
+        returnvalue++;
+      }
+
+      // 1-0:61.7.0 = Electricity actual usage l3(DSMR v4.0)
+      else if (sscanf(buffer, "1-0:61.7.0(%f" , &value) == 1)
+      {
+        _smartmeter_callback(cF("electricity/kw/using/l3"), String(value, 3));
+        returnvalue++;
+      }
+
       // 1-0:2.7.0 = Electricity actual providing (DSMR v4.0)
       else if (sscanf(buffer, "1-0:2.7.0(%f" , &value) == 1)
       {
         _smartmeter_callback(cF("electricity/kw/providing"), String(value, 3));
         watt -= value * 1000;
+        returnvalue++;
+      }
+
+      // 1-0:22.7.0 = Electricity actual providing l1 (DSMR v4.0)
+      else if (sscanf(buffer, "1-0:22.7.0(%f" , &value) == 1)
+      {
+        _smartmeter_callback(cF("electricity/kw/providing/l1"), String(value, 3));
+        returnvalue++;
+      }
+
+      // 1-0:42.7.0 = Electricity actual providing l1 (DSMR v4.0)
+      else if (sscanf(buffer, "1-0:42.7.0(%f" , &value) == 1)
+      {
+        _smartmeter_callback(cF("electricity/kw/providing/l2"), String(value, 3));
+        returnvalue++;
+      }
+
+      // 1-0:62.7.0 = Electricity actual providing l1 (DSMR v4.0)
+      else if (sscanf(buffer, "1-0:62.7.0(%f" , &value) == 1)
+      {
+        _smartmeter_callback(cF("electricity/kw/providing/l3"), String(value, 3));
+        returnvalue++;
+      }
+
+      // 1-0:41.7.0 = Electricity actual providing l1 (DSMR v4.0)
+      else if (sscanf(buffer, "1-0:21.7.0(%f" , &value) == 1)
+      {
+        _smartmeter_callback(cF("electricity/kw/providing/l1"), String(value, 3));
         returnvalue++;
       }
 
