@@ -10,7 +10,7 @@ void smartmeter_init(void(*callback)(const char *, const String&))
   _smartmeter_callback = callback;
   
 
-  Serial.setRxBufferSize(2000);
+  Serial.setRxBufferSize(1000);
   Serial.begin(115200, SERIAL_8N1, SERIAL_FULL, 1, true);   //Init serial 115200 baud 8N1 inverted
   Serial.setDebugOutput(false);
 
@@ -186,6 +186,7 @@ int8_t smartmeter_handle()
 
       buffer[0] = 0;
       bufpos = 0;
+      continue; // If 1 packet was parsed we continue.
     }
     yield();
   }
