@@ -610,6 +610,7 @@ Adafruit_NeoPixel neopixelleds = Adafruit_NeoPixel(2, NEOPIXELPIN, NEO_RGB + NEO
 #define ESPLED D4
 #define NODEMCULEDPIN D0
 #include "smartmeter.h"
+#undef CPUSLEEP
 #undef SERIALLOG
 #endif
 
