@@ -199,25 +199,25 @@ void ZEHNDER_WHR930::loop()
             case 0x00CE:
                 if (datalength >= 16+3)
               {
-                putdatamap(("fanlevel"), data[13]);
-                putdatamap(("exhaust/fan/current"), data[11]);
-                putdatamap(("exhaust/fan/absent"), data[5]);
-                putdatamap(("exhaust/fan/low"), data[6]);
-                putdatamap(("exhaust/fan/medium"), data[7]);
-                putdatamap(("exhaust/fan/high"), data[15]);
-                putdatamap(("intake/fan/active"), data[14]);
-                putdatamap(("intake/fan/current"), data[12]);
-                putdatamap(("intake/fan/absent"), data[8]);
-                putdatamap(("intake/fan/low"), data[9]);
-                putdatamap(("intake/fan/medium"), data[10]);
-                putdatamap(("intake/fan/high"), data[16]);
+                putdatamap(cF("fanlevel"), data[13]);
+                putdatamap(cF("exhaust/fan/current"), data[11]);
+                putdatamap(cF("exhaust/fan/absent"), data[5]);
+                putdatamap(cF("exhaust/fan/low"), data[6]);
+                putdatamap(cF("exhaust/fan/medium"), data[7]);
+                putdatamap(cF("exhaust/fan/high"), data[15]);
+                putdatamap(cF("intake/fan/active"), data[14]);
+                putdatamap(cF("intake/fan/current"), data[12]);
+                putdatamap(cF("intake/fan/absent"), data[8]);
+                putdatamap(cF("intake/fan/low"), data[9]);
+                putdatamap(cF("intake/fan/medium"), data[10]);
+                putdatamap(cF("intake/fan/high"), data[16]);
               }
             break;
             case 0x000C:
               if (datalength >= 10+3)
               {
-                putdatamap("intake/fan/rpm",  1875000 / ((data[7] << 8) + data[8]));
-                putdatamap("exhaust/fan/rpm", 1875000 / ((data[9] << 8) + data[10]));
+                putdatamap(cF("intake/fan/rpm"),  1875000 / ((data[7] << 8) + data[8]));
+                putdatamap(cF("exhaust/fan/rpm"), 1875000 / ((data[9] << 8) + data[10]));
               }
             break;
             case 0x00D2:
@@ -225,40 +225,40 @@ void ZEHNDER_WHR930::loop()
               {
                 char floatvalue[5];
                 snprintf(floatvalue, 5, "%.1f", float(data[5])/ 2.0 - 20);
-                putdatamap(("comfort/temperature"), floatvalue);
+                putdatamap(cF("comfort/temperature"), floatvalue);
                 snprintf(floatvalue, 5, "%.1f", float(data[6])/ 2.0 - 20);
-                putdatamap(("intake/temperature"), floatvalue);
+                putdatamap(cF("intake/temperature"), floatvalue);
                 snprintf(floatvalue, 5, "%.1f", float(data[7])/ 2.0 - 20);
-                putdatamap(("supply/temperature"), floatvalue);
+                putdatamap(cF("supply/temperature"), floatvalue);
                 snprintf(floatvalue, 5, "%.1f", float(data[8])/ 2.0 - 20);
-                putdatamap(("extract/temperature"), floatvalue);
+                putdatamap(cF("extract/temperature"), floatvalue);
                 snprintf(floatvalue, 5, "%.1f", float(data[9])/ 2.0 - 20);
-                putdatamap(("exhaust/temperature"), floatvalue);
+                putdatamap(cF("exhaust/temperature"), floatvalue);
               }
             break;
             case 0x00DA:
               if (datalength >= 13+3)
               {
-                putdatamap("filterfull", data[13]);
+                putdatamap(cF("filterfull"), data[13]);
               }
             break;
             case 0x00E0:
               if (datalength >= 11+3)
               {
-                putdatamap("bypass/factor", data[7]);
-                putdatamap("bypass/level", data[8]);
-                putdatamap("bypass/correction", data[9]);
-                putdatamap("bypass/summermode", data[11]);
+                putdatamap(cF("bypass/factor"), data[7]);
+                putdatamap(cF("bypass/level"), data[8]);
+                putdatamap(cF("bypass/correction"), data[9]);
+                putdatamap(cF("bypass/summermode"), data[11]);
               }
             break;
             case 0x00E2:
               if (datalength >= 10+3)
               {
-                putdatamap("bypass/status", data[5]);
-                putdatamap("frostprotection/heater", data[7]);
-                putdatamap("frostprotection/status", data[6]);
-                putdatamap("frostprotection/minutes", (data[8] << 8) + data[9]);
-                putdatamap("frostprotection/level", data[10]);
+                putdatamap(cF("bypass/status"), data[5]);
+                putdatamap(cF("frostprotection/heater"), data[7]);
+                putdatamap(cF("frostprotection/status"), data[6]);
+                putdatamap(cF("frostprotection/minutes"), (data[8] << 8) + data[9]);
+                putdatamap(cF("frostprotection/level"), data[10]);
               }
             break;
           }
