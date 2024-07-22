@@ -60,7 +60,7 @@ build ()
 
   echo $VERSION > $HOME/Arduino/espMQTT/builds/v$VERSION/$targetname.version
   gzip -9 $HOME/Arduino/espMQTT/builds/tmp/espMQTT.ino.bin 
-  cp $HOME/Arduino/espMQTT/builds/tmp/espMQTT.ino.bin.gz $HOME'/Arduino/espMQTT/builds/v'$VERSION'/'$targetname'_'$VERSION.bin.gz
+  mv $HOME/Arduino/espMQTT/builds/tmp/espMQTT.ino.bin.gz $HOME'/Arduino/espMQTT/builds/v'$VERSION'/'$targetname'_'$VERSION.bin.gz
 
   echo ''
   echo '###################################################################################################'
@@ -105,7 +105,7 @@ mkdir ./builds/cache
 
 echo $VERSION > version
 FQBN=esp8266com:esp8266:nodemcuv2:xtal=80,vt=flash,exception=disabled,ssl=basic,eesz=4M,led=2,ip=lm2n,dbg=Disabled,lvl=None____,wipe=none
-declare -a TARGETS=("ESPMQTT_WHR930" "ESPMQTT_GROWATT_MODBUS" "ESPMQTT_DDM18SD" "ESPMQTT_WEATHER" "ESPMQTT_AMGPELLETSTOVE" "ESPMQTT_BATHROOM" "ESPMQTT_BEDROOM2" "ESPMQTT_OPENTHERM" "ESPMQTT_SMARTMETER" "ESPMQTT_GROWATT" "ESPMQTT_SDM120" "ESPMQTT_WATERMETER" "ESPMQTT_DDNS" "ESPMQTT_GENERIC8266" "ESPMQTT_MAINPOWERMETER" "ESPMQTT_NOISE" "ESPMQTT_SOIL" "ESPMQTT_DIMMER" "ESPMQTT_OBD2" "ESPMQTT_LIVINGROOM" "ESPMQTT_LIVINGROOM" "ESPMQTT_BBQTEMP")
+declare -a TARGETS=("ESPMQTT_WHR930" "ESPMQTT_GROWATT_MODBUS" "ESPMQTT_DDM18SD" "ESPMQTT_WEATHER" "ESPMQTT_AMGPELLETSTOVE" "ESPMQTT_BATHROOM" "ESPMQTT_BEDROOM2" "ESPMQTT_OPENTHERM" "ESPMQTT_SMARTMETER" "ESPMQTT_GROWATT" "ESPMQTT_SDM120" "ESPMQTT_WATERMETER" "ESPMQTT_DDNS" "ESPMQTT_GENERIC8266" "ESPMQTT_MAINPOWERMETER" "ESPMQTT_NOISE" "ESPMQTT_SOIL" "ESPMQTT_DIMMER" "ESPMQTT_OBD2" "ESPMQTT_LIVINGROOM" "ESPMQTT_BBQTEMP")
 for targetname in "${TARGETS[@]}"
 do
 	if [ "$TARGET" == "" ]
