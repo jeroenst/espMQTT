@@ -403,8 +403,8 @@ int8_t smartmeter_handle()
           if (oldhour != hour)
           {
               oldhour = hour;
-              if (oldgas > 0) smartmetervalues.gas.m3h = (value - oldgas) * 1000;
-              oldgas = value;
+              if (oldgas > 0) smartmetervalues.gas.m3h = (smartmetervalues.gas.m3 - oldgas) * 1000;
+              oldgas = smartmetervalues.gas.m3;
           }
         }
   
