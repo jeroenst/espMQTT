@@ -27,7 +27,7 @@ void growattModbus_init()
 uint8_t growattModbus_request() {
   growattModbus_RxReady = false;
 
-  if (growattModbus_itteration > 3) growattModbus_itteration = 0;
+  if (growattModbus_itteration > 5) growattModbus_itteration = 0;
 
   switch (growattModbus_itteration)
   {
@@ -45,6 +45,12 @@ uint8_t growattModbus_request() {
       break;
     case 3:
       modbus_request_function_code(1, 4, 93, 1);
+      break;
+    case 4:
+      modbus_request_function_code(1, 3, 52, 14);
+      break;
+    case 5:
+      modbus_request_function_code(1, 3, 80, 1);
       break;
   }
   return growattModbus_itteration;
@@ -98,6 +104,17 @@ int8_t growattModbus_read()
 
       case 3:
         putdatamap(cF("inverter/temperature"), String((float)modbus_get_register(0) / 10, 1));
+        break;
+
+      case 4:
+        putdatamap(cF("Vac/high/1"), String((float)modbus_get_register(1) / 10, 1));
+        putdatamap(cF("Vac/high/2"), String((float)modbus_get_register(5) / 10, 1));
+        putdatamap(cF("Vac/high/3"), String((float)modbus_get_register(9) / 10, 1));
+        putdatamap(cF("Vac/high/connect"), String((float)modbus_get_register(13) / 10, 1));
+        break;
+        
+      case 5:
+        putdatamap(cF("Vac/high/10min"), String((float)modbus_get_register(0) / 10, 1));
         putdatamap(cF("status"), sF("ready"));
         break;
     }
@@ -117,7 +134,7 @@ void growattModbus_handle()
   if (growattModbus_RxReady)
   {
     growattModbus_RxReady = false;
-    if (growattModbus_itteration < 4) 
+    if (growattModbus_itteration <= 5) 
     {
       growattModbus_request();
       communicationFinished = false;
