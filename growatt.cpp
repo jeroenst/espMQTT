@@ -188,6 +188,18 @@ void growatt_handle()
           putdatamap(cF("grid/total/kwh"), String(value, 1));
           intvalue = ((uint32_t(RxBuffer[19]) << 24) + (uint32_t(RxBuffer[20]) << 16) + (uint16_t(RxBuffer[21]) << 8) + RxBuffer[22]);
           putdatamap(cF("inverter/hours"), String(intvalue));
+          growatt_send_command(0x44);
+        }
+        if ((RxBuffer[3] == 0x32) && (RxBuffer[4] == 0x44) && (RxBufferPointer >= 20))
+        {
+          value = double((uint16_t(RxBuffer[13]) << 8) + RxBuffer[14]) / 10; // Documentation says factor 100 but it is factor 10
+          putdatamap(cF("Vac/Low"), String(value, 1));
+          value = double((uint16_t(RxBuffer[15]) << 8) + RxBuffer[16]) / 10; // Documentation says factor 100 but it is factor 10
+          putdatamap(cF("Vac/High"), String(value, 1));
+          value = double((uint16_t(RxBuffer[17]) << 8) + RxBuffer[18]) / 100;
+          putdatamap(cF("Fac/Low"), String(value, 1));
+          value = double((uint16_t(RxBuffer[19]) << 8) + RxBuffer[20]) / 100;
+          putdatamap(cF("Fac/High"), String(value, 1));
           putdatamap(cF("status"), sF("ready"));
         }
         RxBufferPointer = 0;
