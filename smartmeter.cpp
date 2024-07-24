@@ -142,13 +142,10 @@ void smartmeter_init(void(*callback)(const char *, const String&))
 {
   _smartmeter_callback = callback;
   
+  Serial.setRxBufferSize(400);
+  Serial.begin(115200, SERIAL_8N1);
 
-  Serial.setRxBufferSize(200);
-  Serial.begin(115200, SERIAL_8N1, SERIAL_FULL, 1, true);   //Init serial 115200 baud 8N1 inverted
-  Serial.setDebugOutput(false);
-
-  //U0C0 = BIT(UCRXI) | BIT(UCBN) | BIT(UCBN + 1) | BIT(UCSBN); // Inverse RX
-
+  U0C0 = BIT(UCRXI) | BIT(UCBN) | BIT(UCBN + 1) | BIT(UCSBN); // Inverse RX
 }
 
 int8_t smartmeter_handle()
@@ -164,16 +161,15 @@ int8_t smartmeter_handle()
 {
   float value = 0;
   int8_t returnvalue = 0;
-  int day, month, year, hour, minute, second;
-  char summerwinter;
   static char buffer[SMARTMETER_BUFFER_SIZE];
   static uint16_t bufpos = 0;
-
+  
   while (Serial.available()) 
   {
     char input = Serial.read() & 127;
+    
     // Fill buffer up to and including a new line (\n)
-    if (bufpos < SMARTMETER_BUFFER_SIZE)
+    if (bufpos < SMARTMETER_BUFFER_SIZE - 1)
     {
         buffer[bufpos++] = input;
     }
@@ -266,25 +262,20 @@ int8_t smartmeter_handle()
         }
         else
         {
-          if (Debug.isActive(Debug.VERBOSE)) Debug.printf(cF("SMARTMETER CRC RECEIVE ERROR\n"));
+          if (Debug.isActive(Debug.ERROR)) Debug.printf(cF("SMARTMETER CRC RECEIVE ERROR\n"));
           _smartmeter_callback(cF("status"), sF("crcerror"));
           return 2;
         }
       }
       else
       {
+        int day, month, year, hour, minute, second;
+        char summerwinter;
+
         currentCRC=CRC16(currentCRC, (unsigned char*)buffer, bufpos);
-          
-        if ((buffer[1] != '-') && (buffer[2] != 0)) 
-        { 
-          if (Debug.isActive(Debug.ERROR)) Debug.printf("SERIAL RECEIVE ERROR\n");
-          bufpos = 0;
-          buffer[0] = 0;          
-          return 3;
-        }
   
         // 1-0:1.8.1 = Electricity low tarif used
-        else if (sscanf(buffer, cF("1-0:1.8.1(%f") , &value) == 1)
+        if (sscanf(buffer, cF("1-0:1.8.1(%f") , &value) == 1)
         {
           smartmetervalues.electricity.kWh.fromgrid.t1 = value * 1000;
         }

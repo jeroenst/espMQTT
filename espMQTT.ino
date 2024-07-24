@@ -17,68 +17,10 @@
    Libraries via Arduino Library Manager:
     (I2C) Wire
 */
+#include "espMQTT.h"
 
 #define DEFAULT_PASSWORD "esplogin"
 #define CPUSLEEP 50
-
-#ifdef ESPMQTT_BUILDSCRIPT
-#define DEBUGLEVEL Debug.DEBUG
-#else
-// Only use defines when when firmware is not compiled from the build script...
-/* SETTINGS */
-#define SERIALLOG
-#define MYTZ TZ_Europe_Amsterdam
-#define DEBUGLEVEL Debug.VERBOSE
-
-/* ESP8266 */
-// #define ESPMQTT_WEATHER
-// #define ESPMQTT_AMGPELLETSTOVE
-// #define ESPMQTT_BATHROOM
-// #define ESPMQTT_BEDROOM2
-// #define ESPMQTT_OPENTHERM
-// #define ESPMQTT_SMARTMETER
-// #define ESPMQTT_GROWATT
-// #define ESPMQTT_GROWATT_MODBUS
-// #define ESPMQTT_SDM120
-// #define ESPMQTT_DDM18SD
-// #define ESPMQTT_WATERMETER
-// #define ESPMQTT_GENERIC8266
-// #define ESPMQTT_MAINPOWERMETER
-// #define ESPMQTT_OBD2
-// #define ESPMQTT_NOISE
-// #define ESPMQTT_SOIL
-// #define ESPMQTT_DIMMER
-// #define ESPMQTT_RELAY
-// #define ESPMQTT_LIVINGROOM
-// #define ESPMQTT_BBQTEMP
-// #define ESPMQTT_GOODWE
-// #define ESPMQTT_WHR930
-
-/* ESP8285 */
-// #define ESPMQTT_ZMAI90
-// #define ESPMQTT_DUCOBOX
-// #define ESPMQTT_SONOFFS20 // coffeelamp & sonoffs20_00X
-// #define ESPMQTT_SONOFFBULB
-// #define ESPMQTT_GARDEN //ESP8285 TUIN & MARIANNE & LUIFEL
-// #define ESPMQTT_SONOFF_FLOORHEATING
-// #define ESPMQTT_IRRIGATION
-// #define ESPMQTT_BLITZWOLF
-// #define ESPMQTT_QSWIFIDIMMERD01
-// #define ESPMQTT_QSWIFIDIMMERD02
-// #define ESPMQTT_SONOFF4CH //ESP8285
-// #define ESPMQTT_SONOFFDUAL
-// #define ESPMQTT_SONOFFS20_PRINTER
-// #define ESPMQTT_SONOFFPOW
-// #define ESPMQTT_SONOFFPOWR2 // tv&washingmachine&server&dishwasher
-// #define ESPMQTT_SONOFFTH
-// #define ESPMQTT_GENERIC8255
-// #define ESPMQTT_BHT002
-// #define ESPMQTT_TUYA_2GANGDIMMERV2
-// #define ESPMQTT_QSWIFISWITCH1C
-// #define ESPMQTT_QSWIFISWITCH2C
-
-#define ESPMQTT_VERSION __DATE__
-#endif
 
 #define APONBOOT
 
@@ -276,8 +218,18 @@ QsWifiSwitch qswifiswitch(QSWIFISWITCHCHANNELS);
 #undef SERIALLOG
 #endif
 
-#ifdef  ESPMQTT_GROWATT_MODBUS
-#define FIRMWARE_TARGET "GROWATT_MODBUS"
+#ifdef  ESPMQTT_GROWATT_MODBUS_1
+#define FIRMWARE_TARGET "GROWATT_MODBUS_1"
+#define NODEMCULEDPIN D0
+#define FLASHBUTTON D3
+#define ESPLED D4
+#include "growattmodbus.h"
+#undef SERIALLOG
+#endif
+
+
+#ifdef  ESPMQTT_GROWATT_MODBUS_2
+#define FIRMWARE_TARGET "GROWATT_MODBUS_2"
 #define NODEMCULEDPIN D0
 #define FLASHBUTTON D3
 #define ESPLED D4
@@ -610,8 +562,9 @@ Adafruit_NeoPixel neopixelleds = Adafruit_NeoPixel(2, NEOPIXELPIN, NEO_RGB + NEO
 #define ESPLED D4
 #define NODEMCULEDPIN D0
 #include "smartmeter.h"
-#undef CPUSLEEP
 #undef SERIALLOG
+#undef CPUSLEEP
+#define CPUSLEEP 5
 #endif
 
 #ifdef  ESPMQTT_DDNS
@@ -1228,8 +1181,9 @@ void update_systeminfo(bool writestaticvalues = false)
 
 void startWifiAP()
 {
-  if (Debug.isActive(Debug.ERROR)) Debug.printf(cF("Starting WiFi Accesspoint\n"));
-  if (WiFi.softAP(WiFi.hostname().c_str(), DEFAULT_PASSWORD, 6, 0))
+  String APName = "ESP-"+sF(FIRMWARE_TARGET)+"-"+chipid;
+  if (Debug.isActive(Debug.ERROR)) Debug.printf(cF("Starting WiFi Accesspoint '%s'\n"),APName.c_str());
+  if (WiFi.softAP(APName.c_str(), DEFAULT_PASSWORD, 6, 0))
   {
     mainstate.accesspoint = true;
     if (Debug.isActive(Debug.INFO)) Debug.printf(cF("WiFi Accesspoint Activated\n"));
@@ -1243,6 +1197,10 @@ void startWifiAP()
 #ifdef ESPMQTT_TUYA_2GANGDIMMERV2
     //tuya_apmode();
 #endif
+  }
+  else
+  {
+    if (Debug.isActive(Debug.ERROR)) Debug.printf(cF("WiFi Accesspoint Activation Failed!\n"));
   }
 }
 
@@ -2317,7 +2275,7 @@ void espmqtt_handle_modules()
   goodwe_handle();
 #endif
 
-#ifdef  ESPMQTT_GROWATT_MODBUS
+#if defined(ESPMQTT_GROWATT_MODBUS_1) || defined (ESPMQTT_GROWATT_MODBUS_2)
   growattModbus_handle();
 #endif
 
@@ -2535,11 +2493,12 @@ void dotasks()
   yield();
 }
 
-void SleepDelay(uint32_t mseconds) {
-  if (mseconds) {
+void SleepDelay(int32_t mseconds) {
+  if (mseconds > 0) {
     uint32_t wait = millis() + mseconds;
     while (wait > millis() && !Serial.available()) {  // We need to service serial buffer ASAP as otherwise we get uart buffer overrun
-      delay(1);
+      ESP.wdtFeed();
+      delayMicroseconds(100);
     }
   } else {
     delay(0);
@@ -2549,18 +2508,6 @@ void SleepDelay(uint32_t mseconds) {
 void loop()
 {
   dotasks();
-
-#ifdef CPUSLEEP
-  static uint32_t my_sleep = 0;
-  if (my_sleep > 0)
-  {
-    uint32_t my_activity = millis() - my_sleep;
-    SleepDelay(CPUSLEEP - my_activity);
-    dotasks();
-  }
-  my_sleep = millis();
-#endif
-
 
   if (WiFi.status() == WL_CONNECTED)
   {
@@ -2835,6 +2782,22 @@ void loop()
   yield();
   ESP.wdtFeed(); // Prevent watchdog to kick in...
 
+  // Before going to sleep handle every tasks and modules
+  dotasks();
+  yield();
+  espmqtt_handle_modules();
+ 
+#ifdef CPUSLEEP
+  static uint32_t my_wakeup = 0;
+  if (my_wakeup > 0)
+  {
+    uint32_t my_activity = millis() - my_wakeup;
+    SleepDelay(CPUSLEEP - my_activity);
+  }
+  my_wakeup = millis();
+#endif
+
+  // After sleep first handle the modules so no (serial) data will be lost
   espmqtt_handle_modules();
   yield();
   dotasks();
@@ -3199,8 +3162,8 @@ void systemTimerCallback()
   ledontime = 1;
   ledofftime = 1;
   if (mainstate.accesspoint) {
-    ledontime = 1;
-    ledofftime = 0;
+    ledontime = 20;
+    ledofftime = 20;
   }
   else if (mainstate.defaultpassword) {
     ledontime = 1;
@@ -3211,7 +3174,7 @@ void systemTimerCallback()
     ledofftime = 50;
   }
   else if (mainstate.wificonnected) {
-    ledontime = 19;
+    ledontime = 20;
     ledofftime = 1;
   }
 
@@ -3489,32 +3452,32 @@ void handleWWWSettings()
     }
 
     webserver.setContentLength(CONTENT_LENGTH_UNKNOWN);
-    webserver.send (200, "text/html", F("<HTML><HEAD><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"></HEAD><BODY><CENTER><div align=\"center\" style=\"width:400px; margin:auto\"><H1>"));
-    webserver.sendContent (WiFi.hostname());
+    webserver.send (200, "text/html", F("<HTML><HEAD><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"></HEAD><BODY><CENTER><div align=\"center\" style=\"width:400px; margin:auto\">"));
+    webserver.sendContent ("<H1>"+WiFi.hostname());
     webserver.sendContent (F("</H1><form action=\"/settings\" method=\"post\" autocomplete=\"off\"><TABLE style=\"width:400px; margin:auto\"><TR><TD style=\"width:160px;\">Hostname</TD><TD style=\"width:240px;\"><input style=\"width:200\" type=\"text\" maxlength=\"40\" name=\"hostname\" value=\""));
     webserver.sendContent (WiFi.hostname());
     webserver.sendContent (F("\"></TD></TR><TR><TD>Wifi SSID</TD><TD><select style=\"width:200\" name=\"wifissid\">"));
     webserver.sendContent (wifiselectoptions);
-    webserver.sendContent (F("</select></TD></TR><TR><TD>wifi Key</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"64\" name=\"wifipsk\" value=\""));
-    webserver.sendContent (String(WiFi.psk()));
-    webserver.sendContent (F("\"></TD></TR><TR><TD>MQTT Server</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttserver\" value=\""));
-    webserver.sendContent (mqtt_server);
-    webserver.sendContent (F("\"></TD></TR><TR><TD>MQTT Port</TD><TD><input style=\"width:200\" type=\"number\" maxlength=\"5\" name=\"mqttport\" value=\""));
-    webserver.sendContent (String(mqtt_port));
+    webserver.sendContent (F("</select></TD></TR><TR><TD>wifi Key</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"64\" name=\"wifipsk\" value="));
+    webserver.sendContent ("\""+String(WiFi.psk()));
+    webserver.sendContent (F("\"></TD></TR><TR><TD>MQTT Server</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttserver\" value="));
+    webserver.sendContent ("\""+mqtt_server);
+    webserver.sendContent (F("\"></TD></TR><TR><TD>MQTT Port</TD><TD><input style=\"width:200\" type=\"number\" maxlength=\"5\" name=\"mqttport\" value="));
+    webserver.sendContent ("\""+String(mqtt_port));
     webserver.sendContent (F("\"></TD></TR><TR><TD>MQTT Ssl</TD><TD ALIGN=\"left\"><input type=\"checkbox\" name=\"mqttssl\" "));
     webserver.sendContent (String(mqtt_ssl ? "checked>" : ">"));
-    webserver.sendContent (F("</TD></TR><TR><TD>MQTT Username</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttusername\" value=\""));
-    webserver.sendContent (mqtt_username);
-    webserver.sendContent (F("\"></TD></TR><TR><TD>MQTT Password</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttpassword\" value=\""));
-    webserver.sendContent (mqtt_password);
-    webserver.sendContent (F("\"></TD></TR><TR><TD>MQTT Topic Prefix</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"50\" name=\"mqtttopicprefix\" value=\""));
-    webserver.sendContent (mqtt_topicprefix);
-    webserver.sendContent (F("\"></TD></TR><TR><TD>ESP Password</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"webpassword\" value=\""));
-    webserver.sendContent (esp_password);
+    webserver.sendContent (F("</TD></TR><TR><TD>MQTT Username</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttusername\" value="));
+    webserver.sendContent ("\""+mqtt_username);
+    webserver.sendContent (F("\"></TD></TR><TR><TD>MQTT Password</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttpassword\" value="));
+    webserver.sendContent ("\""+mqtt_password);
+    webserver.sendContent (F("\"></TD></TR><TR><TD>MQTT Topic Prefix</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"50\" name=\"mqtttopicprefix\" value="));
+    webserver.sendContent ("\""+mqtt_topicprefix);
+    webserver.sendContent (F("\"></TD></TR><TR><TD>ESP Password</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"webpassword\" value="));
+    webserver.sendContent ("\""+esp_password);
     webserver.sendContent (F("\"></TD></TR>"));
 #ifdef  ESPMQTT_WATERMETER
-    webserver.sendContent (F("<TR><TD>Watermeter Liter</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"64\" name=\"watermeterliter\" value=\""));
-    webserver.sendContent (getdatamap("water/liter"));
+    webserver.sendContent (F("<TR><TD>Watermeter Liter</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"64\" name=\"watermeterliter\" value="));
+    webserver.sendContent ("\""+getdatamap("water/liter"));
     webserver.sendContent (F("\"></TD></TR>"));
 #endif
 #ifdef  ESPMQTT_QSWIFIDIMMERD01
@@ -3641,7 +3604,7 @@ void goodwecallback (const char *topic, String payload)
 }
 #endif
 
-#ifdef  ESPMQTT_GROWATT_MODBUS
+#if defined(ESPMQTT_GROWATT_MODBUS_1) || defined (ESPMQTT_GROWATT_MODBUS_2)
 void growattModbuscallback (const char *topic, String payload)
 {
   if (strcmp(topic, cF("status")))
@@ -3973,7 +3936,7 @@ void eeprom_load_variables()
   if (!eeprom_read(&esp_hostname, 4))
   {
     if (Debug.isActive(Debug.ERROR)) Debug.printf(cF("Error reading hostname from internal eeprom\n"));
-    esp_hostname = String(FIRMWARE_TARGET) + "-" + String(chipid);
+    esp_hostname = String(FIRMWARE_TARGET) + "-" + chipid;
   }
   esp_hostname.replace("_", "-"); // RFC doesn't alllow underscores.
   if (Debug.isActive(Debug.INFO)) Debug.printf(cF("Hostname=%s\n"), esp_hostname.c_str());
@@ -4093,7 +4056,8 @@ void setup() {
 
   EEPROM.begin(512);
 
-  snprintf(chipid, 25, cF("%08X"), ESP.getChipId());
+  snprintf(chipid, 9, cF("%08X"), ESP.getChipId());
+  chipid[9] = 0;
 
   configTime(MYTZ, "nl.pool.ntp.org");
   yield();
@@ -4273,7 +4237,7 @@ void setup() {
   goodwe_init(goodwecallback);
 #endif
 
-#ifdef  ESPMQTT_GROWATT_MODBUS
+#if defined(ESPMQTT_GROWATT_MODBUS_1) || defined (ESPMQTT_GROWATT_MODBUS_2)
   growattModbus_init();
 #endif
 
