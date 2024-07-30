@@ -60,6 +60,7 @@ static struct
       } electricity;
       struct {
         uint32_t m3 = UINT32_MAX; // liter
+        uint32_t oldm3 = UINT32_MAX; // liter
         uint16_t m3h = UINT16_MAX; // liter/hour
         char datetime[20] = ""; // date time
       } gas;
@@ -390,12 +391,11 @@ int8_t smartmeter_handle()
           sprintf(smartmetervalues.gas.datetime, cF("%02d-%02d-%02d %d:%02d:%02d"), day, month, year, hour, minute, second);
   
           static uint8_t oldhour = 255;
-          static uint32_t oldgas = 0;
           if (oldhour != hour)
           {
               oldhour = hour;
-              if (oldgas > 0) smartmetervalues.gas.m3h = (smartmetervalues.gas.m3 - oldgas) * 1000;
-              oldgas = smartmetervalues.gas.m3;
+              if (smartmetervalues.gas.oldm3 != UINT32_MAX) smartmetervalues.gas.m3h = (smartmetervalues.gas.m3 - smartmetervalues.gas.oldm3);
+              smartmetervalues.gas.oldm3 = smartmetervalues.gas.m3;
           }
         }
   
