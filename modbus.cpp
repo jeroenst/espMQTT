@@ -18,63 +18,116 @@ uint8_t modbus_RxBufferPointer = 0;
 bool modbux_RxReady = false;
 bool modbux_RxError = false;
 
-void modbus_request_function_code(uint8_t deviceAddress, uint8_t functionCode, uint16_t startAddress, uint16_t numberOfAddresses )
+uint16_t modbus_write_and_calculate_crc(uint16_t crc, uint8_t data)
 {
-  DEBUG_V("Requesting Modbus Data From %02x, FunctionCode: %d, StartAddress: %d, NumberOfAddresses: %d...\n", deviceAddress, functionCode, startAddress, numberOfAddresses);
-  modbux_RxReady = false;
-  modbux_RxError = false;
-  uint8_t TxBuffer[10];
-
-  modbusDeviceAddress = deviceAddress;
-  TxBuffer[0] = deviceAddress; // adres
-  TxBuffer[1] = functionCode; // type
-  TxBuffer[2] = startAddress >> 8; // H startaddress
-  TxBuffer[3] = startAddress & 0xFF; // L startaddress
-  TxBuffer[4] = numberOfAddresses >> 8; // H number of addresses
-  TxBuffer[5] = numberOfAddresses & 0xFF; // L number of addresses
+  Serial.write(data);
 
   //Calc the raw_msg_data_byte CRC code
-  uint16_t crc = 0xFFFF;
-  String crc_string = "";
-  for (int pos = 0; pos < 6; pos++) {
-    crc ^= (uint16_t)TxBuffer[pos];   // XOR byte into least sig. byte of crc
-    for (int i = 8; i != 0; i--) {    // Loop over each bit
-      if ((crc & 0x0001) != 0) {      // If the LSB is set
-        crc >>= 1;                    // Shift right and XOR 0xA001
-        crc ^= 0xA001;
-      }
-      else                            // Else LSB is not set
-        crc >>= 1;                    // Just shift right
+  crc ^= data;   // XOR byte into least sig. byte of crc
+  for (int i = 8; i != 0; i--) {    // Loop over each bit
+    if ((crc & 0x0001) != 0) {      // If the LSB is set
+      crc >>= 1;                    // Shift right and XOR 0xA001
+      crc ^= 0xA001;
     }
+    else                            // Else LSB is not set
+      crc >>= 1;                    // Just shift right
+  }
+  return crc;
+}
+
+uint8_t modbus_send_function_code(uint8_t deviceAddress, uint8_t functionCode, uint16_t startAddress, uint16_t registerCount, uint16_t *data)
+/*
+ * Send funtion code to modbus device
+ * 
+ * Available function codes: 4,5,6,16
+ * 
+ * Return values:
+ * 0 = Data send OK
+ * 1 = Wrong function code
+ * 2 = Wrong number of registers
+ * 3 = Data aray is NULL
+ */
+{
+  uint16_t crc = 0xFFFF;
+
+  modbux_RxReady = false;
+  modbux_RxError = false;
+  modbus_RxBufferPointer = 0;
+  modbusDeviceAddress = deviceAddress;
+
+  switch (functionCode)
+  {
+    case 3:
+    case 4:
+      if ((registerCount == 0) || (registerCount > 30)) return 2;
+    break;
+    case 6:
+      if (registerCount != 1) return 2;
+      if (data == NULL) return 3;
+    break;
+    case 16:
+      if ((registerCount == 0) || (registerCount > 30)) return 2;
+      if (data == NULL) return 3;
+    break;
+    default:
+      return 1;
+    break;
   }
 
-  TxBuffer[6] = crc & 0xFF;
-  TxBuffer[7] = crc >> 8;
-
+  DEBUG_V ("Sending data to modbus Device deviceAddress:%d, functionCode:%d, startAddress%d, registerCount:%d:\n", deviceAddress, functionCode, startAddress, registerCount);
+  
+  crc = modbus_write_and_calculate_crc(crc, deviceAddress);
+  crc = modbus_write_and_calculate_crc(crc, functionCode);
+  crc = modbus_write_and_calculate_crc(crc, startAddress >> 8);
+  crc = modbus_write_and_calculate_crc(crc, startAddress & 0xFF);
+  switch (functionCode)
+  {
+    case 3:
+    case 4:
+      crc = modbus_write_and_calculate_crc(crc, registerCount >> 8);
+      crc = modbus_write_and_calculate_crc(crc, registerCount & 0xFF);
+    break;
+    case 6:
+      crc = modbus_write_and_calculate_crc(crc, data[0] >> 8);
+      crc = modbus_write_and_calculate_crc(crc, data[0] & 0xFF);
+    break;
+    case 16:
+      crc = modbus_write_and_calculate_crc(crc, registerCount >> 8);
+      crc = modbus_write_and_calculate_crc(crc, registerCount & 0xFF);
+      crc = modbus_write_and_calculate_crc(crc, registerCount * 2);
+      for (uint8_t dataPointer = 0; dataPointer < registerCount; dataPointer++)
+      {
+        crc = modbus_write_and_calculate_crc(crc, data[dataPointer] >> 8);
+        crc = modbus_write_and_calculate_crc(crc, data[dataPointer] & 0xFF);    
+      }
+    break;
+  }
+  
+  Serial.write(crc & 0xFF);
+  Serial.write(crc >> 8);
   Serial.flush();
 
-  for (int i = 0; i < 8; i++)
-  {
-    DEBUG_V ("Sending to modbus Device [addr %i] (pointer : %d): %d (0x%02x)\n", TxBuffer[0], i, TxBuffer[i], TxBuffer[i]);
-    yield();
-  }
-
-  for (int i = 0; i < 8; i++)
-  {
-    Serial.write(TxBuffer[i]);
-  }
-
-  modbus_RxBufferPointer = 0;
+  return 0;
 }
 
-void modbus_request_holding_register(uint8_t deviceAddress, uint16_t startRegister, uint16_t numberOfRegisters)
+uint8_t modbus_write_holding_registers(uint8_t deviceAddress, uint16_t startRegister, uint16_t numberOfRegisters, uint16_t *values)
 {
-  modbus_request_function_code(deviceAddress, 3, startRegister, numberOfRegisters);
+  return modbus_send_function_code(deviceAddress, 6, startRegister, numberOfRegisters, values);
 }
 
-void modbus_request_input_register(uint8_t deviceAddress, uint16_t startRegister, uint16_t numberOfRegisters)
+uint8_t modbus_write_holding_register(uint8_t deviceAddress, uint16_t startRegister, uint16_t value)
 {
-  modbus_request_function_code(deviceAddress, 4, startRegister, numberOfRegisters);  
+  return modbus_send_function_code(deviceAddress, 6, startRegister, 1, &value);
+}
+
+uint8_t modbus_request_holding_registers(uint8_t deviceAddress, uint16_t startRegister, uint16_t numberOfRegisters)
+{
+  return modbus_send_function_code(deviceAddress, 3, startRegister, numberOfRegisters, NULL);
+}
+
+uint8_t modbus_request_input_registers(uint8_t deviceAddress, uint16_t startRegister, uint16_t numberOfRegisters)
+{
+  return modbus_send_function_code(deviceAddress, 4, startRegister, numberOfRegisters, NULL);  
 }
 
 void modbus_handle()
@@ -185,11 +238,11 @@ double glue(unsigned int d1, unsigned int d0) {
   t = d1 << 16;
   t += d0;
   return t;
-}
+  }
 
 double modbus_get_two_register_double(uint8_t registerstartid, double devide)
 {
-  if (registerstartid * 2 < modbus_RxBufferPointer)
+  if (registerstartid * 2 <= modbus_RxBufferPointer + 5)
   {
     return glue(modbus_get_register(registerstartid), modbus_get_register(registerstartid+1)) / devide;
   }
