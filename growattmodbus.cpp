@@ -67,7 +67,7 @@ growattModbus_RxReady = false;
       modbus_request_input_registers(1, 0, 11);
       break;
     case 1:
-      modbus_request_input_registers(1, 35, 5);
+      modbus_request_input_registers(1, 35, 15);
       break;
     case 2:
       modbus_request_input_registers(1, 53, 7);
@@ -201,9 +201,16 @@ int8_t growattModbus_read()
 
       case 1:
         putdatamap(cF("grid/watt"), String(modbus_get_two_register_double(0, 10), 1));
-        putdatamap(cF("grid/l1/frequency"), String((float)modbus_get_register(2) / 100, 1));
+        putdatamap(cF("grid/frequency"), String((float)modbus_get_register(2) / 100, 1));
         putdatamap(cF("grid/l1/volt"), String((float)modbus_get_register(3) / 10, 1));
         putdatamap(cF("grid/l1/amp"), String((float)modbus_get_register(4) / 10, 1));
+        putdatamap(cF("grid/l1/watt"), String(modbus_get_two_register_double(5, 10), 1));
+        putdatamap(cF("grid/l2/volt"), String((float)modbus_get_register(7) / 10, 1));
+        putdatamap(cF("grid/l2/amp"), String((float)modbus_get_register(8) / 10, 1));
+        putdatamap(cF("grid/l2/watt"), String(modbus_get_two_register_double(9, 10), 1));
+        putdatamap(cF("grid/l3/volt"), String((float)modbus_get_register(11) / 10, 1));
+        putdatamap(cF("grid/l3/amp"), String((float)modbus_get_register(12) / 10, 1));
+        putdatamap(cF("grid/l3/watt"), String(modbus_get_two_register_double(13, 10), 1));
         break;
 
       case 2:
