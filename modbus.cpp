@@ -112,7 +112,7 @@ uint8_t modbus_send_function_code(uint8_t deviceAddress, uint8_t functionCode, u
 
 uint8_t modbus_write_holding_registers(uint8_t deviceAddress, uint16_t startRegister, uint16_t numberOfRegisters, uint16_t *values)
 {
-  return modbus_send_function_code(deviceAddress, 6, startRegister, numberOfRegisters, values);
+  return modbus_send_function_code(deviceAddress, 16, startRegister, numberOfRegisters, values);
 }
 
 uint8_t modbus_write_holding_register(uint8_t deviceAddress, uint16_t startRegister, uint16_t value)
