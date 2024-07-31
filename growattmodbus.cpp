@@ -162,7 +162,7 @@ int8_t growattModbus_read()
       case 3:
         putdatamap(cF("grid/today/kwh"), String(modbus_get_two_register_double(0, 10), 1));
         putdatamap(cF("grid/total/kwh"), String(modbus_get_two_register_double(2, 10), 1));
-        putdatamap(cF("inverter/seconds"), String(modbus_get_two_register_double(4, 10), 1));
+        putdatamap(cF("inverter/seconds"), String(modbus_get_two_register_double(4, 2), 1));
         putdatamap(cF("inverter/temperature"), String((float)modbus_get_register(6) / 10, 1));
         break;
 
@@ -254,7 +254,7 @@ int8_t growattModbus_read()
       case 3:
         putdatamap(cF("grid/today/kwh"), String(modbus_get_two_register_double(0, 10), 1));
         putdatamap(cF("grid/total/kwh"), String(modbus_get_two_register_double(2, 10), 1));
-        putdatamap(cF("inverter/seconds"), String(modbus_get_two_register_double(4, 10), 1));
+        putdatamap(cF("inverter/seconds"), String(modbus_get_two_register_double(4, 2), 1));
         break;
 
       case 4:
