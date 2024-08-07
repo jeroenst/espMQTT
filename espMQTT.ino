@@ -23,6 +23,8 @@
 #define CPUSLEEP 50
 
 #define APONBOOT
+#define MQTTRESTARTTIMEOUT 600
+#define MQTTRESTARTTIMEOUTONBOOT 3000
 
 #ifdef ESPMQTT_ZMAI90
 #define FIRMWARE_TARGET "ZMAI90"
@@ -575,6 +577,9 @@ Adafruit_NeoPixel neopixelleds = Adafruit_NeoPixel(2, NEOPIXELPIN, NEO_RGB + NEO
 #define ESPLED D4
 #endif
 
+#ifndef FIRMWARE_TARGET
+#error "No target defined! Define target in espMQTT.h or in build options."
+#endif
 
 
 // ################################################################################################################# END OF DEFINES ####################################################################################################################
@@ -629,6 +634,7 @@ struct Mainstate {
   bool accesspoint : 1;
   uint16_t mqttlastsubscribedpacketid = 0;
   uint16_t mqttlastpublishedpacketid = 0;
+  uint32_t mqttdisconnecttime = 0;
 } mainstate;
 
 uint8_t wifichannel = 0;
@@ -1262,6 +1268,9 @@ void onMqttDisconnect(AsyncMqttClientDisconnectReason reason)
   mainstate.mqttconnected = false;
   mainstate.mqttready = false;
   triggers.mqttdisconnected = true;
+#ifdef MQTTRESTARTTIMEOUT
+  mainstate.mqttdisconnecttime = uptime;
+#endif
 }
 
 void onMqttUnsubscribe(uint16_t packetId) {
@@ -2882,6 +2891,12 @@ void loop()
 
     espmqtt_handle_modules_1sec();
   }
+
+  // If there is no connection to MQTT server for 10 minutes reboot
+  if ((mainstate.mqttdisconnecttime > 0) && (uptime > (mainstate.mqttdisconnecttime + MQTTRESTARTTIMEOUT)))
+  {
+    ESP.restart();
+  }
 }
 
 #ifdef SONOFFCH
@@ -4031,6 +4046,9 @@ void setup() {
   mainstate.mqttsenddatamap = false;
   mainstate.defaultpassword = true;
   mainstate.accesspoint = false;
+#if defined(MQTTRESTARTTIMEOUTONBOOT) && defined(MQTTRESTARTTIMEOUT)
+  mainstate.mqttdisconnecttime = max(int(MQTTRESTARTTIMEOUTONBOOT) - int(MQTTRESTARTTIMEOUT), 0);
+#endif
 
   triggers.wificonnected = false;
   triggers.wifidisconnected = false;
