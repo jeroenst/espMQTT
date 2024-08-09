@@ -1255,6 +1255,9 @@ void onMqttConnect(bool sessionPresent) {
   mqttReconnectTimer.detach();
   mainstate.mqttconnected = true;
   triggers.mqttconnected = true;
+#ifdef MQTTRESTARTTIMEOUT
+  mainstate.mqttdisconnecttime = 0;
+#endif
 }
 
 void onMqttDisconnect(AsyncMqttClientDisconnectReason reason)
