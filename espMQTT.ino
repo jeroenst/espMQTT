@@ -221,7 +221,7 @@ QsWifiSwitch qswifiswitch(QSWIFISWITCHCHANNELS);
 #endif
 
 #ifdef  ESPMQTT_GROWATT_MODBUS_1
-#define FIRMWARE_TARGET "GROWATT_MODBUS_1"
+#define FIRMWARE_TARoGET "GROWATT_MODBUS_1"
 #define NODEMCULEDPIN D0
 #define FLASHBUTTON D3
 #define ESPLED D4
@@ -1255,9 +1255,6 @@ void onMqttConnect(bool sessionPresent) {
   mqttReconnectTimer.detach();
   mainstate.mqttconnected = true;
   triggers.mqttconnected = true;
-#ifdef MQTTRESTARTTIMEOUT
-  mainstate.mqttdisconnecttime = 0;
-#endif
 }
 
 void onMqttDisconnect(AsyncMqttClientDisconnectReason reason)
@@ -1271,9 +1268,6 @@ void onMqttDisconnect(AsyncMqttClientDisconnectReason reason)
   mainstate.mqttconnected = false;
   mainstate.mqttready = false;
   triggers.mqttdisconnected = true;
-#ifdef MQTTRESTARTTIMEOUT
-  mainstate.mqttdisconnecttime = uptime;
-#endif
 }
 
 void onMqttUnsubscribe(uint16_t packetId) {
@@ -2590,6 +2584,9 @@ void loop()
 #ifdef ESPMQTT_TUYA_2GANGDIMMERV2
     //tuya_disconnected(); // Don't do this, the device starts beeping....
 #endif
+    #ifdef MQTTRESTARTTIMEOUT
+      mainstate.mqttdisconnecttime = uptime;
+    #endif
   }
   yield();
   ESP.wdtFeed(); // Prevent watchdog to kick in...
@@ -2618,6 +2615,9 @@ void loop()
 #ifdef ESPMQTT_TUYA_2GANGDIMMERV2
     tuya_connectedMQTT();
 #endif
+    #ifdef MQTTRESTARTTIMEOUT
+      mainstate.mqttdisconnecttime = 0;
+    #endif
   }
   yield();
   ESP.wdtFeed(); // Prevent watchdog to kick in...
@@ -2651,6 +2651,9 @@ void loop()
     if (WiFi.isConnected()) {
       mqttReconnectTimer.once(5, connectToMqtt);
     }
+    #ifdef MQTTRESTARTTIMEOUT
+      mainstate.mqttdisconnecttime = uptime;
+    #endif
   }
   yield();
   ESP.wdtFeed(); // Prevent watchdog to kick in...
@@ -3472,10 +3475,10 @@ void handleWWWSettings()
     webserver.setContentLength(CONTENT_LENGTH_UNKNOWN);
     webserver.send (200, "text/html", F("<HTML><HEAD><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"></HEAD><BODY><CENTER><div align=\"center\" style=\"width:400px; margin:auto\">"));
     webserver.sendContent ("<H1>"+WiFi.hostname());
-    webserver.sendContent (F("</H1><form action=\"/settings\" method=\"post\" autocomplete=\"off\"><TABLE style=\"width:400px; margin:auto\"><TR><TD style=\"width:160px;\">Hostname</TD><TD style=\"width:240px;\"><input style=\"width:200\" type=\"text\" maxlength=\"40\" name=\"hostname\" value=\""));
-    webserver.sendContent (WiFi.hostname());
-    webserver.sendContent (F("\"></TD></TR><TR><TD>Wifi SSID</TD><TD><select style=\"width:200\" name=\"wifissid\">"));
-    webserver.sendContent (wifiselectoptions);
+    webserver.sendContent (F("</H1><form action=\"/settings\" method=\"post\" autocomplete=\"off\"><TABLE style=\"width:400px; margin:auto\"><TR><TD style=\"width:160px;\">Hostname</TD><TD style=\"width:240px;\"><input style=\"width:200\" type=\"text\" maxlength=\"40\" name=\"hostname\" value="));
+    webserver.sendContent ("\"" + WiFi.hostname());
+    webserver.sendContent (F("\"></TD></TR><TR><TD>Wifi SSID</TD><TD><select style=\"width:200\" name=\"wifissid\""));
+    webserver.sendContent (">"+wifiselectoptions);
     webserver.sendContent (F("</select></TD></TR><TR><TD>wifi Key</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"64\" name=\"wifipsk\" value="));
     webserver.sendContent ("\""+String(WiFi.psk()));
     webserver.sendContent (F("\"></TD></TR><TR><TD>MQTT Server</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"20\" name=\"mqttserver\" value="));
@@ -3499,15 +3502,15 @@ void handleWWWSettings()
     webserver.sendContent (F("\"></TD></TR>"));
 #endif
 #ifdef  ESPMQTT_QSWIFIDIMMERD01
-    webserver.sendContent (F("<TR><TD>Dimmer Offset</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"3\" name=\"qswifidimoffset\" value=\""));
-    webserver.sendContent (getdatamap("dimoffset"));
+    webserver.sendContent (F("<TR><TD>Dimmer Offset</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"3\" name=\"qswifidimoffset\" value="));
+    webserver.sendContent ("\""+getdatamap("dimoffset"));
     webserver.sendContent (F("\"></TD></TR>"));
 #endif
 #ifdef  ESPMQTT_QSWIFIDIMMERD02
-    webserver.sendContent (F("<TR><TD>Dimmer Offset 0</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"3\" name=\"qswifidimoffset0\" value=\""));
-    webserver.sendContent (getdatamap("dimoffset/0"));
-    webserver.sendContent (F("\"></TD></TR><TR><TD>Dimmer Offset 1</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"3\" name=\"qswifidimoffset1\" value=\""));
-    webserver.sendContent (getdatamap("dimoffset/1"));
+    webserver.sendContent (F("<TR><TD>Dimmer Offset 0</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"3\" name=\"qswifidimoffset0\" value="));
+    webserver.sendContent ("\""+getdatamap("dimoffset/0"));
+    webserver.sendContent (F("\"></TD></TR><TR><TD>Dimmer Offset 1</TD><TD><input style=\"width:200\" type=\"text\" maxlength=\"3\" name=\"qswifidimoffset1\" value="));
+    webserver.sendContent ("\""+getdatamap("dimoffset/1"));
     webserver.sendContent (F("\"></TD></TR>"));
 #endif
     webserver.sendContent (F("</TABLE><BR><input type=\"submit\" value=\"Save Settings\"></form><BR>"));
@@ -3954,7 +3957,7 @@ void eeprom_load_variables()
   if (!eeprom_read(&esp_hostname, 4))
   {
     if (Debug.isActive(Debug.ERROR)) Debug.printf(cF("Error reading hostname from internal eeprom\n"));
-    esp_hostname = String(FIRMWARE_TARGET) + "-" + chipid;
+    esp_hostname = sF(FIRMWARE_TARGET) + "-" + chipid;
   }
   esp_hostname.replace("_", "-"); // RFC doesn't alllow underscores.
   if (Debug.isActive(Debug.INFO)) Debug.printf(cF("Hostname=%s\n"), esp_hostname.c_str());
