@@ -19,8 +19,8 @@ void growattModbus_init()
   Serial.begin(9600);  //Init serial 9600 baud
   Serial.setDebugOutput(false);
 
-  putdatamap(cF("grid/today/kwh"), "-");
-  putdatamap(cF("grid/total/kwh"), "-");
+  putdatamap(F("grid/today/kwh"), F("-"));
+  putdatamap(F("grid/total/kwh"), F("-"));
 
 #if defined(ESPMQTT_GROWATT_MODBUS_2)
   // Write AC Low Limit 1 and AC High Limit 1 
@@ -41,7 +41,7 @@ growattModbus_RxReady = false;
   switch (growattModbus_itteration)
   {
     case 0:
-      putdatamap(cF("status"), sF("querying"));
+      putdatamap(F("status"), F("querying"));
       modbus_request_holding_registers(1, 73, 1);
       break;
     case 1:
@@ -76,7 +76,7 @@ growattModbus_RxReady = false;
   switch (growattModbus_itteration)
   {
     case 0:
-      putdatamap(cF("status"), sF("querying"));
+      putdatamap(F("status"), F("querying"));
       modbus_request_holding_registers(1, 88, 1);
       break;
     case 1:
@@ -117,176 +117,177 @@ int8_t growattModbus_read()
     switch (growattModbus_itteration++)
     {
       case 0:
-        putdatamap(cF("modbus/version"), String((float)modbus_get_register(0) / 100, 2));
+        putdatamap(F("modbus/version"), String((float)modbus_get_register(0) / 100, 2));
         break;
 
       case 1:
         switch (modbus_get_register(0))
         {
-          case 0: putdatamap(cF("inverter/status"), sF("waiting"));
+          case 0: putdatamap(F("inverter/status"), F("waiting"));
             break;
-          case 1: putdatamap(cF("inverter/status"), sF("normal"));
+          case 1: putdatamap(F("inverter/status"), F("normal"));
             break;
-          case 3: putdatamap(cF("inverter/status"), sF("fault"));
+          case 3: putdatamap(F("inverter/status"), F("fault"));
             break;
         }
 
-        putdatamap(cF("inverter/status/value"), String((int)modbus_get_register(0)));
+        putdatamap(F("inverter/status/value"), String((int)modbus_get_register(0)));
 
-        putdatamap(cF("pv/watt"), String(modbus_get_two_register_double(1, 10), 1));
+        putdatamap(F("pv/watt"), String(modbus_get_two_register_double(1, 10), 1));
 
-        putdatamap(cF("pv/1/volt"), String((float)modbus_get_register(3) / 10, 1));
-        putdatamap(cF("pv/1/amp"),  String((float)modbus_get_register(4) / 10, 1));
-        putdatamap(cF("pv/1/watt"), String(modbus_get_two_register_double(5, 10), 1));
+        putdatamap(F("pv/1/volt"), String((float)modbus_get_register(3) / 10, 1));
+        putdatamap(F("pv/1/amp"),  String((float)modbus_get_register(4) / 10, 1));
+        putdatamap(F("pv/1/watt"), String(modbus_get_two_register_double(5, 10), 1));
 
-        putdatamap(cF("pv/2/volt"), String((float)modbus_get_register(7) / 10, 1));
-        putdatamap(cF("pv/2/amp"),  String((float)modbus_get_register(8) / 10, 1));
-        putdatamap(cF("pv/2/watt"), String(modbus_get_two_register_double(9, 10), 1));
+        putdatamap(F("pv/2/volt"), String((float)modbus_get_register(7) / 10, 1));
+        putdatamap(F("pv/2/amp"),  String((float)modbus_get_register(8) / 10, 1));
+        putdatamap(F("pv/2/watt"), String(modbus_get_two_register_double(9, 10), 1));
 
-        putdatamap(cF("grid/watt"), String(modbus_get_two_register_double(11, 10), 1));
-        putdatamap(cF("grid/frequency"),  String((float)modbus_get_register(13) / 100, 2));
+        putdatamap(F("grid/watt"), String(modbus_get_two_register_double(11, 10), 1));
+        putdatamap(F("grid/frequency"),  String((float)modbus_get_register(13) / 100, 2));
         break;
 
       case 2:
-        putdatamap(cF("grid/l1/volt"), String((float)modbus_get_register(0) / 10, 1));
-        putdatamap(cF("grid/l1/amp"), String((float)modbus_get_register(1) / 10, 1));        
-        putdatamap(cF("grid/l1/watt"), String(modbus_get_two_register_double(2, 10), 1));
-        putdatamap(cF("grid/l2/volt"), String((float)modbus_get_register(4) / 10, 1));
-        putdatamap(cF("grid/l2/amp"), String((float)modbus_get_register(5) / 10, 1));        
-        putdatamap(cF("grid/l2/watt"), String(modbus_get_two_register_double(6, 10), 1));
-        putdatamap(cF("grid/l3/volt"), String((float)modbus_get_register(8) / 10, 1));
-        putdatamap(cF("grid/l3/amp"), String((float)modbus_get_register(9) / 10, 1));        
-        putdatamap(cF("grid/l3/watt"), String(modbus_get_two_register_double(10, 10), 1));
+        putdatamap(F("grid/l1/volt"), String((float)modbus_get_register(0) / 10, 1));
+        putdatamap(F("grid/l1/amp"), String((float)modbus_get_register(1) / 10, 1));        
+        putdatamap(F("grid/l1/watt"), String(modbus_get_two_register_double(2, 10), 1));
+        putdatamap(F("grid/l2/volt"), String((float)modbus_get_register(4) / 10, 1));
+        putdatamap(F("grid/l2/amp"), String((float)modbus_get_register(5) / 10, 1));        
+        putdatamap(F("grid/l2/watt"), String(modbus_get_two_register_double(6, 10), 1));
+        putdatamap(F("grid/l3/volt"), String((float)modbus_get_register(8) / 10, 1));
+        putdatamap(F("grid/l3/amp"), String((float)modbus_get_register(9) / 10, 1));        
+        putdatamap(F("grid/l3/watt"), String(modbus_get_two_register_double(10, 10), 1));
         break;
 
       case 3:
-        putdatamap(cF("grid/today/kwh"), String(modbus_get_two_register_double(0, 10), 1));
-        putdatamap(cF("grid/total/kwh"), String(modbus_get_two_register_double(2, 10), 1));
-        putdatamap(cF("inverter/seconds"), String(modbus_get_two_register_double(4, 2), 1));
-        putdatamap(cF("inverter/temperature"), String((float)modbus_get_register(6) / 10, 1));
+        putdatamap(F("grid/today/kwh"), String(modbus_get_two_register_double(0, 10), 1));
+        putdatamap(F("grid/total/kwh"), String(modbus_get_two_register_double(2, 10), 1));
+        putdatamap(F("inverter/seconds"), String(modbus_get_two_register_double(4, 2), 1));
+        putdatamap(F("inverter/temperature"), String((float)modbus_get_register(6) / 10, 1));
         break;
 
       case 4:
-        putdatamap(cF("grid/volt/low/1"), String((float)modbus_get_register(0) / 10, 1));
-        putdatamap(cF("grid/volt/high/1"), String((float)modbus_get_register(1) / 10, 1));
-        putdatamap(cF("grid/freq/low/1"), String((float)modbus_get_register(2) / 100, 1));
-        putdatamap(cF("grid/freq/high/1"), String((float)modbus_get_register(3) / 100, 1));
+        putdatamap(F("grid/volt/low/1"), String((float)modbus_get_register(0) / 10, 1));
+        putdatamap(F("grid/volt/high/1"), String((float)modbus_get_register(1) / 10, 1));
+        putdatamap(F("grid/freq/low/1"), String((float)modbus_get_register(2) / 100, 1));
+        putdatamap(F("grid/freq/high/1"), String((float)modbus_get_register(3) / 100, 1));
         break;
 
       case 5:
-        putdatamap(cF("grid/volt/low/2"), String((float)modbus_get_register(0) / 10, 1));
-        putdatamap(cF("grid/volt/high/2"), String((float)modbus_get_register(1) / 10, 1));
-        putdatamap(cF("grid/freq/low/2"), String((float)modbus_get_register(2) / 100, 1));
-        putdatamap(cF("grid/freq/high/2"), String((float)modbus_get_register(3) / 100, 1));
-        putdatamap(cF("grid/volt/low/connect"), String((float)modbus_get_register(4) / 10, 1));
-        putdatamap(cF("grid/volt/high/connect"), String((float)modbus_get_register(5) / 10, 1));
-        putdatamap(cF("grid/freq/low/connect"), String((float)modbus_get_register(6) / 100, 1));
-        putdatamap(cF("grid/freq/high/connect"), String((float)modbus_get_register(7) / 100, 1));
+        putdatamap(F("grid/volt/low/2"), String((float)modbus_get_register(0) / 10, 1));
+        putdatamap(F("grid/volt/high/2"), String((float)modbus_get_register(1) / 10, 1));
+        putdatamap(F("grid/freq/low/2"), String((float)modbus_get_register(2) / 100, 1));
+        putdatamap(F("grid/freq/high/2"), String((float)modbus_get_register(3) / 100, 1));
+        putdatamap(F("grid/volt/low/connect"), String((float)modbus_get_register(4) / 10, 1));
+        putdatamap(F("grid/volt/high/connect"), String((float)modbus_get_register(5) / 10, 1));
+        putdatamap(F("grid/freq/low/connect"), String((float)modbus_get_register(6) / 100, 1));
+        putdatamap(F("grid/freq/high/connect"), String((float)modbus_get_register(7) / 100, 1));
         break;
 
       case 6:
-        putdatamap(cF("grid/time/low/1"), String(modbus_get_register(0)));
-        putdatamap(cF("grid/time/high/1"), String(modbus_get_register(1)));
-        putdatamap(cF("grid/time/low/2"), String(modbus_get_register(2)));
-        putdatamap(cF("grid/time/high/2"), String(modbus_get_register(3)));
+        putdatamap(F("grid/time/low/1"), String(modbus_get_register(0)));
+        putdatamap(F("grid/time/high/1"), String(modbus_get_register(1)));
+        putdatamap(F("grid/time/low/2"), String(modbus_get_register(2)));
+        putdatamap(F("grid/time/high/2"), String(modbus_get_register(3)));
         break; 
 
       case 7:
-        putdatamap(cF("grid/volt/low/3"), String((float)modbus_get_register(0) / 10, 1));
-        putdatamap(cF("grid/volt/high/3"), String((float)modbus_get_register(1) / 10, 1));
-        putdatamap(cF("grid/time/low/3"), String(modbus_get_register(2)));
-        putdatamap(cF("grid/time/high/3"), String(modbus_get_register(3)));
-        putdatamap(cF("grid/freq/low/3"), String((float)modbus_get_register(4) / 100, 1));
-        putdatamap(cF("grid/freq/high/3"), String((float)modbus_get_register(5) / 100, 1));
+        putdatamap(F("grid/volt/low/3"), String((float)modbus_get_register(0) / 10, 1));
+        putdatamap(F("grid/volt/high/3"), String((float)modbus_get_register(1) / 10, 1));
+        putdatamap(F("grid/time/low/3"), String(modbus_get_register(2)));
+        putdatamap(F("grid/time/high/3"), String(modbus_get_register(3)));
+        putdatamap(F("grid/freq/low/3"), String((float)modbus_get_register(4) / 100, 1));
+        putdatamap(F("grid/freq/high/3"), String((float)modbus_get_register(5) / 100, 1));
         break;
 
       case 8:
-        putdatamap(cF("grid/volt/high/10min"), String((float)modbus_get_register(0) / 10, 1));
-        putdatamap(cF("status"), sF("ready"));
+        putdatamap(F("grid/volt/high/10min"), String((float)modbus_get_register(0) / 10, 1));
+        putdatamap(F("status"), F("ready"));
         break;
     }
 #elif defined(ESPMQTT_GROWATT_MODBUS_2)
     switch (growattModbus_itteration++)
     {
       case 0:
-        putdatamap(cF("modbus/version"), String((float)modbus_get_register(0) / 100, 2));
+        putdatamap(F("modbus/version"), String((float)modbus_get_register(0) / 100, 2));
         break;
 
       case 1:
         switch (modbus_get_register(0))
         {
-          case 0: putdatamap(cF("inverter/status"), sF("waiting"));
+          case 0: putdatamap(F("inverter/status"), F("waiting"));
             break;
-          case 1: putdatamap(cF("inverter/status"), sF("normal"));
+          case 1: putdatamap(F("inverter/status"), F("normal"));
             break;
-          case 3: putdatamap(cF("inverter/status"), sF("fault"));
+          case 3: putdatamap(F("inverter/status"), F("fault"));
             break;
         }
 
 
-        putdatamap(cF("inverter/status/value"), String((int)modbus_get_register(0)));
+        putdatamap(F("inverter/status/value"), String((int)modbus_get_register(0)));
 
-        putdatamap(cF("pv/watt"), String(modbus_get_two_register_double(1, 10), 1));
+        putdatamap(F("pv/watt"), String(modbus_get_two_register_double(1, 10), 1));
 
-        putdatamap(cF("pv/1/volt"), String((float)modbus_get_register(3) / 10, 1));
-        putdatamap(cF("pv/1/amp"),  String((float)modbus_get_register(4) / 10, 1));
-        putdatamap(cF("pv/1/watt"), String(modbus_get_two_register_double(5, 10), 1));
+        putdatamap(F("pv/1/volt"), String((float)modbus_get_register(3) / 10, 1));
+        putdatamap(F("pv/1/amp"),  String((float)modbus_get_register(4) / 10, 1));
+        putdatamap(F("pv/1/watt"), String(modbus_get_two_register_double(5, 10), 1));
 
-        putdatamap(cF("pv/2/volt"), String((float)modbus_get_register(7) / 10, 1));
-        putdatamap(cF("pv/2/amp"),  String((float)modbus_get_register(8) / 10, 1));
-        putdatamap(cF("pv/2/watt"), String(modbus_get_two_register_double(9, 10), 1));
+        putdatamap(F("pv/2/volt"), String((float)modbus_get_register(7) / 10, 1));
+        putdatamap(F("pv/2/amp"),  String((float)modbus_get_register(8) / 10, 1));
+        putdatamap(F("pv/2/watt"), String(modbus_get_two_register_double(9, 10), 1));
         break;
 
       case 2:
-        putdatamap(cF("grid/watt"), String(modbus_get_two_register_double(0, 10), 1));
-        putdatamap(cF("grid/frequency"), String((float)modbus_get_register(2) / 100, 1));
-        putdatamap(cF("grid/l1/volt"), String((float)modbus_get_register(3) / 10, 1));
-        putdatamap(cF("grid/l1/amp"), String((float)modbus_get_register(4) / 10, 1));
-        putdatamap(cF("grid/l1/watt"), String(modbus_get_two_register_double(5, 10), 1));
-        putdatamap(cF("grid/l2/volt"), String((float)modbus_get_register(7) / 10, 1));
-        putdatamap(cF("grid/l2/amp"), String((float)modbus_get_register(8) / 10, 1));
-        putdatamap(cF("grid/l2/watt"), String(modbus_get_two_register_double(9, 10), 1));
-        putdatamap(cF("grid/l3/volt"), String((float)modbus_get_register(11) / 10, 1));
-        putdatamap(cF("grid/l3/amp"), String((float)modbus_get_register(12) / 10, 1));
-        putdatamap(cF("grid/l3/watt"), String(modbus_get_two_register_double(13, 10), 1));
+        putdatamap(F("grid/watt"), String(modbus_get_two_register_double(0, 10), 1));
+        putdatamap(F("grid/frequency"), String((float)modbus_get_register(2) / 100, 1));
+        putdatamap(F("grid/l1/volt"), String((float)modbus_get_register(3) / 10, 1));
+        putdatamap(F("grid/l1/amp"), String((float)modbus_get_register(4) / 10, 1));
+        putdatamap(F("grid/l1/watt"), String(modbus_get_two_register_double(5, 10), 1));
+        putdatamap(F("grid/l2/volt"), String((float)modbus_get_register(7) / 10, 1));
+        putdatamap(F("grid/l2/amp"), String((float)modbus_get_register(8) / 10, 1));
+        putdatamap(F("grid/l2/watt"), String(modbus_get_two_register_double(9, 10), 1));
+        putdatamap(F("grid/l3/volt"), String((float)modbus_get_register(11) / 10, 1));
+        putdatamap(F("grid/l3/amp"), String((float)modbus_get_register(12) / 10, 1));
+        putdatamap(F("grid/l3/watt"), String(modbus_get_two_register_double(13, 10), 1));
         break;
 
       case 3:
-        putdatamap(cF("grid/today/kwh"), String(modbus_get_two_register_double(0, 10), 1));
-        putdatamap(cF("grid/total/kwh"), String(modbus_get_two_register_double(2, 10), 1));
-        putdatamap(cF("inverter/seconds"), String(modbus_get_two_register_double(4, 2), 1));
+        putdatamap(F("grid/today/kwh"), String(modbus_get_two_register_double(0, 10), 1));
+        putdatamap(F("grid/total/kwh"), String(modbus_get_two_register_double(2, 10), 1));
+        putdatamap(F("inverter/seconds"), String(modbus_get_two_register_double(4, 2), 1));
         break;
 
       case 4:
-        putdatamap(cF("inverter/temperature"), String((float)modbus_get_register(0) / 10, 1));
+        putdatamap(F("inverter/temperature"), String((float)modbus_get_register(0) / 10, 1));
         break;
 
       case 5:
-        putdatamap(cF("grid/volt/low/1"), String((float)modbus_get_register(0) / 10, 1));
-        putdatamap(cF("grid/volt/high/1"), String((float)modbus_get_register(1) / 10, 1));
-        putdatamap(cF("grid/freq/low/1"), String((float)modbus_get_register(2) / 100, 1));
-        putdatamap(cF("grid/freq/high/1"), String((float)modbus_get_register(3) / 100, 1));
-        putdatamap(cF("grid/volt/low/2"), String((float)modbus_get_register(4) / 10, 1));
-        putdatamap(cF("grid/volt/high/2"), String((float)modbus_get_register(5) / 10, 1));
-        putdatamap(cF("grid/freq/low/2"), String((float)modbus_get_register(6) / 100, 1));
-        putdatamap(cF("grid/freq/high/2"), String((float)modbus_get_register(7) / 100, 1));
-        putdatamap(cF("grid/volt/low/3"), String((float)modbus_get_register(8) / 10, 1));
-        putdatamap(cF("grid/volt/high/3"), String((float)modbus_get_register(9) / 10, 1));
-        putdatamap(cF("grid/freq/low/3"), String((float)modbus_get_register(10) / 100, 1));
-        putdatamap(cF("grid/freq/high/3"), String((float)modbus_get_register(11) / 100, 1));
-        putdatamap(cF("grid/volt/low/connect"), String((float)modbus_get_register(12) / 10, 1));
-        putdatamap(cF("grid/volt/high/connect"), String((float)modbus_get_register(13) / 10, 1));
-        putdatamap(cF("grid/freq/low/connect"), String((float)modbus_get_register(14) / 100, 1));
-        putdatamap(cF("grid/freq/high/connect"), String((float)modbus_get_register(15) / 100, 1));
-        putdatamap(cF("grid/time/low/1"), String(modbus_get_register(16)));
-        putdatamap(cF("grid/time/high/1"), String(modbus_get_register(17)));
-        putdatamap(cF("grid/time/low/2"), String(modbus_get_register(18)));
-        putdatamap(cF("grid/time/high/2"), String(modbus_get_register(19)));
+        putdatamap(F("grid/volt/low/1"), String((float)modbus_get_register(0) / 10, 1));
+        putdatamap(F("grid/volt/high/1"), String((float)modbus_get_register(1) / 10, 1));
+        putdatamap(F("grid/freq/low/1"), String((float)modbus_get_register(2) / 100, 1));
+        putdatamap(F("grid/freq/high/1"), String((float)modbus_get_register(3) / 100, 1));
+        putdatamap(F("grid/volt/low/2"), String((float)modbus_get_register(4) / 10, 1));
+        putdatamap(F("grid/volt/high/2"), String((float)modbus_get_register(5) / 10, 1));
+        putdatamap(F("grid/freq/low/2"), String((float)modbus_get_register(6) / 100, 1));
+        putdatamap(F("grid/freq/high/2"), String((float)modbus_get_register(7) / 100, 1));
+        putdatamap(F("grid/volt/low/3"), String((float)modbus_get_register(8) / 10, 1));
+        putdatamap(F("grid/volt/high/3"), String((float)modbus_get_register(9) / 10, 1));
+        putdatamap(F("grid/freq/low/3"), String((float)modbus_get_register(10) / 100, 1));
+        putdatamap(F("grid/freq/high/3"), String((float)modbus_get_register(11) / 100, 1));
+        putdatamap(F("grid/volt/low/connect"), String((float)modbus_get_register(12) / 10, 1));
+        putdatamap(F("grid/volt/high/connect"), String((float)modbus_get_register(13) / 10, 1));
+        putdatamap(F("grid/freq/low/connect"), String((float)modbus_get_register(14) / 100, 1));
+        putdatamap(F("grid/freq/high/connect"), String((float)modbus_get_register(15) / 100, 1));
+        putdatamap(F("grid/time/low/1"), String(modbus_get_register(16)));
+        putdatamap(F("grid/time/high/1"), String(modbus_get_register(17)));
+        putdatamap(F("grid/time/low/2"), String(modbus_get_register(18)));
+        putdatamap(F("grid/time/high/2"), String(modbus_get_register(19)));
       break;
         
       case 6:
-        putdatamap(cF("grid/volt/high/10min"), String((float)modbus_get_register(0) / 10, 1));
-        putdatamap(cF("status"), sF("ready"));
+        putdatamap(F("grid/volt/high/10min"), String((float)modbus_get_register(0) / 10, 1));
+        putdatamap(F("status"), F("ready"));
+        growattModbus_errorCounter = 0;
         break;
     }
 #endif
@@ -294,13 +295,12 @@ int8_t growattModbus_read()
     modbus_clear_buffer();
     return growattModbus_itteration;
   }
-  else return -1;
+  return -1;
 }
 
 void growattModbus_handle()
 {
   static long long timeout = GROWATTMODBUS_WAIT_AFTER_STARTUP_TIMEOUT;
-  static bool communicationFinished = false;
 
   // When receiving has finished request next packet if it's not the last packet of sequence
   // and set timeout for next request round
@@ -310,14 +310,11 @@ void growattModbus_handle()
     if (growattModbus_itteration < 255) 
     {
       growattModbus_request();
-      communicationFinished = false;
     }
     else 
     {
       modbus_clear_buffer();
-      communicationFinished = true;
     }
-    growattModbus_errorCounter = 0;
     timeout = millis() + (GROWATTMODBUS_TIMEOUT * 1000);
   }
 
@@ -327,37 +324,36 @@ void growattModbus_handle()
   {
       if (growattModbus_errorCounter > 4)
       {
-        putdatamap(cF("inverter/status"), sF("offline"));
-        putdatamap(cF("inverter/status/value"), sF("-"));
-        putdatamap(cF("pv/watt"), sF("-"));
-        putdatamap(cF("pv/1/volt"), sF("-"));
-        putdatamap(cF("pv/1/amp"), sF("-"));
-        putdatamap(cF("pv/1/watt"), sF("-"));
-        putdatamap(cF("pv/2/volt"), sF("-"));
-        putdatamap(cF("pv/2/amp"), sF("-"));
-        putdatamap(cF("pv/2/watt"), sF("-"));
-        putdatamap(cF("grid/l1/volt"), sF("-"));
-        putdatamap(cF("grid/l1/amp"), sF("-"));
-        putdatamap(cF("grid/l1/watt"), sF("-"));
-        putdatamap(cF("grid/l2/volt"), sF("-"));
-        putdatamap(cF("grid/l2/amp"), sF("-"));
-        putdatamap(cF("grid/l2/watt"), sF("-"));
-        putdatamap(cF("grid/l3/volt"), sF("-"));
-        putdatamap(cF("grid/l3/amp"), sF("-"));
-        putdatamap(cF("grid/l3/watt"), sF("-"));
-        putdatamap(cF("grid/watt"), sF("-"));
-        putdatamap(cF("inverter/temperature"), sF("-"));
-        putdatamap(cF("status"), sF("commerror"));
+        putdatamap(F("inverter/status"), F("offline"));
+        putdatamap(F("inverter/status/value"), F("-"));
+        putdatamap(F("pv/watt"), F("-"));
+        putdatamap(F("pv/1/volt"), F("-"));
+        putdatamap(F("pv/1/amp"), F("-"));
+        putdatamap(F("pv/1/watt"), F("-"));
+        putdatamap(F("pv/2/volt"), F("-"));
+        putdatamap(F("pv/2/amp"), F("-"));
+        putdatamap(F("pv/2/watt"), F("-"));
+        putdatamap(F("grid/l1/volt"), F("-"));
+        putdatamap(F("grid/l1/amp"), F("-"));
+        putdatamap(F("grid/l1/watt"), F("-"));
+        putdatamap(F("grid/l2/volt"), F("-"));
+        putdatamap(F("grid/l2/amp"), F("-"));
+        putdatamap(F("grid/l2/watt"), F("-"));
+        putdatamap(F("grid/l3/volt"), F("-"));
+        putdatamap(F("grid/l3/amp"), F("-"));
+        putdatamap(F("grid/l3/watt"), F("-"));
+        putdatamap(F("grid/watt"), F("-"));
+        putdatamap(F("grid/frequency"), F("-"));
+        putdatamap(F("inverter/temperature"), F("-"));
+        putdatamap(F("status"), F("commerror"));
       }
       else 
       {
-        if (!communicationFinished) if (Debug.isActive(Debug.ERROR)) Debug.printf(cF("Modbus Receive Error!\n"));
+        if (Debug.isActive(Debug.ERROR)) Debug.printf(cF("Modbus Receive Error!\n"));
         growattModbus_errorCounter++;
       }
-      modbus_clear_buffer();
-      timeout = millis() + (GROWATTMODBUS_TIMEOUT * 1000);
       growattModbus_itteration = 0;
-      growattModbus_request();
+      growattModbus_RxReady = true;
   }
 
   modbus_handle();
