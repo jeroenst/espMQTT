@@ -34,7 +34,7 @@ void growatt_init(int fanpin)
     _growatt_fan_pid_d = 0;
   }
 
-  putdatamap(cF("grid/today/kwh"), "-");
+  putdatamap(F("grid/today/kwh"), "-");
   putdatamap(cF("grid/total/kwh"), "-");
   putdatamap(cF("inverter/hours"), "-");
 }
@@ -79,27 +79,27 @@ void growatt_handle()
 
     if (!RxPowerDataOk)
     {
-      putdatamap(cF("inverter/status"), sF("offline"));
-      putdatamap(cF("inverter/status/value"), "-");
-      putdatamap(cF("pv/1/volt"), "-");
-      putdatamap(cF("pv/2/volt"), "-");
-      putdatamap(cF("pv/watt"), "-");
-      putdatamap(cF("grid/volt"), "-");
-      putdatamap(cF("grid/amp"), "-");
-      putdatamap(cF("grid/frequency"), "-");
-      putdatamap(cF("grid/watt"), "-");
-      putdatamap(cF("fault/temperature"), "-");
-      putdatamap(cF("fault/type"), "-");
-      putdatamap(cF("temperature"), "-");
-      putdatamap(cF("status"), sF("commerror").c_str());
-      putdatamap(cF("grid/today/kwh"), "-");
+      putdatamap(F("inverter/status"), F("offline"));
+      putdatamap(F("inverter/status/value"), F("-"));
+      putdatamap(F("pv/1/volt"), F("-"));
+      putdatamap(F("pv/2/volt"), F("-"));
+      putdatamap(F("pv/watt"), F("-"));
+      putdatamap(F("grid/volt"), F("-"));
+      putdatamap(F("grid/amp"), F("-"));
+      putdatamap(F("grid/frequency"), F("-"));
+      putdatamap(F("grid/watt"), F("-"));
+      putdatamap(F("fault/temperature"), F("-"));
+      putdatamap(F("fault/type"), F("-"));
+      putdatamap(F("temperature"), F("-"));
+      putdatamap(F("status"), F("commerror"));
+      putdatamap(F("grid/today/kwh"), F("-"));
       if (_growatt_fanpin >= 0)
       {
          putdatamap(cF("fanspeed"), "0");
          analogWrite(_growatt_fanpin, 0);
       }
     }
-    else putdatamap(cF("status"), sF("querying").c_str());
+    else putdatamap(F("status"), F("querying"));
     RxPowerDataOk = 0;
     growatt_send_command(0x41);
   }
@@ -133,29 +133,29 @@ void growatt_handle()
         {
           if (Debug.isActive(Debug.DEBUG)) Debug.printf(cF("Received power data from Growatt Inverter...\n"));
           intvalue = RxBuffer[6];
-          putdatamap(cF("inverter/status/value"), String(intvalue));
-          putdatamap(cF("inverter/status"), intvalue == 0 ? sF("waiting") : intvalue == 1 ? sF("ready") : intvalue == 3 ? sF("fault") : sF("unknown"));
+          putdatamap(F("inverter/status/value"), String(intvalue));
+          putdatamap(F("inverter/status"), intvalue == 0 ? F("waiting") : intvalue == 1 ? F("ready") : intvalue == 3 ? F("fault") : F("unknown"));
           value = double((uint16_t(RxBuffer[7]) << 8) + RxBuffer[8]) / 10;
-          putdatamap(cF("pv/1/volt"), String(value, 1));
+          putdatamap(F("pv/1/volt"), String(value, 1));
           value = double((uint16_t(RxBuffer[9]) << 8) + RxBuffer[10]) / 10;
-          putdatamap(cF("pv/2/volt"), String(value, 1));
+          putdatamap(F("pv/2/volt"), String(value, 1));
           value = double((uint16_t(RxBuffer[11]) << 8) + RxBuffer[12]) / 10;
-          putdatamap(cF("pv/watt"), String(value, 1));
+          putdatamap(F("pv/watt"), String(value, 1));
           value = double((uint16_t(RxBuffer[13]) << 8) + RxBuffer[14]) / 10;
           pvwatt = value;
-          putdatamap(cF("grid/volt"), String(value, 1));
+          putdatamap(F("grid/volt"), String(value, 1));
           value = double((uint16_t(RxBuffer[15]) << 8) + RxBuffer[16]) / 10;
-          putdatamap(cF("grid/amp"), String(value, 1));
+          putdatamap(F("grid/amp"), String(value, 1));
           value = double((uint16_t(RxBuffer[17]) << 8) + RxBuffer[18]) / 100;
-          putdatamap(cF("grid/frequency"), String(value, 1));
+          putdatamap(F("grid/frequency"), String(value, 1));
           value = double((uint16_t(RxBuffer[19]) << 8) + RxBuffer[20]) / 10;
-          putdatamap(cF("grid/watt"), String(value, 1));
+          putdatamap(F("grid/watt"), String(value, 1));
           value = double((uint16_t(RxBuffer[33]) << 8) + RxBuffer[34]) / 10;
-          putdatamap(cF("fault/temperature"), String(value, 1));
+          putdatamap(F("fault/temperature"), String(value, 1));
           intvalue = double((uint16_t(RxBuffer[35]) << 8) + RxBuffer[36]);
-          putdatamap(cF("fault/type"), String(intvalue));
+          putdatamap(F("fault/type"), String(intvalue));
           value = double((uint16_t(RxBuffer[37]) << 8) + RxBuffer[38]) / 10;
-          putdatamap(cF("temperature"), String(value, 1));
+          putdatamap(F("temperature"), String(value, 1));
           if (_growatt_fanpin >= 0)
           {
             //if (value >= GROWATT_FANSPEED_MINTEMP) digitalWrite(_growatt_fanpin,1);
@@ -173,7 +173,7 @@ void growatt_handle()
             if (_growatt_fan_pid_error >= 0) fanstop = 0;
             if (fanstop == 1) _growatt_fanspeed = 0;
             analogWrite(_growatt_fanpin, _growatt_fanspeed);
-            putdatamap(cF("fanspeed"), String((100 * _growatt_fanspeed)/PWMRANGE));
+            putdatamap(F("fanspeed"), String((100 * _growatt_fanspeed)/PWMRANGE));
             if (Debug.isActive(Debug.DEBUG)) Debug.printf(cF("Temperature=%.01f, Fanspeed=%d\n"), value, _growatt_fanspeed);
           }
           RxPowerDataOk = 1;
@@ -183,24 +183,24 @@ void growatt_handle()
         {
           if (Debug.isActive(Debug.DEBUG)) Debug.printf(cF("Received energy data from Growatt Inverter...\n"));
           value = double((uint16_t(RxBuffer[13]) << 8) + RxBuffer[14]) / 10;
-          if (pvwatt > 1) putdatamap(cF("grid/today/kwh"), String(value, 1)); // Only reset today value when pvwatt above 1 watt otherwise this gets resets during shutdown
+          if (pvwatt > 1) putdatamap(F("grid/today/kwh"), String(value, 1)); // Only reset today value when pvwatt above 1 watt otherwise this gets resets during shutdown
           value = double((uint32_t(RxBuffer[15]) << 24) + (uint32_t(RxBuffer[16]) << 16) + (uint16_t(RxBuffer[17]) << 8) + RxBuffer[18]) / 10;
-          putdatamap(cF("grid/total/kwh"), String(value, 1));
+          putdatamap(F("grid/total/kwh"), String(value, 1));
           intvalue = ((uint32_t(RxBuffer[19]) << 24) + (uint32_t(RxBuffer[20]) << 16) + (uint16_t(RxBuffer[21]) << 8) + RxBuffer[22]);
-          putdatamap(cF("inverter/hours"), String(intvalue));
+          putdatamap(F("inverter/hours"), String(intvalue));
           growatt_send_command(0x44);
         }
         if ((RxBuffer[3] == 0x32) && (RxBuffer[4] == 0x44) && (RxBufferPointer >= 20))
         {
           value = double((uint16_t(RxBuffer[13]) << 8) + RxBuffer[14]) / 10; // Documentation says factor 100 but it is factor 10
-          putdatamap(cF("Vac/Low"), String(value, 1));
+          putdatamap(F("Vac/Low"), String(value, 1));
           value = double((uint16_t(RxBuffer[15]) << 8) + RxBuffer[16]) / 10; // Documentation says factor 100 but it is factor 10
-          putdatamap(cF("Vac/High"), String(value, 1));
+          putdatamap(F("Vac/High"), String(value, 1));
           value = double((uint16_t(RxBuffer[17]) << 8) + RxBuffer[18]) / 100;
-          putdatamap(cF("Fac/Low"), String(value, 1));
+          putdatamap(F("Fac/Low"), String(value, 1));
           value = double((uint16_t(RxBuffer[19]) << 8) + RxBuffer[20]) / 100;
-          putdatamap(cF("Fac/High"), String(value, 1));
-          putdatamap(cF("status"), sF("ready"));
+          putdatamap(F("Fac/High"), String(value, 1));
+          putdatamap(F("status"), sF("ready"));
         }
         RxBufferPointer = 0;
       }
