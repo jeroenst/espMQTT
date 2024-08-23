@@ -74,7 +74,7 @@ uint8_t modbus_send_function_code(uint8_t deviceAddress, uint8_t functionCode, u
     break;
   }
 
-  DEBUG_V ("Sending data to modbus Device deviceAddress:%d, functionCode:%d, startAddress%d, registerCount:%d:\n", deviceAddress, functionCode, startAddress, registerCount);
+  DEBUG_V ("Sending data to modbus Device deviceAddress:%d, functionCode:%d, startAddress%d, registerCount:%d\n", deviceAddress, functionCode, startAddress, registerCount);
   
   crc = modbus_write_and_calculate_crc(crc, deviceAddress);
   crc = modbus_write_and_calculate_crc(crc, functionCode);
