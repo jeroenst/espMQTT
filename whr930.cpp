@@ -21,6 +21,7 @@ void ZEHNDER_WHR930::requestData(bool startSequence)
     switch (sendCounter)
     {
       case 1:
+        putdatamap(cF("status"), F("querying"));
         sendPacket(0x00CD);
       break;
       case 2:
@@ -259,6 +260,7 @@ void ZEHNDER_WHR930::loop()
                 putdatamap(cF("frostprotection/status"), data[6]);
                 putdatamap(cF("frostprotection/minutes"), (data[8] << 8) + data[9]);
                 putdatamap(cF("frostprotection/level"), data[10]);
+                putdatamap(cF("status"), F("ready"));
               }
             break;
           }
