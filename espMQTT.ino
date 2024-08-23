@@ -36,6 +36,7 @@ uint8_t zmai90pointer = 255;
 #endif
 
 #ifdef  ESPMQTT_SONOFFS20_PRINTER
+#undef MQTTRESTARTTIMEOUT
 #define FIRMWARE_TARGET "SONOFFS20_PRINTER"
 #define  ESPMQTT_SONOFFS20
 #define SONOFFCH_TIMEOUT 1800
@@ -44,15 +45,17 @@ static bool sonoffch_timeout_enabled[1] = {1};
 #endif
 
 #ifdef  ESPMQTT_SONOFF_FLOORHEATING
+#undef MQTTRESTARTTIMEOUT
+#undef SERIALLOG
 #define FIRMWARE_TARGET "SONOFF_FLOORHEATING"
 #define  ESPMQTT_SONOFFS20
 // Use RX pin for onewire
 #define ONEWIREPIN 3
-#undef SERIALLOG
 #define SONOFF_FLOORHEATING_TEMPMAX 45
 #endif
 
 #ifdef  ESPMQTT_DIMMER
+#undef MQTTRESTARTTIMEOUT
 #define FIRMWARE_TARGET "DIMMER"
 #define TRIAC_PIN D1
 #define ZEROCROSS_PIN D2
@@ -70,22 +73,22 @@ static bool sonoffch_timeout_enabled[1] = {1};
 #endif
 
 #ifdef  ESPMQTT_SDM120
+#undef SERIALLOG
 #define FIRMWARE_TARGET "SDM120"
 #define FLASHBUTTON D3
 #define ESPLED D4
 #define NODEMCULEDPIN D0
-#undef SERIALLOG
 HardwareSerial serSDM(0);
 #include <SDM.h>
 SDM sdm(serSDM, 2400);
 #endif
 
 #ifdef  ESPMQTT_DDM18SD
+#undef SERIALLOG
 #define FIRMWARE_TARGET "DDM18SD"
 #define FLASHBUTTON D3
 #define ESPLED D4
 #define NODEMCULEDPIN D0
-#undef SERIALLOG
 HardwareSerial serSDM(0);
 #include <SDM.h>
 SDM sdm(serSDM, 2400);
@@ -107,17 +110,21 @@ SDM sdm(serSDM, 2400);
 #include "qswifidimmer.h"
 #undef CPUSLEEP
 #define CPUSLEEP 5
+#undef MQTTRESTARTTIMEOUT
 #endif
 
 #ifdef  ESPMQTT_QSWIFISWITCH1C
+#undef MQTTRESTARTTIMEOUT
 #define FIRMWARE_TARGET "QSWIFISWITCH1C"
 #define APONBOOT
 #define QSWIFISWITCHCHANNELS 1
 #include "qswifiswitch.h"
 QsWifiSwitch qswifiswitch(QSWIFISWITCHCHANNELS);
+#undef MQTTRESTARTTIMEOUT
 #endif
 
 #ifdef  ESPMQTT_QSWIFISWITCH2C
+#undef MQTTRESTARTTIMEOUT
 #define FIRMWARE_TARGET "QSWIFISWITCH2C"
 #define APONBOOT
 #define QSWIFISWITCHCHANNELS 2
@@ -257,6 +264,7 @@ QsWifiSwitch qswifiswitch(QSWIFISWITCHCHANNELS);
 #endif
 
 #ifdef  ESPMQTT_GARDEN
+#undef MQTTRESTARTTIMEOUT
 #define FIRMWARE_TARGET "GARDEN"
 #ifndef ARDUINO_ESP8266_ESP01
 #error "Wrong board selected! Select Generic ESP8285 module"
@@ -265,6 +273,7 @@ QsWifiSwitch qswifiswitch(QSWIFISWITCHCHANNELS);
 #endif
 
 #ifdef  ESPMQTT_IRRIGATION
+#undef MQTTRESTARTTIMEOUT
 #define FIRMWARE_TARGET "IRRIGATION"
 uint32_t sonoffch_starttime[4];
 static bool sonoffch_timeout_enabled[4] = {1, 1, 1, 0};
@@ -276,6 +285,7 @@ static bool sonoffch_timeout_enabled[4] = {1, 1, 1, 0};
 #endif
 
 #ifdef  ESPMQTT_SONOFF4CH
+#undef MQTTRESTARTTIMEOUT
 #ifndef FIRMWARE_TARGET
 #define FIRMWARE_TARGET "SONOFF4CH"
 #endif
@@ -291,6 +301,7 @@ static bool sonoff_oldbuttons[4] = {1, 1, 1, 1};
 #endif
 
 #ifdef  ESPMQTT_RELAY
+#undef MQTTRESTARTTIMEOUT
 #ifndef FIRMWARE_TARGET
 #define FIRMWARE_TARGET "RELAY"
 #endif
@@ -304,6 +315,7 @@ static bool sonoff_oldbuttons[2] = {1};
 
 
 #ifdef  ESPMQTT_SONOFFDUAL
+#undef MQTTRESTARTTIMEOUT
 #ifndef FIRMWARE_TARGET
 #define FIRMWARE_TARGET "SONOFFDUAL"
 #endif
@@ -331,6 +343,7 @@ static bool sonoff_oldbuttons[2] = {1, 1};
 
 
 #ifdef  ESPMQTT_BLITZWOLF
+#undef MQTTRESTARTTIMEOUT
 #define FIRMWARE_TARGET "BLITZWOLF"
 #ifndef ARDUINO_ESP8266_ESP01
 #error "Wrong board selected! Select Generic ESP8285 module"
@@ -360,6 +373,7 @@ const bool sonoff_ledinverse = 1;
 #endif
 
 #ifdef  ESPMQTT_SONOFFPOW
+#undef MQTTRESTARTTIMEOUT
 #define FIRMWARE_TARGET "SONOFFPOW"
 #ifndef ARDUINO_ESP8266_ESP01
 #error "Wrong board selected! Select Generic ESP8285 module"
@@ -390,6 +404,7 @@ static bool sonoff_oldbuttons[1] = {1};
 
 #ifdef  ESPMQTT_SONOFFPOWR2
 #undef SERIALLOG
+#undef MQTTRESTARTTIMEOUT
 #define FIRMWARE_TARGET "SONOFFPOWR2"
 #ifndef ARDUINO_ESP8266_ESP01
 #error "Wrong board selected! Select Generic ESP8285 module"
@@ -747,7 +762,7 @@ void ICACHE_RAM_ATTR hlw8012_cf_interrupt() {
 #endif
 
 
-void publishdatamap(int32_t packetId = -1, bool publishall = false, bool init = false, bool publishregular = false);
+void publishdatamap(int32_t packetId = -1, bool init = false);
 
 String getRandomString(int len) {
   String alphanum = sF("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz");
@@ -790,13 +805,13 @@ String getdatamapbyindex(uint8_t index)
     }
     case 7: return String(system_get_free_heap_size());
     case 8: return String(100 - ESP.getMaxFreeBlockSize() * 100.0 / ESP.getFreeHeap(), 0);
-    case 9: return chipid;
-    case 10: return WiFi.SSID();
-    case 11: return String(WiFi.RSSI());
-    case 12: return WiFi.macAddress();
-    case 13: return WiFi.status() == WL_CONNECTED ? cF("connected") : cF("disconnected");
-    case 14: return WiFi.localIP().toString();
-    case 15: return WiFi.SSID();
+    case 9: return String(ESP.getSketchSize());
+    case 10: return chipid;
+    case 11: return WiFi.SSID();
+    case 12: return String(WiFi.RSSI());
+    case 13: return WiFi.macAddress();
+    case 14: return WiFi.status() == WL_CONNECTED ? cF("connected") : cF("disconnected");
+    case 15: return WiFi.localIP().toString();
     case 16: return WiFi.BSSIDstr();
     case 17: return String(wifichannel);
     case 18: return mqtt_server;
@@ -833,13 +848,13 @@ String getdatamapkey(uint8_t index)
     case 6: return sF("system/uptime");
     case 7: return sF("system/freeram");
     case 8: return sF("system/ramfrag");
-    case 9: return sF("system/chipid");
-    case 10: return sF("wifi/ssid");
-    case 11: return sF("wifi/rssi");
-    case 12: return sF("wifi/mac");
-    case 13: return sF("wifi/state");
-    case 14: return sF("wifi/localip");
-    case 15: return sF("wifi/ssid");
+    case 9: return sF("system/sketchsize");
+    case 10: return sF("system/chipid");
+    case 11: return sF("wifi/ssid");
+    case 12: return sF("wifi/rssi");
+    case 13: return sF("wifi/mac");
+    case 14: return sF("wifi/state");
+    case 15: return sF("wifi/localip");
     case 16: return sF("wifi/bssid");
     case 17: return sF("wifi/channel");
     case 18: return sF("mqtt/server");
@@ -867,22 +882,28 @@ uint8_t getdatamapsize()
   return dataMap->size() + STATICDATAMAPSIZE;
 }
 
-void setdatamapsend(uint8_t index, bool state)
+void setdatamapsend(uint8_t index, bool state = true)
 {
   if (index < STATICDATAMAPSIZE) bitWrite(staticdatamapsend, index, state);
   else bitWrite(datamapsend, index-STATICDATAMAPSIZE, state);
 }
 
-void setdatamaponair(uint8_t index, bool state)
+void setdatamaponair(uint8_t index, bool state = true)
 {
   if (index < STATICDATAMAPSIZE) bitWrite(staticdatamaponair, index, state);
   else bitWrite(datamaponair, index-STATICDATAMAPSIZE, state);
 }
 
-void setdatamappublishregular(uint8_t index, bool state)
+void setdatamappublishregular(uint8_t index, bool state = true)
 {
   if (index < STATICDATAMAPSIZE) bitWrite(staticdatamappublishregular, index, state);
   else bitWrite(datamappublishregular, index-STATICDATAMAPSIZE, state);
+}
+
+bool getdatamappublishregular(uint8_t index)
+{
+  if (index < STATICDATAMAPSIZE) return bitRead(staticdatamappublishregular, index);
+  else return bitRead(datamappublishregular, index-STATICDATAMAPSIZE);
 }
 
 bool getdatamapsend(uint8_t index)
@@ -897,15 +918,17 @@ bool getdatamaponair(uint8_t index)
   else return bitRead(datamaponair, index-STATICDATAMAPSIZE);
 }
 
-bool getdatamappublishregular(uint8_t index)
-{
-  if (index < STATICDATAMAPSIZE) return bitRead(staticdatamappublishregular, index);
-  else return bitRead(datamappublishregular, index-STATICDATAMAPSIZE);
-}
-
-void setdatamapsendall(bool state = true)
+void datamapsendall(bool state = true)
 {
   for (int index = 0; index < getdatamapsize(); index++) setdatamapsend(index, state);
+}
+
+void datamapsendregular(bool state = true)
+{
+  for (int index = 0; index < getdatamapsize(); index++) 
+  {
+    if (getdatamappublishregular(index)) setdatamapsend(index, state);
+  }
 }
 
 void showdatamap()
@@ -968,6 +991,15 @@ void putdatamap(const char *topic, const String& value, bool sendupdate, bool fo
 
   // Do not output debug for uptime
   if (strcmp(topic, cF("system/uptime")) != 0) if (Debug.isActive(Debug.INFO)) Debug.printf(cF("PUTDATAMAP %s=%s (sendupdate=%d, oldval=%s oldsend=%d forceupdate=%d)\n"), topic, value.c_str(), sendupdate, datamapPayload, getdatamapsend(index), forceupdate);
+}
+
+void initdatamap()
+{
+  setdatamappublishregular(6);
+  setdatamappublishregular(7);
+  setdatamappublishregular(8);
+  setdatamappublishregular(11);
+  setdatamappublishregular(16);
 }
 
 #ifdef  ESPMQTT_BBQTEMP
@@ -2600,6 +2632,7 @@ void loop()
   }
   else publishdatamap();
   yield();
+
   ESP.wdtFeed(); // Prevent watchdog to kick in...
 
   if (triggers.mqttconnected)
@@ -2609,7 +2642,6 @@ void loop()
     //syslogN("Connected to MQTT Server=%s\n", mqtt_server.c_str());
     dotasks();  // Prevent crash because of to many debug data to send
     update_systeminfo(true);
-    setdatamapsendall();
     mqttdosubscriptions(-1);
     updateexternalip();
 #ifdef ESPMQTT_TUYA_2GANGDIMMERV2
@@ -2637,7 +2669,8 @@ void loop()
   if (triggers.mqttsubscribed)
   {
     triggers.mqttsubscribed = false;
-    publishdatamap(-1, true, true);
+    publishdatamap(-1, true);
+    datamapsendall();
   }
   yield();
   ESP.wdtFeed(); // Prevent watchdog to kick in...
@@ -2843,19 +2876,28 @@ void loop()
     yield();
     ESP.wdtFeed(); // Prevent watchdog to kick in...
 
-    if (0 == uptime % 600)
+    // Every 60 minutes (+/- 60 seconds) publish all mqtt data
+    static int8_t randomfactor = random(-60, 60);
+    if ((uptime > 120) && (((uptime + randomfactor) % 3600) == 0))
     {
-      updateexternalip();
+      if (Debug.isActive(Debug.INFO)) Debug.printf(cF("Publishing full datamap...\n"));
+      datamapsendall();
     }
     yield();
     ESP.wdtFeed(); // Prevent watchdog to kick in...
 
-    // Every 10 minutes (+/- 600 seconds) publish all mqtt data
-    static int8_t dividefactor = random(-60, 60);
-    if ((uptime > 60) && (((uptime + dividefactor) % 600) == 0))
+    // Every minutes (+/- 6 seconds) publish regular mqtt data
+    if (((uptime + int8_t(randomfactor/10)) % 60) == 0)
     {
       if (Debug.isActive(Debug.INFO)) Debug.printf(cF("Regular publishing datamap...\n"));
-      publishdatamap(-1, false, false, true);
+      datamapsendregular();
+    }
+    yield();
+    ESP.wdtFeed(); // Prevent watchdog to kick in...
+
+    if ((uptime > 120) && (((uptime + randomfactor - 10) % 600) == 0))
+    {
+      updateexternalip();
     }
     yield();
     ESP.wdtFeed(); // Prevent watchdog to kick in...
@@ -2893,16 +2935,16 @@ void loop()
     // Every 10 seconds update system info
     if (0 == uptime % 10) update_systeminfo();
 
-    if (0 == uptime % 60) setdatamapsendall();
-
     espmqtt_handle_modules_1sec();
   }
 
+#ifdef MQTTRESTARTTIMEOUT
   // If there is no connection to MQTT server for 10 minutes reboot
   if ((mainstate.mqttdisconnecttime > 0) && (uptime > (mainstate.mqttdisconnecttime + MQTTRESTARTTIMEOUT)))
   {
     ESP.restart();
   }
+#endif
 }
 
 #ifdef SONOFFCH
@@ -3064,7 +3106,7 @@ void sonoff_handle()
 
 
 // Publish datamap publishes the datamap one by one to mqtt broker to prevent buffer overflow
-void publishdatamap(int32_t packetId, bool publishall, bool init, bool publishregular)
+void publishdatamap(int32_t packetId, bool init)
 {
   static uint16_t datamappointer = 0;
   static int32_t nextpacketId = -1;
@@ -3075,25 +3117,11 @@ void publishdatamap(int32_t packetId, bool publishall, bool init, bool publishre
     waitingforack = false;
     datamappointer = 0;
     nextpacketId = -1;
+    setdatamappublishregular(8);
+    return;
   }
 
-  if ((packetId != -1) || publishall) if (Debug.isActive(Debug.VERBOSE)) Debug.printf(cF("Publishdatamap packetId=%d publishall=%d datamappointer=%d datamapsize=%d nextpacketid=%d waitingforack=%d\n"), packetId, publishall, datamappointer, dataMap->size(), nextpacketId, waitingforack);
-
-  yield();
-
-  if (publishall || publishregular)
-  {
-    for (int8_t publishallpointer = 0; publishallpointer < getdatamapsize(); publishallpointer++)
-    {
-      setdatamaponair(publishallpointer, false);
-      if (publishall) setdatamapsend(publishallpointer, true);
-      if (publishregular) setdatamapsend(publishallpointer, true);
-      //DEBUG("publishallpointer=%d datamapsize=%d\n",publishallpointer, dataMap->size());
-      yield();
-    }
-    datamappointer = 0;
-  }
-
+  if (packetId != -1) if (Debug.isActive(Debug.VERBOSE)) Debug.printf(cF("Publishdatamap packetId=%d datamappointer=%d datamapsize=%d nextpacketid=%d waitingforack=%d\n"), packetId, datamappointer, dataMap->size(), nextpacketId, waitingforack);
   yield();
 
   // If connected to mqtt and waiting for ack wait for packetid which has to be acked
@@ -3124,7 +3152,7 @@ void publishdatamap(int32_t packetId, bool publishall, bool init, bool publishre
   }
 
   // If not waiting for ack search for next item in datamap which has to be send
-  else if (mqttClient.connected() && (WiFi.status() == WL_CONNECTED) && mainstate.mqttsubscribed)
+  else if (mainstate.mqttconnected && mainstate.mqttsubscribed)
   {
     if (datamappointer < getdatamapsize())
     {
@@ -4087,6 +4115,8 @@ void setup() {
   yield();
 
   eeprom_load_variables();
+
+  initdatamap();
 
   update_systeminfo(true);
 
