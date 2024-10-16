@@ -2510,10 +2510,6 @@ void espmqtt_handle_modules_1sec()
 #endif
   }
 
-#ifdef ESPMQTT_WHR930
-  zehnder_whr930.secondTick(uptime);
-#endif
-
   previouswifistatus = WiFi.status();
 }
 

@@ -3,9 +3,14 @@
 #include <iostream>
 #include <algorithm>
 
+#define ZEHNDER_WHR930_COMMINTERVAL 5000
+
 ZEHNDER_WHR930 zehnder_whr930;
 
 using namespace std;
+
+uint16_t whr930_uptime = 0;
+uint16_t whr930_lastresponse = 0;
 
 void ZEHNDER_WHR930::requestData(bool startSequence)
 {  
@@ -21,25 +26,8 @@ void ZEHNDER_WHR930::requestData(bool startSequence)
     switch (sendCounter)
     {
       case 1:
+        if (Debug.isActive(Debug.DEBUG)) Debug.printf(cF("Requesting data from WHR-930\n"));
         putdatamap(cF("status"), F("querying"));
-        sendPacket(0x00CD);
-      break;
-      case 2:
-        sendPacket(0x000B);
-      break;
-      case 3:
-        sendPacket(0x00D1);
-      break;
-      case 4:
-        sendPacket(0x00D9);
-      break;
-      case 5: 
-        sendPacket(0x00DF);
-      break;
-      case 6: 
-        sendPacket(0x00E1);
-      break;
-      case 7:
         if (fanlevel.send)
         {
           uint8_t sendData[1] = {fanlevel.level};
@@ -48,7 +36,7 @@ void ZEHNDER_WHR930::requestData(bool startSequence)
         }
         else sendCleared = true;
       break;        
-      case 8:
+      case 2:
         if (comfort.send)
         {
           uint8_t sendData[1] = {comfort.calculated_temperature};
@@ -57,8 +45,27 @@ void ZEHNDER_WHR930::requestData(bool startSequence)
         }
         else sendCleared = true;
       break;        
+      case 3:
+        sendPacket(0x00CD);
+      break;
+      case 4:
+        sendPacket(0x000B);
+      break;
+      case 5:
+        sendPacket(0x00D1);
+      break;
+      case 6:
+        sendPacket(0x00D9);
+      break;
+      case 7: 
+        sendPacket(0x00DF);
+      break;
+      case 8: 
+        sendPacket(0x00E1);
+      break;
       default: 
         sendCounter = 0;
+        sendCleared = true;
       break;
     }
     if (sendCounter) sendCounter++;
@@ -116,6 +123,8 @@ void ZEHNDER_WHR930::sendPacket(uint16_t command, uint8_t *data, uint8_t length)
 
   Serial.write(packet, packetpointer);
   free(packet);
+
+  lastTXtime = millis();
 }
 
 void ZEHNDER_WHR930::setfanlevel(uint8_t level)
@@ -125,6 +134,7 @@ void ZEHNDER_WHR930::setfanlevel(uint8_t level)
         if (Debug.isActive(Debug.DEBUG)) Debug.printf(cF("setfanlevel(%d)\n"), level);
         fanlevel.level = level;
         fanlevel.send = true;
+        sendCounter = 1;
       }
 }
 
@@ -135,6 +145,7 @@ void ZEHNDER_WHR930::setcomforttemperature(float temperature)
         if (Debug.isActive(Debug.DEBUG)) Debug.printf(cF("setcomforttemperature(%f)\n"), temperature);
         comfort.calculated_temperature = (float)((temperature + 20) * 2);
         comfort.send = true;
+        sendCounter = 1;
       }
 }
 
@@ -149,6 +160,7 @@ void ZEHNDER_WHR930::loop()
 {
   static uint8_t data[40];
   static uint8_t datalength = 0;
+  static bool removed0x7 = false;
 
 
   if (Serial.available())
@@ -165,6 +177,7 @@ void ZEHNDER_WHR930::loop()
     {
       // ACK received
       datalength = 0;
+      if ((sendCounter == 2) || (sendCounter == 3)) sendCleared = true;
     }
 
     if (data[0] != 0x07)
@@ -184,102 +197,105 @@ void ZEHNDER_WHR930::loop()
       // ACK
       datalength = 0;
     }
-    if (datalength > 10)
+
+    if (datalength > 4)
     {
-       uint8_t messagelength = data[4] + 8;
-      // Check if complete packet is received
-      if ((data[0] == 0x7) && (data[1] == 0xF0) && (data[datalength-2] == 0x7) && (data[datalength-1] == 0xF))
+      uint8_t messagelength = data[4] + 8;
+
+      // When a 0x07 value appears in the dataset, another 0x07 is inserted, but not added to the length or the checksum so remove it
+      // but only if we did removed it allready last time to prevent 0x7 0x7 0x7 0x7 t become 0x7 instead of 0x7 0x7.
+      if ((data[0] == 0x7) && (data[1] == 0xF0) && (data[datalength-2] == 0x7) && (data[datalength-1] == 0x7) && !removed0x7)
       {
-        sendCleared = true;
-        if (datalength == messagelength)
+        datalength--;
+        removed0x7 = true;
+      }
+      else removed0x7 = false;
+       
+      // Check if complete packet is received
+      if ((data[0] == 0x7) && (data[1] == 0xF0) && (data[datalength-2] == 0x7) && (data[datalength-1] == 0xF) && (datalength == messagelength))
+      {
+        uint16_t command = (data[2] << 8) + data[3];
+        if (Debug.isActive(Debug.DEBUG)) Debug.printf(cF("Command received:0x%x\n"), command);
+        switch (command)
         {
-          uint16_t command = (data[2] << 8) + data[3];
-          if (Debug.isActive(Debug.DEBUG)) Debug.printf(cF("Command received:0x%x\n"), command);
-          switch (command)
-          {
-            case 0x00CE:
-                if (datalength >= 16+3)
-              {
-                putdatamap(cF("fanlevel"), data[13]);
-                putdatamap(cF("exhaust/fan/current"), data[11]);
-                putdatamap(cF("exhaust/fan/absent"), data[5]);
-                putdatamap(cF("exhaust/fan/low"), data[6]);
-                putdatamap(cF("exhaust/fan/medium"), data[7]);
-                putdatamap(cF("exhaust/fan/high"), data[15]);
-                putdatamap(cF("intake/fan/active"), data[14]);
-                putdatamap(cF("intake/fan/current"), data[12]);
-                putdatamap(cF("intake/fan/absent"), data[8]);
-                putdatamap(cF("intake/fan/low"), data[9]);
-                putdatamap(cF("intake/fan/medium"), data[10]);
-                putdatamap(cF("intake/fan/high"), data[16]);
-              }
-            break;
-            case 0x000C:
-              if (datalength >= 10+3)
-              {
-                putdatamap(cF("intake/fan/rpm"),  1875000 / ((data[7] << 8) + data[8]));
-                putdatamap(cF("exhaust/fan/rpm"), 1875000 / ((data[9] << 8) + data[10]));
-              }
-            break;
-            case 0x00D2:
-              if (datalength >= 9+3)
-              {
-                char floatvalue[5];
-                snprintf(floatvalue, 5, "%.1f", float(data[5])/ 2.0 - 20);
-                putdatamap(cF("comfort/temperature"), floatvalue);
-                snprintf(floatvalue, 5, "%.1f", float(data[6])/ 2.0 - 20);
-                putdatamap(cF("intake/temperature"), floatvalue);
-                snprintf(floatvalue, 5, "%.1f", float(data[7])/ 2.0 - 20);
-                putdatamap(cF("supply/temperature"), floatvalue);
-                snprintf(floatvalue, 5, "%.1f", float(data[8])/ 2.0 - 20);
-                putdatamap(cF("extract/temperature"), floatvalue);
-                snprintf(floatvalue, 5, "%.1f", float(data[9])/ 2.0 - 20);
-                putdatamap(cF("exhaust/temperature"), floatvalue);
-              }
-            break;
-            case 0x00DA:
-              if (datalength >= 13+3)
-              {
-                putdatamap(cF("filterfull"), data[13]);
-              }
-            break;
-            case 0x00E0:
-              if (datalength >= 11+3)
-              {
-                putdatamap(cF("bypass/factor"), data[7]);
-                putdatamap(cF("bypass/level"), data[8]);
-                putdatamap(cF("bypass/correction"), data[9]);
-                putdatamap(cF("bypass/summermode"), data[11]);
-              }
-            break;
-            case 0x00E2:
-              if (datalength >= 10+3)
-              {
-                putdatamap(cF("bypass/status"), data[5]);
-                putdatamap(cF("frostprotection/heater"), data[7]);
-                putdatamap(cF("frostprotection/status"), data[6]);
-                putdatamap(cF("frostprotection/minutes"), (data[8] << 8) + data[9]);
-                putdatamap(cF("frostprotection/level"), data[10]);
-                putdatamap(cF("status"), F("ready"));
-              }
-            break;
-          }
-          datalength = 0;
+          case 0x00CE:
+              if (datalength >= 16+3)
+            {
+              putdatamap(cF("fanlevel"), data[13]);
+              putdatamap(cF("exhaust/fan/current"), data[11]);
+              putdatamap(cF("exhaust/fan/absent"), data[5]);
+              putdatamap(cF("exhaust/fan/low"), data[6]);
+              putdatamap(cF("exhaust/fan/medium"), data[7]);
+              putdatamap(cF("exhaust/fan/high"), data[15]);
+              putdatamap(cF("intake/fan/active"), data[14]);
+              putdatamap(cF("intake/fan/current"), data[12]);
+              putdatamap(cF("intake/fan/absent"), data[8]);
+              putdatamap(cF("intake/fan/low"), data[9]);
+              putdatamap(cF("intake/fan/medium"), data[10]);
+              putdatamap(cF("intake/fan/high"), data[16]);
+            }
+          break;
+          case 0x000C:
+            if (datalength >= 10+3)
+            {
+              putdatamap(cF("intake/fan/rpm"),  1875000 / ((data[7] << 8) + data[8]));
+              putdatamap(cF("exhaust/fan/rpm"), 1875000 / ((data[9] << 8) + data[10]));
+            }
+          break;
+          case 0x00D2:
+            if (datalength >= 9+3)
+            {
+              char floatvalue[5];
+              snprintf(floatvalue, 5, "%.1f", float(data[5])/ 2.0 - 20);
+              putdatamap(cF("comfort/temperature"), floatvalue);
+              snprintf(floatvalue, 5, "%.1f", float(data[6])/ 2.0 - 20);
+              putdatamap(cF("intake/temperature"), floatvalue);
+              snprintf(floatvalue, 5, "%.1f", float(data[7])/ 2.0 - 20);
+              putdatamap(cF("supply/temperature"), floatvalue);
+              snprintf(floatvalue, 5, "%.1f", float(data[8])/ 2.0 - 20);
+              putdatamap(cF("extract/temperature"), floatvalue);
+              snprintf(floatvalue, 5, "%.1f", float(data[9])/ 2.0 - 20);
+              putdatamap(cF("exhaust/temperature"), floatvalue);
+            }
+          break;
+          case 0x00DA:
+            if (datalength >= 13+3)
+            {
+              putdatamap(cF("filterfull"), data[13]);
+            }
+          break;
+          case 0x00E0:
+            if (datalength >= 11+3)
+            {
+              putdatamap(cF("bypass/factor"), data[7]);
+              putdatamap(cF("bypass/level"), data[8]);
+              putdatamap(cF("bypass/correction"), data[9]);
+              putdatamap(cF("bypass/summermode"), data[11]);
+            }
+          break;
+          case 0x00E2:
+            if (datalength >= 10+3)
+            {
+              putdatamap(cF("bypass/status"), data[5]);
+              putdatamap(cF("frostprotection/heater"), data[7]);
+              putdatamap(cF("frostprotection/status"), data[6]);
+              putdatamap(cF("frostprotection/minutes"), (data[8] << 8) + data[9]);
+              putdatamap(cF("frostprotection/level"), data[10]);
+              putdatamap(cF("status"), F("ready"));
+            }
+          break;
         }
+        sendCleared = true;
+        datalength = 0;
       }
     }
   }
   else
   {
   }
-  zehnder_whr930.requestData(false);
-}
-
-void ZEHNDER_WHR930::secondTick(uint16_t uptime)
-{
-  if ((uptime % 10 == 0) && (uptime > 0))
+  this->requestData(false);
+  if(millis() - lastTXtime > ZEHNDER_WHR930_COMMINTERVAL)
   {
-    if (Debug.isActive(Debug.DEBUG)) Debug.printf(cF("Requesting data from WHR-930\n"));
-    zehnder_whr930.requestData(true);
+    this->requestData(true);
   }
 }

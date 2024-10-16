@@ -33,13 +33,16 @@ class ZEHNDER_WHR930
       bool send = 0;
     } comfort;
 
+    //uint16_t uptime = 0;
+    unsigned long lastTXtime = 0;
+
     void sendPacket(uint16_t command, uint8_t *data = nullptr, uint8_t length = 0);
     void requestData(bool startSequence = false);
     static void mqttClientCallback(char* topic, byte* payload, unsigned int length);
   public:
     void loop();
     void setup();
-    static void secondTick(uint16_t uptime);
+    void secondTick(uint16_t uptime);
     void setfanlevel(uint8_t level);
     void setcomforttemperature(float temperature); // In 0,5 degrees celcius
 };
